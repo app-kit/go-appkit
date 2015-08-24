@@ -13,6 +13,21 @@ type BaseAuthItem struct {
 	Data string `sql:type:text; not null`
 }
 
+func(a *BaseAuthItem) GetName() string {
+	return "auth_items"
+}
+
+func (a BaseAuthItem) TableName() string {
+	return "auth_items"
+}
+
+func(a *BaseAuthItem) GetID() string {
+	return ""
+}
+
+func(a *BaseAuthItem) SetID(x string) {
+}
+
 func (b *BaseAuthItem) SetUserID(rawId string) {
 	b.UserID = rawId
 }
@@ -50,7 +65,7 @@ func (b *BaseAuthItem) GetData() (interface{}, error) {
 
 type BaseAuthItemIntID struct {
 	BaseAuthItem
-	UserID uint64
+	UserID uint64 `gorm:"primary_key" sql:"not null;"`
 }
 
 func (u *BaseAuthItemIntID) SetUserID(x string) {
@@ -86,6 +101,10 @@ type BaseUser struct {
  * See https://github.com/manyminds/api2go
  */
 func (u BaseUser) GetName() string {
+	return "users"
+}
+
+func (a BaseUser) TableName() string {
 	return "users"
 }
 
@@ -152,7 +171,7 @@ func (u *BaseUser) GetUpdatedAt() time.Time {
 type BaseUserIntID struct {
 	BaseUser
 
-	ID uint64 `gorm:"primary_key"`
+	ID uint64 `gorm:"primary_key" sql:"not null"`
 }
 
 func (u *BaseUserIntID) SetID(x string) error {
@@ -208,6 +227,32 @@ type BaseSession struct {
 	UserID string `sql:"-"`
 	StartedAt  time.Time `sql:"not null" jsonapi:"name=started-at"`
 	ValidUntil time.Time `sql:"not null" jsonapi:"name=valid-until"`	
+
+	Typ string `sql:"size:100; not null"`
+}
+
+func (b BaseSession) GetName() string {
+	return "sessions"
+}
+
+func (b BaseSession) TableName() string {
+	return "sessions"
+}
+
+func (s BaseSession) GetID() string {
+	return s.Token
+}
+
+func (s *BaseSession) SetID(x string) {
+	s.Token = x
+}
+
+func(s *BaseSession) GetType() string {
+	return s.Typ
+}
+
+func(s *BaseSession) SetType(x string) {
+	s.Typ = x
 }
 
 func (s *BaseSession) SetToken(x string) {
@@ -248,7 +293,7 @@ func (s *BaseSession) IsGuest() bool {
 
 type BaseSessionIntID struct {
 	BaseSession
-	UserID uint64 `sql:"not null;"`
+	UserID uint64 `gorm:"primary_key" sql:"not null;"`
 }
 
 func (u *BaseSessionIntID) SetUserID(x string) {

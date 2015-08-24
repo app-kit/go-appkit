@@ -1,6 +1,5 @@
-package kit
+package gorm
 
 import (
-
 )
 

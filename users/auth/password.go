@@ -1,4 +1,4 @@
-package users
+package auth
 
 import (
 	"errors"
@@ -52,10 +52,6 @@ func (a AuthAdaptorPassword) Authenticate(rawData, rawCheckable interface{}) (bo
 		return false, errors.New("invalid_data")
 	}
 
-	rawHash, err := bcrypt.GenerateFromPassword([]byte(pw), 10)
-	if err != nil {
-		return false, err
-	}
-
-	return string(rawHash) == hash, nil
+	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw))
+	return err == nil, err
 }
