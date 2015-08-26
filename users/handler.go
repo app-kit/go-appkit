@@ -3,82 +3,82 @@ package users
 import(
 	"time"
 
-	"github.com/theduke/appkit"
+	kit "github.com/theduke/appkit"
 	"github.com/theduke/appkit/users/auth"
 )
 
 type UserHandler struct {
-	Users appkit.ApiResource
-	Sessions appkit.ApiResource
-	AuthItems appkit.ApiResource
+	Users kit.ApiResource
+	Sessions kit.ApiResource
+	AuthItems kit.ApiResource
 
-	AuthAdaptors map[string]appkit.ApiAuthAdaptor
+	AuthAdaptors map[string]kit.ApiAuthAdaptor
 }
 
 func NewUserHandler() *UserHandler {
 	h := UserHandler{}
-	h.AuthAdaptors = make(map[string]appkit.ApiAuthAdaptor)
+	h.AuthAdaptors = make(map[string]kit.ApiAuthAdaptor)
 
 	// Register auth adaptors.
 	h.AddAuthAdaptor(auth.AuthAdaptorPassword{})
 
 	// Build resources.
-	users := UserResource{}
-	users.Model = &BaseUserIntID{}
-	h.Users = &users
+	users := kit.NewResource(&BaseUserIntID{}, UserResourceHooks{})
+	h.Users = users
 
-	sessions := SessionResource{}
-	sessions.Model = &BaseSessionIntID{}
-	h.Sessions = &sessions
+	sessions := kit.NewResource(&BaseSessionIntID{}, SessionResourceHooks{
+		ApiUpdateAllowed: false,
+		ApiDeleteAllowed: false,
+	})
+	h.Sessions = sessions
 
-	auths := appkit.Resource{}
-	auths.Model = &BaseAuthItemIntID{}
-	h.AuthItems = &auths
+	auths := kit.NewResource(&BaseAuthItemIntID{}, nil)
+	h.AuthItems = auths
 
 	return &h
 }
 
-func (h *UserHandler) GetAuthAdaptor(name string) appkit.ApiAuthAdaptor {
+func (h *UserHandler) GetAuthAdaptor(name string) kit.ApiAuthAdaptor {
 	return h.AuthAdaptors[name];
 }
 
-func (h *UserHandler) AddAuthAdaptor(a appkit.ApiAuthAdaptor) {
+func (h *UserHandler) AddAuthAdaptor(a kit.ApiAuthAdaptor) {
 	h.AuthAdaptors[a.GetName()] = a
 }
 
-func(h *UserHandler) GetUserResource() appkit.ApiResource {
+func(h *UserHandler) GetUserResource() kit.ApiResource {
 	return h.Users
 }
 
-func(h *UserHandler) SetUserResource(x appkit.ApiResource) {
+func(h *UserHandler) SetUserResource(x kit.ApiResource) {
 	h.Users = x
 }
 
-func(h *UserHandler) GetSessionResource() appkit.ApiResource {
+func(h *UserHandler) GetSessionResource() kit.ApiResource {
 	return h.Sessions
 }
 
-func(h *UserHandler) SetSessionResource(x appkit.ApiResource) {
+func(h *UserHandler) SetSessionResource(x kit.ApiResource) {
 	h.Sessions = x
 }
 
-func(h *UserHandler) GetAuthItemResource() appkit.ApiResource {
+func(h *UserHandler) GetAuthItemResource() kit.ApiResource {
 	return h.AuthItems
 }
 
-func(h *UserHandler) SetAuthItemResource(x appkit.ApiResource) {
+func(h *UserHandler) SetAuthItemResource(x kit.ApiResource) {
 	h.AuthItems = x
 }
 
-func (h *UserHandler) CreateUser(user appkit.ApiUser, adaptorName string, authData interface{}) appkit.ApiError {
+func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData interface{}) kit.ApiError {
 	adaptor := h.GetAuthAdaptor(adaptorName)
 	if adaptor == nil  {
-		return appkit.Error{Code: "unknown_auth_adaptor"}
+		return kit.Error{Code: "unknown_auth_adaptor"}
 	}
 
 	data, err := adaptor.BuildData(authData)
 	if err != nil {
-		return appkit.Error{Code: "adaptor_error", Message: err.Error()}
+		return kit.Error{Code: "adaptor_error", Message: err.Error()}
 	}
 
 	if user.GetUsername() == "" {
@@ -86,63 +86,59 @@ func (h *UserHandler) CreateUser(user appkit.ApiUser, adaptorName string, authDa
 	}
 	
 	// Check if user with same username or email exists.
-	q := map[string]interface{}{"email": user.GetEmail()}
-	if u, err := h.Users.FindOneBy(q); err != nil {
-		return err
-	} else if u != nil {
-		return appkit.Error{Code: "email_exists"}
+	oldUser, err2 := h.Users.GetQuery().
+	  Filter("email", user.GetEmail()).Or("username", user.GetUsername()).First()
+	if err2 != nil {
+		return err2
+	} else if oldUser != nil {
+		return kit.Error{
+			Code: "user_exists", 
+			Message: "A user with the username or email already exists",
+		}
 	}
 
-	q = map[string]interface{}{"username": user.GetUsername()}
-	if u, err := h.Users.FindOneBy(q); err != nil {
-		return err
-	} else if u != nil {
-		return appkit.Error{Code: "username_exists"}
-	}
-
-	if err := h.Users.GetBackend().Create(user); err != nil {
+	if err := h.Users.Create(user, nil); err != nil {
 		return err
 	}
 
-	rawAuth, _ := h.AuthItems.GetBackend().GetType(h.AuthItems.GetModel().GetName())
-	auth := rawAuth.(appkit.ApiAuthItem)
+	rawAuth, _ := h.AuthItems.GetBackend().NewModel(h.AuthItems.GetModel().GetCollection())
+	auth := rawAuth.(kit.ApiAuthItem)
 	auth.SetUserID(user.GetID())
 	auth.SetType(adaptorName)
 	auth.SetData(data)
 
-	if err := h.AuthItems.Create(auth); err != nil {
-		h.Users.Delete(user)
-		return appkit.Error{Code: "auth_save_failed", Message: err.Error()}
+	if err := h.AuthItems.Create(auth, nil); err != nil {
+		h.Users.Delete(user, nil)
+		return kit.Error{Code: "auth_save_failed", Message: err.Error()}
 	}
 
 	return nil
 }
 
-func (h *UserHandler) AuthenticateUser(user appkit.ApiUser, authAdaptorName string, data interface{}) appkit.ApiError {
+func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string, data interface{}) kit.ApiError {
 	if !user.IsActive() {
-		return appkit.Error{Code: "user_inactive"}
+		return kit.Error{Code: "user_inactive"}
 	}
 
 	authAdaptor := h.GetAuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
-		return appkit.Error{
+		return kit.Error{
 			Code: "unknown_auth_adaptor", 
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
 
-	rawAuth, err := h.AuthItems.FindOneBy(map[string]interface{}{
-		"typ": authAdaptorName,
-		"user_id": user.GetID(),
-	})
+	rawAuth, err := h.AuthItems.GetQuery().
+	  Filter("typ", authAdaptorName).And("user_id", user.GetID()).First()
+
 	if err != nil {
-		return appkit.Error{Code: "auth_error", Message: err.Error()}
+		return err
 	}
 
-	auth := rawAuth.(appkit.ApiAuthItem)
+	auth := rawAuth.(kit.ApiAuthItem)
 
 	cleanData, err2 := auth.GetData()
 	if err2 != nil {
-		return appkit.Error{
+		return kit.Error{
 			Code: "invalid_auth_data", 
 			Message: err.Error(),
 		}
@@ -150,43 +146,43 @@ func (h *UserHandler) AuthenticateUser(user appkit.ApiUser, authAdaptorName stri
 
 	ok, err2 := authAdaptor.Authenticate(cleanData, data)
 	if err2 != nil {
-		return appkit.Error{Code: "auth_error", Message: err.Error()}
+		return kit.Error{Code: "auth_error", Message: err.Error()}
 	}
 	if !ok {
-		return appkit.Error{Code: "invalid_credentials"}
+		return kit.Error{Code: "invalid_credentials"}
 	}
 
 	return nil
 }
 
-func (h *UserHandler) VerifySession(token string) (appkit.ApiUser, appkit.ApiSession, appkit.ApiError) {
-	rawSession, err := h.Sessions.FindOneBy(map[string]interface{}{"token": token})
+func (h *UserHandler) VerifySession(token string) (kit.ApiUser, kit.ApiSession, kit.ApiError) {
+	rawSession, err := h.Sessions.FindOne(token)
 	if err != nil {
 		return nil, nil, err
 	}
 	if rawSession == nil {
-		return nil, nil, appkit.Error{Code: "session_not_found"}
+		return nil, nil, kit.Error{Code: "session_not_found"}
 	}
-	session := rawSession.(appkit.ApiSession)
+	session := rawSession.(kit.ApiSession)
 
 	// Load user.
 	rawUser, err := h.GetUserResource().FindOne(session.GetUserID())
 	if err != nil {
 		return nil, nil, err
 	}
-	user := rawUser.(appkit.ApiUser)
+	user := rawUser.(kit.ApiUser)
 
 	if !user.IsActive() {
-		return nil, nil, appkit.Error{Code: "user_inactive"}
+		return nil, nil, kit.Error{Code: "user_inactive"}
 	}
 
 	if session.GetValidUntil().Sub(time.Now()) < 1 {
-		return nil, nil, appkit.Error{Code: "session_expired"}
+		return nil, nil, kit.Error{Code: "session_expired"}
 	}
 
 	// Prolong session
 	session.SetValidUntil(time.Now().Add(time.Hour * 12))
-	if err := h.Sessions.Update(session); err != nil {
+	if err := h.Sessions.Update(session, nil); err != nil {
 		return nil, nil, err
 	}
 

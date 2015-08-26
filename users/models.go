@@ -7,10 +7,14 @@ import (
 )
 
 type BaseAuthItem struct {
-	UserID string `sql:"-"`
+	UserID string `sql:"-" db:"primary_key"`
 	Typ string `sql:"size: 100; not null"`
 
 	Data string `sql:type:text; not null`
+}
+
+func(a *BaseAuthItem) GetCollection() string {
+	return "auth_items"
 }
 
 func(a *BaseAuthItem) GetName() string {
@@ -22,10 +26,11 @@ func (a BaseAuthItem) TableName() string {
 }
 
 func(a *BaseAuthItem) GetID() string {
-	return ""
+		return ""
 }
 
-func(a *BaseAuthItem) SetID(x string) {
+func(a *BaseAuthItem) SetID(x string) error {
+	return nil
 }
 
 func (b *BaseAuthItem) SetUserID(rawId string) {
@@ -83,8 +88,6 @@ func (u *BaseAuthItemIntID) GetUserID() string {
 
 
 type BaseUser struct {
-	ID string `sql:"-"`
-
 	Active bool `sql:"not null"`
 
 	Username string `sql:"size:100; not null; unique"`
@@ -96,11 +99,12 @@ type BaseUser struct {
 	UpdatedAt time.Time `jsonapi:"name=updated-at"`
 }
 
-/**
- * Implements api2go interface.
- * See https://github.com/manyminds/api2go
- */
-func (u BaseUser) GetName() string {
+func (u BaseUser) GetCollection() string {
+	return "users"
+}
+
+// For api2go!
+func(a *BaseUser) GetName() string {
 	return "users"
 }
 
@@ -110,14 +114,6 @@ func (a BaseUser) TableName() string {
 
 // Implement User interface.
 
-func (u *BaseUser) SetID(x string) error {
-	u.ID = x
-	return nil
-}
-
-func (u *BaseUser) GetID() string {
-	return u.ID
-}
 
 func (u *BaseUser) SetIsActive(x bool) {
 	u.Active = x	
@@ -174,6 +170,11 @@ type BaseUserIntID struct {
 	ID uint64 `gorm:"primary_key" sql:"not null"`
 }
 
+// For api2go!
+func (u BaseUserIntID) GetName() string {
+	return "users"
+}
+
 func (u *BaseUserIntID) SetID(x string) error {
 	i, err := strconv.ParseUint(x, 10, 64)
 	if err != nil {
@@ -223,7 +224,7 @@ func (p *BaseUserProfileIntID) GetUserID() string {
  */
 
 type BaseSession struct {
-	Token string `gorm:"primary_key" sql:"size:100"`
+	Token string `gorm:"primary_key" db:"primary_key" sql:"size:100"`
 	UserID string `sql:"-"`
 	StartedAt  time.Time `sql:"not null" jsonapi:"name=started-at"`
 	ValidUntil time.Time `sql:"not null" jsonapi:"name=valid-until"`	
@@ -231,6 +232,11 @@ type BaseSession struct {
 	Typ string `sql:"size:100; not null"`
 }
 
+func (b BaseSession) GetCollection() string {
+	return "sessions"
+}
+
+// For api2go.
 func (b BaseSession) GetName() string {
 	return "sessions"
 }
@@ -243,8 +249,9 @@ func (s BaseSession) GetID() string {
 	return s.Token
 }
 
-func (s *BaseSession) SetID(x string) {
+func (s *BaseSession) SetID(x string) error {
 	s.Token = x
+	return nil
 }
 
 func(s *BaseSession) GetType() string {

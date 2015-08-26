@@ -5,7 +5,8 @@ import(
 	"math/big"	
 	"time"
 
-	"github.com/theduke/appkit"
+	kit "github.com/theduke/appkit"
+	db "github.com/theduke/dukedb"
 )
 
 func randomToken() string {
@@ -31,31 +32,29 @@ func randomToken() string {
 	return string(bytes)
 }
 
-type SessionResource struct {
-	appkit.Resource
-	UserHandler UserHandler
+type SessionResourceHooks struct {
+	ApiUpdateAllowed bool
+	ApiDeleteAllowed bool
 }
 
-func (res SessionResource) StartSession(user appkit.ApiUser) (appkit.ApiSession, appkit.ApiError) {
+func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, kit.ApiError) {
 	token := randomToken()
 	if token == "" {
-		return nil, appkit.Error{Code: "token_creation_failed"}
+		return nil, kit.Error{Code: "token_creation_failed"}
 	}
 
-	rawSession, err := res.Backend.GetType(res.Model.GetName())
+	rawSession, err := res.GetBackend().NewModel(res.GetModel().GetCollection())
 	if err != nil  {
 		return nil, err
 	}
-
-	// TOdo: fix this.
-	session := rawSession.(appkit.ApiSession)
+	session := rawSession.(kit.ApiSession)
 
 	session.SetUserID(user.GetID())
 	session.SetToken(token)
 	session.SetStartedAt(time.Now())
 	session.SetValidUntil(time.Now().Add(time.Hour * 12))
 
-	err = res.Create(session)
+	err = res.Create(session, nil	)
 	if err != nil {
 		return nil, err
 	}
@@ -63,111 +62,88 @@ func (res SessionResource) StartSession(user appkit.ApiUser) (appkit.ApiSession,
 	return session, nil
 }
 
-func (res SessionResource) ApiCreate(obj appkit.ApiModel, r appkit.ApiRequest) appkit.ApiResponse {
+func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
 	meta := r.GetMeta()
 
 	userIdentifier := meta.GetString("user")
 	if userIdentifier == "" {
-		return appkit.NewErrorResponse("user_missing", "Expected 'user' in metadata.")
+		return kit.NewErrorResponse("user_missing", "Expected 'user' in metadata.")
 	}
 
 	// Find user.
-	userResource := res.UserHandler.GetUserResource()
+	userResource := res.GetUserHandler().GetUserResource()
 
-	rawUser, err := userResource.FindOneBy(map[string]interface{}{"email": userIdentifier})
+	rawUser, err := userResource.GetQuery().
+	  Filter("username", userIdentifier).Or("email", userIdentifier).First()
+
 	if err != nil {
-		return appkit.Response{Error: err}
+		return kit.Response{Error: err}
+	} else if rawUser == nil {
+		return kit.NewErrorResponse("user_not_found", "User not found for identifier: " + userIdentifier)
 	}
-	if rawUser == nil {
-		rawUser, err = userResource.FindOneBy(map[string]interface{}{"username": userIdentifier})
-		if err != nil {
-			return appkit.Response{Error: err}
-		}
-		if rawUser == nil {
-			return appkit.NewErrorResponse("user_not_found", "User not found for identifier: " + userIdentifier)
-		}
-	}
-	user := rawUser.(appkit.ApiUser)
+
+	user := rawUser.(kit.ApiUser)
 
 	adaptor := meta.GetString("adaptor")
 	if adaptor == "" {
-		return appkit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
+		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
 	}
 
 	data, ok := meta.Get("auth-data")
 	if !ok {
-		return appkit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
+		kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
 	}
 
-	err = res.UserHandler.AuthenticateUser(user, adaptor, data)
+	err = res.GetUserHandler().AuthenticateUser(user, adaptor, data)
 	if err != nil {
-		return appkit.Response{Error: err}
+		return kit.Response{Error: err}
 	}
 
-	session, err := res.StartSession(user)
+	session, err := StartSession(res, user)
 	if err != nil {
-		return appkit.Response{Error: err}
+		return kit.Response{Error: err}
 	}
-
-	return appkit.Response{
-  	Data: session,
-  }
+		
+	return kit.Response{
+		Data: session,
+	}
 }
+
 
 /**
  * User resource.
  */
 
- type UserResource struct {
- 	appkit.Resource
- 	UserHandler UserHandler
- }
-
- func (res UserResource) Create(obj appkit.ApiModel) appkit.ApiError {
- 	panic("Must use UserResource.CreateUser()")
- }
-
-func (res UserResource) CreateUser(user appkit.ApiUser, adaptorName string, adaptorData interface{}) appkit.ApiError {
-	obj := user.(appkit.ApiModel)
-
-	if res.BeforeCreate != nil {
-		if err := res.BeforeCreate(obj); err != nil {
-			return err
-		}
-	}
-
-	if err := res.UserHandler.CreateUser(user, adaptorName, adaptorData); err != nil {
-		return err
-	}
-
-	if res.AfterCreate != nil {
-		if err := res.AfterCreate(obj); err != nil {
-			return err
-		}
-	}
-
-	return nil
+type UserResourceHooks struct {
 }
 
-func (res UserResource) ApiCreate(obj appkit.ApiModel, r appkit.ApiRequest) appkit.ApiResponse {
- 	meta := r.GetMeta()
+func (hooks UserResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
+	meta := r.GetMeta()
 
  	adaptor := meta.GetString("adaptor")
 	if adaptor == "" {
-		return appkit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
+		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
 	}
 
 	data, ok := meta.Get("auth-data")
 	if !ok {
-		return appkit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
+		return kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
 	}
 
-	err := res.CreateUser(obj.(appkit.ApiUser), adaptor, data)
-	if err != nil {
-		return appkit.Response{Error: err}
+	user := obj.(kit.ApiUser)
+	if err := res.GetUserHandler().CreateUser(user, adaptor, data); err != nil {
+		return kit.Response{Error: err}
 	}
 
-	return appkit.Response{
-  	Data: obj,
-  }
+	return kit.Response{
+		Data: user,
+	}
+}
+
+func (hooks UserResourceHooks) UserCanUpdate(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
+	return obj.GetID() == user.GetID()
+}
+
+func (hooks UserResourceHooks) UserCanDelete(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
+	return obj.GetID() == user.GetID()
 }

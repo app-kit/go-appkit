@@ -1,4 +1,4 @@
-package app
+package appkit
 
 import (
 	"log"
@@ -9,8 +9,7 @@ import (
 	"github.com/manyminds/api2go"
 	"github.com/olebedev/config"
 
-	kit "github.com/theduke/appkit"
-	"github.com/theduke/appkit/servers"
+	db "github.com/theduke/dukedb"
 )
 
 type App struct {
@@ -18,17 +17,17 @@ type App struct {
 	ENV string
 	Config *config.Config
 
-	DefaultBackend kit.Backend
-	backends map[string]kit.Backend
+	DefaultBackend db.Backend
+	backends map[string]db.Backend
 
-	resources map[string]kit.ApiResource
-	userHandler kit.ApiUserHandler
+	resources map[string]ApiResource
+	userHandler ApiUserHandler
 }
 
 func NewApp(cfgPath string) *App {
 	app := App{}
-	app.resources = make(map[string]kit.ApiResource)
-	app.backends = make(map[string]kit.Backend)
+	app.resources = make(map[string]ApiResource)
+	app.backends = make(map[string]db.Backend)
 
 	app.ReadConfig(cfgPath)
 
@@ -69,6 +68,7 @@ func (a *App) ReadConfig(path string) {
 		env = "dev"
 		log.Printf("No environment specified, defaulting to 'dev'\n")
 	}
+	a.ENV = env
 
 	if envConf, _ := cfg.Get(env); envConf != nil {
 		cfg = envConf
@@ -82,7 +82,7 @@ func (a *App) Run() {
 
 	for key := range a.resources {
 		res := a.resources[key]
-		api.AddResource(res.GetModel(), servers.Api2GoResource{
+		api.AddResource(res.GetModel(), Api2GoResource{
 			AppResource: res,
 		})
 	}
@@ -98,14 +98,14 @@ func (a *App) Run() {
 	}
 }
 
-func (a *App) RegisterBackend(name string, b kit.Backend) {
+func (a *App) RegisterBackend(name string, b db.Backend) {
 	a.backends[name] = b
 	if a.DefaultBackend == nil {
 		a.DefaultBackend = b
 	}
 }
 
-func (a *App) GetBackend(name string) kit.Backend {
+func (a *App) GetBackend(name string) db.Backend {
 	b, ok := a.backends[name]
 	if !ok {
 		panic("Unknown backend: " + name)
@@ -114,29 +114,37 @@ func (a *App) GetBackend(name string) kit.Backend {
 	return b
 }
 
-func (a *App) RegisterResource(res kit.ApiResource) {
+func (a *App) RegisterResource(model db.Model, hooks ApiHooks) {
+	res := NewResource(model, hooks)
+	a.RegisterCustomResource(res)
+}
+
+func (a *App) RegisterCustomResource(res ApiResource) {
+	res.SetDebug(a.Debug)
 	if res.GetBackend() == nil {
 		if a.DefaultBackend == nil {
 			panic("Registering resource without backend, but no default backend set.")
 		}
 
 		log.Printf("Using default backend %v for resource %v", 
-			a.DefaultBackend.GetName(), res.GetModel().GetName())
-
-		// Register model with the backend.
-		a.DefaultBackend.RegisterModel(res.GetModel())
+			a.DefaultBackend.GetName(), res.GetModel().GetCollection())
 
 		// Set backend.
 		res.SetBackend(a.DefaultBackend)
-	}
-	a.resources[res.GetModel().GetName()] = res
+	} 
 
+	// Register model with the backend.
+	res.GetBackend().RegisterModel(res.GetModel())
+
+	// Set userhandler if neccessary.
 	if res.GetUserHandler() == nil {
 		res.SetUserHandler(a.userHandler)
 	}
+
+	a.resources[res.GetModel().GetCollection()] = res
 }
 
-func (a App) GetResource(name string) kit.ApiResource {
+func (a App) GetResource(name string) ApiResource {
 	r, ok := a.resources[name]
 	if !ok {
 		panic("Unknown resource: " + name)
@@ -145,10 +153,10 @@ func (a App) GetResource(name string) kit.ApiResource {
 	return r
 }
 
-func (a *App) RegisterUserHandler(h kit.ApiUserHandler) {
+func (a *App) RegisterUserHandler(h ApiUserHandler) {
 	a.userHandler = h
-	a.RegisterResource(h.GetUserResource())
-	a.RegisterResource(h.GetSessionResource())
+	a.RegisterCustomResource(h.GetUserResource())
+	a.RegisterCustomResource(h.GetSessionResource())
 
 	auth := h.GetAuthItemResource()
 	if auth.GetBackend() == nil {
@@ -157,6 +165,6 @@ func (a *App) RegisterUserHandler(h kit.ApiUserHandler) {
 	}
 }
 
-func (a App) GetUserHandler() kit.ApiUserHandler {
+func (a App) GetUserHandler() ApiUserHandler {
 	return a.userHandler
 }

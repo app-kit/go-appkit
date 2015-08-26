@@ -1,5 +1,0 @@
-package gorm
-
-import (
-)
-

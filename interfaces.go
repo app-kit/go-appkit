@@ -1,48 +1,8 @@
 package appkit
 
 import (
-	
+	db "github.com/theduke/dukedb"	
 )
-
-type ApiConfig interface{
-
-}
-
-/**
- * Resource.
- */
-
- type ApiResource interface {
- 	GetBackend() Backend
- 	SetBackend(Backend)
-
- 	GetDebug() bool
- 	SetDebug(bool)
-
- 	SetUserHandler(ApiUserHandler)
-	GetUserHandler() ApiUserHandler
-
- 	GetModel() ApiModel
- 	SetModel(ApiModel)
-
-	FindOneBy(map[string]interface{}) (ApiModel, ApiError)
- 	FindOne(id string) (ApiModel, ApiError)
- 	ApiFindOne(id string, r ApiRequest) ApiResponse
-
- 	FindBy(map[string]interface{}) ([]ApiModel, ApiError)
- 	Find(Query) ([]ApiModel, ApiError)
- 	ApiFind(RawQuery, ApiRequest) ApiResponse
-
- 	Create(obj ApiModel) ApiError
- 	ApiCreate(obj ApiModel, r ApiRequest) ApiResponse
-
- 	Update(obj ApiModel) ApiError
- 	ApiUpdate(obj ApiModel, r ApiRequest) ApiResponse
-
- 	Delete(obj ApiModel) ApiError
- 	ApiDelete(id string, r ApiRequest) ApiResponse
-}
-
 
 /**
  * API interface.
@@ -62,44 +22,161 @@ type ApiResponse interface {
 	GetData() interface{}
 }
 
+
 /**
- * DB interfaces.
+ * Resource.
  */
 
-type ApiModel interface {
-	GetName() string
-	GetID() string
+ type ApiResource interface {
+ 	GetBackend() db.Backend
+ 	SetBackend(db.Backend)
+
+ 	SetHooks(ApiHooks)
+
+ 	GetDebug() bool
+ 	SetDebug(bool)
+
+ 	SetUserHandler(ApiUserHandler)
+	GetUserHandler() ApiUserHandler
+
+ 	GetModel() db.Model
+ 	SetModel(db.Model)
+
+ 	Query(*db.Query) ([]db.Model, ApiError)
+ 	GetQuery() *db.Query
+
+ 	FindOne(id string) (db.Model, ApiError)
+ 	ApiFindOne(id string, r ApiRequest) ApiResponse
+
+ 	Find(*db.Query) ([]db.Model, ApiError)
+ 	ApiFind(*db.Query, ApiRequest) ApiResponse
+
+ 	Create(obj db.Model, user ApiUser) ApiError
+ 	ApiCreate(obj db.Model, r ApiRequest) ApiResponse
+
+ 	Update(obj db.Model, user ApiUser) ApiError
+ 	ApiUpdate(obj db.Model, r ApiRequest) ApiResponse
+
+ 	Delete(obj db.Model, user ApiUser) ApiError
+ 	ApiDelete(id string, r ApiRequest) ApiResponse
 }
 
-type Query interface {
-	GetModel() string
-	SetModel(string)
+type ApiHooks interface {
 
-	GetLimit() int
-	SetLimit(int)
-	GetOffset() int
-	SetOffset(int)
 }
 
-type Backend interface {
-	GetName() string
+/**
+ * Query hook.
+ */
 
-	RegisterModel(ApiModel)
+type UserCanQueryHook interface {
+	UserCanQuery(q db.Query, user ApiUser)
+}
 
-	// Get a new struct instance for a model type.
-	GetType(string) (interface{}, ApiError)
-	GetTypeSlice(string) (interface{}, ApiError)
-	
-	Find(Query) ([]ApiModel, ApiError)
-	FindOne(modelType string, id string) (ApiModel, ApiError)
+/**
+ * FindOne hooks.
+ */
 
-	FindBy(modelType string, filters map[string]interface{}) ([]ApiModel, ApiError)
-	FindOneBy(modelType string, filters map[string]interface{}) (ApiModel, ApiError)
+type ApiFindOneHook interface {
+	ApiFindOne(res ApiResource, id string, r ApiRequest) ApiResponse
+}
 
-	BuildQuery(RawQuery) (Query, ApiError)
+type UserCanFindOneHook interface {
+	UserCanFindOne(res ApiResource, obj db.Model, user ApiUser) bool
+}
 
-	Create(ApiModel) ApiError
-	Update(ApiModel) ApiError
-	Delete(ApiModel) ApiError
+type ApiAfterFindOneHook interface {
+	ApiAfterFindOne(res ApiResource, obj db.Model, user ApiUser) ApiError
+}
+
+/**
+ * Find hooks.
+ */
+
+type ApiFindHook interface {
+	ApiFind(res ApiResource, query *db.Query, r ApiRequest) ApiResponse
+}
+
+type UserCanFindHook interface {
+	UserCanFind(res ApiResource, objs []db.Model, user ApiUser) bool
+}
+
+type ApiAfterFindHook interface {
+	ApiAfterFind(res ApiResource, objs []db.Model, user ApiUser) ApiError
+}
+
+/**
+ * Create hooks.
+ */
+
+type ApiCreateHook interface {
+	ApiCreate(res ApiResource, obj db.Model, r ApiRequest) ApiResponse
+}
+
+type CreateHook interface {
+	Create(res ApiResource, obj db.Model, user ApiUser) ApiError
+}
+
+type BeforeCreateHook interface {
+	BeforeCreate(res ApiResource, obj db.Model, user ApiUser) ApiError
+}
+
+type UserCanCreateHook interface {
+	UserCanCreate(res ApiResource, obj db.Model, user ApiUser) bool
+}
+
+type AfterCreateHook interface {
+	AfterCreate(res ApiResource, obj db.Model, user ApiUser) ApiError
+}
+
+
+/**
+ * Update hooks.
+ */
+
+type ApiUpdateHook interface {
+	ApiUpdate(res ApiResource, obj db.Model, r ApiRequest) ApiResponse
+}
+
+type UpdateHook interface {
+	Update(res ApiResource, obj db.Model, r ApiRequest) ApiError
+}
+
+
+type BeforeUpdateHook interface {
+	BeforeUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
+}
+
+type AfterUpdateHook interface {
+	AfterUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
+}
+
+type UserCanUpdateHook interface {
+	UserCanUpdate(res ApiResource, obj db.Model, old db.Model, user ApiUser) bool
+}
+
+
+/**
+ * Delete hooks.
+ */
+
+type ApiDeleteHook interface {
+	ApiDelete(res ApiResource, obj db.Model, r ApiRequest) ApiResponse
+}
+
+type DeleteHook interface {
+	Delete(res ApiResource, obj db.Model, user ApiUser) ApiError
+}
+
+type BeforeDeleteHook interface {
+	BeforeDelete(res ApiResource, obj db.Model, user ApiUser) ApiError
+}
+
+type UserCanDeleteHook interface {
+	UserCanDelete(res ApiResource, obj db.Model, user ApiUser) bool
+}
+
+type AfterDeleteHook interface {
+	AfterDelete(res ApiResource, obj db.Model, user ApiUser) ApiError
 }
 

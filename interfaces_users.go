@@ -2,6 +2,7 @@ package appkit
 
 import (
 	"time"
+	db "github.com/theduke/dukedb"	
 )
 
 type ApiAuthAdaptor interface {
@@ -12,7 +13,7 @@ type ApiAuthAdaptor interface {
 }
 
 type ApiAuthItem interface {
-	ApiModel
+	db.Model
 
 	SetUserID(string)
 	GetUserID() string
@@ -50,7 +51,7 @@ type ApiUserProfile interface {
 }
 
 type ApiUser interface {
-	ApiModel
+	db.Model
 
 	SetIsActive(bool)
 	IsActive() bool
@@ -72,7 +73,7 @@ type ApiUser interface {
 }
 
 type ApiSession interface {
-	ApiModel
+	db.Model
 
 	SetType(string)
 	GetType() string
