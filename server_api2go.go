@@ -117,10 +117,11 @@ func buildRequest(
 	if token := header.Get("Authentication"); token != "" {
 		if userHandler != nil {
 			user, session, err := userHandler.VerifySession(token)	
-
 			if err == nil {
 				req.User = user
 				req.Session = session
+			} else {
+				log.Printf("Could not verify session: %v\n", err)
 			}
 		}
 	}
@@ -169,6 +170,9 @@ func convertResult(res ApiResponse, status int) (api2go.Responder, error) {
 		status := 500
 		if err.GetCode() == "not_found" || err.GetCode() == "record_not_found" {
 			status = 404
+		}
+		if err.GetCode() == "permission_denied" {
+			status = 403
 		}
 		return nil, api2go.NewHTTPError(errors.New(err.GetCode()), err.GetMessage(), status)
 	}

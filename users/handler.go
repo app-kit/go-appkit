@@ -97,6 +97,7 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 		}
 	}
 
+	user.SetIsActive(true)
 	if err := h.Users.Create(user, nil); err != nil {
 		return err
 	}
