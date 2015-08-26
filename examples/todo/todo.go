@@ -95,7 +95,7 @@ func start() error {
 	app.RegisterResource(&Project{}, ProjectHooks{})
 	app.RegisterResource(&Todo{}, nil)
 
-	app.Run()
+	app.RunCli()
 
 	return nil
 }

@@ -8,6 +8,7 @@ import (
 
 	"github.com/manyminds/api2go"
 	"github.com/olebedev/config"
+	"github.com/spf13/cobra"
 
 	db "github.com/theduke/dukedb"
 )
@@ -22,6 +23,8 @@ type App struct {
 
 	resources map[string]ApiResource
 	userHandler ApiUserHandler
+
+	Cli *cobra.Command
 }
 
 func NewApp(cfgPath string) *App {
@@ -29,8 +32,7 @@ func NewApp(cfgPath string) *App {
 	app.resources = make(map[string]ApiResource)
 	app.backends = make(map[string]db.Backend)
 
-	app.ReadConfig(cfgPath)
-
+	app.InitCli()
 	return &app
 }
 
