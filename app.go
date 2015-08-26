@@ -5,6 +5,7 @@ import (
 	"os"
 	"io/ioutil"
 	"net/http"
+	"fmt"
 
 	"github.com/manyminds/api2go"
 	"github.com/olebedev/config"
@@ -16,6 +17,8 @@ import (
 type App struct {
 	Debug bool
 	ENV string
+	AutoMigrate bool
+
 	Config *config.Config
 
 	DefaultBackend db.Backend
@@ -81,6 +84,11 @@ func (a *App) ReadConfig(path string) {
 
 func (a *App) Run() {
 	api := api2go.NewAPI("api")
+
+	// Auto migrate if enabled or not explicitly disabled and env is debug.
+	if auto, err := a.Config.Bool("autoMigrate"); (err == nil && auto) || (err != nil && a.ENV=="dev") {
+		a.MigrateAllBackends(false)
+	}
 
 	for key := range a.resources {
 		res := a.resources[key]
@@ -165,6 +173,44 @@ func (a *App) RegisterUserHandler(h ApiUserHandler) {
 		a.DefaultBackend.RegisterModel(auth.GetModel())
 		auth.SetBackend(a.DefaultBackend)
 	}
+}
+
+func (a *App) MigrateBackend(name string, version int, force bool) ApiError {
+	log.Printf("MIGRATE: Migrating backend '%v'", name)
+	backend := a.GetBackend(name)
+	if backend == nil {
+		return Error{
+			Code: "unknown_backend",
+			Message: fmt.Sprint("The backend '%v' does not exist", name),
+		}
+	}
+
+	migrationBackend, ok := backend.(db.MigrationBackend)
+	if !ok {
+		return Error{
+			Code: "backend_cant_migrate",
+			Message: fmt.Sprintf("The backend '%v' does not support migrations", name),
+		}
+	}
+
+	if version == 0 {
+		return migrationBackend.GetMigrationHandler().Migrate(force)
+	} else {
+		return migrationBackend.GetMigrationHandler().MigrateTo(version, force)
+	}
+
+	return nil
+}
+
+func (a *App) MigrateAllBackends(force bool) ApiError {
+	log.Printf("MIGRATE: Migrating all backends to newest version")
+	for key := range a.backends {
+		if err := a.MigrateBackend(key, 0, force); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 func (a App) GetUserHandler() ApiUserHandler {

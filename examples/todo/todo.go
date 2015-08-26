@@ -75,6 +75,25 @@ func (t Todo) GetCollection() string {
 	return "todos"
 }
 
+func InitMigrations(app *kit.App) {
+	handler := app.GetBackend("gorm").(db.MigrationBackend).GetMigrationHandler()
+	v1 := db.Migration{
+		Name: "create tables",
+		Up: func(b db.MigrationBackend) error {
+			db := b.(*dbgorm.Backend).Db
+			if err := db.CreateTable(&Todo{}).Error; err != nil {
+				return err
+			}
+			if err := db.CreateTable(&Project{}).Error; err != nil {
+				return err
+			}
+
+			return nil
+		},
+	}
+	handler.Add(v1)
+}
+
 func start() error {
 	// Build backend.
 	db, err := gorm.Open("postgres", "user=theduke dbname=docduke sslmode=disable")
@@ -94,6 +113,8 @@ func start() error {
 	app.RegisterUserHandler(userHandler)
 	app.RegisterResource(&Project{}, ProjectHooks{})
 	app.RegisterResource(&Todo{}, nil)
+
+	InitMigrations(app)
 
 	app.RunCli()
 
