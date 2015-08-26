@@ -10,6 +10,7 @@ import (
 	"github.com/manyminds/api2go"
 	"github.com/olebedev/config"
 	"github.com/spf13/cobra"
+	"github.com/julienschmidt/httprouter"	
 
 	db "github.com/theduke/dukedb"
 )
@@ -27,6 +28,8 @@ type App struct {
 	resources map[string]ApiResource
 	userHandler ApiUserHandler
 
+	methods map[string]*Method
+
 	Cli *cobra.Command
 }
 
@@ -34,6 +37,7 @@ func NewApp(cfgPath string) *App {
 	app := App{}
 	app.resources = make(map[string]ApiResource)
 	app.backends = make(map[string]db.Backend)
+	app.methods = make(map[string]*Method)
 
 	app.InitCli()
 	return &app
@@ -82,18 +86,39 @@ func (a *App) ReadConfig(path string) {
 	a.Config = cfg
 }
 
-func (a *App) Run() {
-	api := api2go.NewAPI("api")
-
+func (a *App) PrepareForRun() {
 	// Auto migrate if enabled or not explicitly disabled and env is debug.
 	if auto, err := a.Config.Bool("autoMigrate"); (err == nil && auto) || (err != nil && a.ENV=="dev") {
 		a.MigrateAllBackends(false)
 	}
+}
 
+func (a *App) Run() {
+	a.PrepareForRun()
+
+	api := api2go.NewAPI("api")
+
+	// Register methods.
+	router := api.Router()
+
+	for key := range a.methods {
+		method := a.methods[key]
+
+		// Use both POST and GET to allow for easier debugging.
+		router.GET("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			JsonWrapHandler(w, r, a, method)
+		})
+		router.POST("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+			JsonWrapHandler(w, r, a, method)
+		})
+	}
+
+	// Register api2json resources.
 	for key := range a.resources {
 		res := a.resources[key]
 		api.AddResource(res.GetModel(), Api2GoResource{
 			AppResource: res,
+			App: a,
 		})
 	}
 
@@ -122,6 +147,14 @@ func (a *App) GetBackend(name string) db.Backend {
 	}
 
 	return b
+}
+
+func (a *App) RegisterMethod(method *Method) {
+	if _, exists := a.methods[method.Name]; exists {
+		panic(fmt.Sprintf("Method name '%v' already registered.", method.Name))
+	}	
+
+	a.methods[method.Name] = method
 }
 
 func (a *App) RegisterResource(model db.Model, hooks ApiHooks) {

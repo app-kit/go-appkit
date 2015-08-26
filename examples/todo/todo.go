@@ -114,6 +114,20 @@ func start() error {
 	app.RegisterResource(&Project{}, ProjectHooks{})
 	app.RegisterResource(&Todo{}, nil)
 
+	app.RegisterMethod(&kit.Method{
+		Name: "todo-count",
+		RequiresUser: true,
+		Run: func(app *kit.App, request *kit.Request) (interface{}, kit.ApiError) {
+			todos := app.GetResource("todos")
+			result, _ := todos.GetQuery().Find()
+			count := len(result)
+
+			return map[string]interface{}{
+				"count": count,
+			}, nil
+		},
+	})
+
 	InitMigrations(app)
 
 	app.RunCli()
