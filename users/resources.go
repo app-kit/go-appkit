@@ -147,3 +147,11 @@ func (hooks UserResourceHooks) UserCanUpdate(res kit.ApiResource, obj db.Model, 
 func (hooks UserResourceHooks) UserCanDelete(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
 	return obj.GetID() == user.GetID()
 }
+
+type RoleResourceHooks struct {
+
+}
+
+type PermissionResourceHooks struct {
+	
+}

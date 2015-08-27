@@ -86,10 +86,20 @@ func (a *App) ReadConfig(path string) {
 	a.Config = cfg
 }
 
+func (a *App) PrepareBackends() {
+	for name := range a.backends {
+		a.backends[name].BuildRelationshipInfo()
+	}
+}
+
 func (a *App) PrepareForRun() {
+	a.PrepareBackends()
+
 	// Auto migrate if enabled or not explicitly disabled and env is debug.
 	if auto, err := a.Config.Bool("autoMigrate"); (err == nil && auto) || (err != nil && a.ENV=="dev") {
-		a.MigrateAllBackends(false)
+		if err := a.MigrateAllBackends(false); err != nil {
+			log.Printf("Migration FAILED: %v\n", err)
+		}
 	}
 }
 
@@ -206,6 +216,19 @@ func (a *App) RegisterUserHandler(h ApiUserHandler) {
 		a.DefaultBackend.RegisterModel(auth.GetModel())
 		auth.SetBackend(a.DefaultBackend)
 	}
+
+	roles := h.GetRoleResource()
+	if roles.GetBackend() == nil {
+		log.Printf("registering roles model: %v\n", roles.GetModel())
+		a.DefaultBackend.RegisterModel(roles.GetModel())
+		roles.SetBackend(a.DefaultBackend)
+	}
+
+	permissions := h.GetPermissionResource()
+	if permissions.GetBackend() == nil {
+		a.DefaultBackend.RegisterModel(permissions.GetModel())
+		permissions.SetBackend(a.DefaultBackend)
+	}
 }
 
 func (a *App) MigrateBackend(name string, version int, force bool) ApiError {
@@ -242,6 +265,69 @@ func (a *App) MigrateAllBackends(force bool) ApiError {
 			return err
 		}
 	}
+
+	return nil
+}
+
+func (a *App) DropBackend(name string) ApiError {
+	b := a.GetBackend(name)
+	if b == nil {
+		panic("Unknown backend " + name)
+	}
+
+	log.Printf("Dropping all collections on backend " + name)
+
+	if err := b.DropAllCollections(); err != nil {
+		log.Printf("Dropping all collections failed: %v", err)
+		return err
+	}
+
+	return nil
+}
+
+func (a *App) DropAllBackends() ApiError {
+	log.Printf("Dropping all backends")
+	for name := range a.backends {
+		if err := a.DropBackend(name); err != nil {
+			return err
+		}
+	}
+	log.Printf("Successfully dropped all collections")
+	return nil
+}
+
+func (a *App) RebuildBackend(name string) ApiError {
+	b := a.GetBackend(name)
+	if b == nil {
+		panic("Unknown backend " + name)
+	}
+
+	log.Printf("Rebuilding backend " + name)
+
+	if err := a.DropBackend(name); err != nil {
+		return err
+	}
+	
+	if err := a.MigrateBackend(name, 0, false); err != nil {
+		log.Printf("Migration failed: %v", err)
+		return Error{
+			Code: "backend_migration_failed",
+			Message: err.Error(),
+		}
+	}
+
+	return nil
+}
+
+func (a *App) RebuildAllBackends() ApiError {
+	log.Printf("Rebuilding all backends")
+	for key := range a.backends {
+		if err := a.RebuildBackend(key); err != nil {
+			return err
+		}
+	}
+
+	log.Printf("Successfully migrated all backends")
 
 	return nil
 }

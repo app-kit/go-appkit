@@ -64,6 +64,50 @@ func (app *App) InitCli() {
 	cmdMigrate.Flags().BoolVarP(&migrateAll, "all", "a", false, "Migrate all backends to newest version")
 	cli.AddCommand(cmdMigrate)
 
+	var rebuildAll bool
+	cmdDbRebuild := &cobra.Command{
+		Use:   "db-rebuild [backend]",
+		Short: "Rebuild a backend by dropping all collections and running migrations.",
+		Long:  `Rebuild a backend by dropping all collections and running migrations`,
+
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				if rebuildAll {
+					app.RebuildAllBackends()
+					return
+				} else {
+					log.Printf("Need to specify backend.")
+				}
+			}
+
+			app.RebuildBackend(args[0])
+		},
+	}
+	cmdDbRebuild.Flags().BoolVarP(&rebuildAll, "all", "a", false, "Rebuild all backends")
+	cli.AddCommand(cmdDbRebuild)
+
+	var dropAll bool
+	cmdDbDrop := &cobra.Command{
+		Use:   "db-drop [backend]",
+		Short: "Drop all collections from a backend.",
+		Long:  `Drop all collections from a backend`,
+
+		Run: func(cmd *cobra.Command, args []string) {
+			if len(args) < 1 {
+				if dropAll {
+					app.DropAllBackends()
+					return
+				} else {
+					log.Printf("Need to specify backend.")
+				}
+			}
+
+			app.DropBackend(args[0])
+		},
+	}
+	cmdDbDrop.Flags().BoolVarP(&dropAll, "all", "a", false, "Drop all backends")
+	cli.AddCommand(cmdDbDrop	)
+
 	app.Cli = cli
 }
 

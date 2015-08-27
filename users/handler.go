@@ -12,6 +12,9 @@ type UserHandler struct {
 	Sessions kit.ApiResource
 	AuthItems kit.ApiResource
 
+	Roles kit.ApiResource
+	Permissions kit.ApiResource
+
 	AuthAdaptors map[string]kit.ApiAuthAdaptor
 }
 
@@ -32,8 +35,19 @@ func NewUserHandler() *UserHandler {
 	})
 	h.Sessions = sessions
 
+	
 	auths := kit.NewResource(&BaseAuthItemIntID{}, nil)
 	h.AuthItems = auths
+
+	roles := kit.NewResource(&Role{}, RoleResourceHooks{
+
+	})
+	h.Roles = roles
+
+	permissions := kit.NewResource(&Permission{}, PermissionResourceHooks{
+
+	})
+	h.Permissions = permissions
 
 	return &h
 }
@@ -69,6 +83,28 @@ func(h *UserHandler) GetAuthItemResource() kit.ApiResource {
 func(h *UserHandler) SetAuthItemResource(x kit.ApiResource) {
 	h.AuthItems = x
 }
+
+/**
+ * RBAC resources.
+ */
+
+func(u *UserHandler) GetRoleResource() kit.ApiResource {
+	return u.Roles
+}
+
+func(u *UserHandler) SetRoleResource(x kit.ApiResource) {
+	u.Roles = x
+}
+
+func(u *UserHandler) GetPermissionResource() kit.ApiResource {
+	return u.Permissions
+}
+
+func(u *UserHandler) SetPermissionResource(x kit.ApiResource) {
+	u.Permissions = x
+}
+
+
 
 func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData interface{}) kit.ApiError {
 	adaptor := h.GetAuthAdaptor(adaptorName)

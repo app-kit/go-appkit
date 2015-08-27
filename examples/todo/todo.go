@@ -19,6 +19,11 @@ import (
 type Project struct {
 	ID uint64 `gorm:"primary_key"`
 	Name string
+
+	Todos []*Todo
+
+	Todo *Todo
+	TodoID uint64
 }
 
 func (b Project) GetID() string {
@@ -77,7 +82,13 @@ func (t Todo) GetCollection() string {
 
 func InitMigrations(app *kit.App) {
 	handler := app.GetBackend("gorm").(db.MigrationBackend).GetMigrationHandler()
-	v1 := db.Migration{
+	
+	userMigrations := users.GetUserMigrations(app)
+	handler.Add(userMigrations[0])
+	handler.Add(userMigrations[1])
+
+
+	v2 := db.Migration{
 		Name: "create tables",
 		Up: func(b db.MigrationBackend) error {
 			db := b.(*dbgorm.Backend).Db
@@ -91,7 +102,7 @@ func InitMigrations(app *kit.App) {
 			return nil
 		},
 	}
-	handler.Add(v1)
+	handler.Add(v2)
 }
 
 func start() error {
@@ -114,13 +125,14 @@ func start() error {
 	app.RegisterResource(&Project{}, ProjectHooks{})
 	app.RegisterResource(&Todo{}, nil)
 
+	app.PrepareBackends()
+
 	app.RegisterMethod(&kit.Method{
 		Name: "todo-count",
-		RequiresUser: true,
+		RequiresUser: false,
 		Run: func(app *kit.App, request *kit.Request) (interface{}, kit.ApiError) {
-			todos := app.GetResource("todos")
-			result, _ := todos.GetQuery().Find()
-			count := len(result)
+			todos := app.GetResource("projects")
+			count, _ := todos.GetQuery().Last()
 
 			return map[string]interface{}{
 				"count": count,

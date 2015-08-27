@@ -4,6 +4,8 @@ import (
 	"strconv"
 	"time"
 	"encoding/json"
+
+	kit "github.com/theduke/appkit"
 )
 
 type BaseAuthItem struct {
@@ -69,6 +71,7 @@ func (b *BaseAuthItem) GetData() (interface{}, error) {
 }
 
 type BaseAuthItemIntID struct {
+	ID uint64
 	BaseAuthItem
 	UserID uint64 `gorm:"primary_key" sql:"not null;"`
 }
@@ -97,6 +100,8 @@ type BaseUser struct {
 
 	CreatedAt time.Time `jsonapi:"name=created-at"`
 	UpdatedAt time.Time `jsonapi:"name=updated-at"`
+
+	Roles []*Role `gorm:"many2many:user_roles;" db:"m2m;"`
 }
 
 func (u BaseUser) GetCollection() string {
@@ -163,11 +168,67 @@ func (u *BaseUser) GetUpdatedAt() time.Time {
 	return u.UpdatedAt
 }
 
+/**
+ * RBAC methods.
+ */
+
+func (u *BaseUser) GetRoles() []kit.ApiRole {
+	slice := make([]kit.ApiRole, 0)
+	for _, r := range u.Roles {
+		slice = append(slice, r)
+	}
+	return slice
+}
+
+func (u *BaseUser) AddRole(r kit.ApiRole) {
+	if u.Roles == nil {
+		u.Roles = make([]*Role, 0)
+	}
+	if !u.HasRole(r) {
+		u.Roles = append(u.Roles, r.(*Role))
+	}
+}
+
+func (u *BaseUser) RemoveRole(r kit.ApiRole) {
+	if u.Roles == nil {
+		return
+	}
+
+	for i := 0; i < len(u.Roles); i++ {
+		if u.Roles[i].Name == r.GetName() {
+			u.Roles = append(u.Roles[:i], u.Roles[i+1:]...)
+		}
+	}	
+}
+
+func (u *BaseUser) ClearRoles() {
+	u.Roles = make([]*Role, 0)
+}
+
+func (u *BaseUser) HasRole(r kit.ApiRole) bool {
+	return u.HasRoleStr(r.GetName())
+}
+
+func (u *BaseUser) HasRoleStr(role string) bool {
+	if u.Roles == nil {
+		return false
+	}
+
+	for i := 0; i < len(u.Roles); i++ {
+		if u.Roles[i].Name == role {
+			return true
+		}
+	}
+
+	return false
+}
+
 
 type BaseUserIntID struct {
 	BaseUser
 
-	ID uint64 `gorm:"primary_key" sql:"not null"`
+	ID uint64 `sql:"not null"`
+	Roles []*Role `gorm:"many2many:user_roles;" db:"m2m;"`
 }
 
 // For api2go!
@@ -315,3 +376,70 @@ func (u *BaseSessionIntID) GetUserID() string {
 func (s *BaseSessionIntID) IsGuest() bool {
 	return s.UserID == 0
 }
+
+/**
+ * Role.
+ */
+
+type Role struct {
+	Name string `gorm:"primary_key" db:"primary_key" sql:"type: varchar(200)"`
+	Permissions []*Permission `gorm:"many2many:role_permissions;" db:"m2m"`
+}
+
+func (r Role) GetCollection() string {
+	return "roles"
+}
+
+func (r Role) GetTableName() string {
+	return "roles"
+}
+
+func (r *Role) SetName(n string) {
+	r.Name = n
+}
+
+func (r Role) GetName() string {
+	return r.Name
+}
+
+func (r Role) GetID() string {
+	return r.Name
+}
+
+func (r *Role) SetID(n string) error {
+	r.Name = n
+	return nil
+} 
+
+/**
+ * Permission.
+ */
+
+type Permission struct {
+	Name string `gorm:"primary_key" db:"primary_key" sql:"type: varchar(200)"`
+}
+
+func (r Permission) GetCollection() string {
+	return "permissions"
+}
+
+func (r Permission) GetTableName() string {
+	return "permissions"
+}
+
+func (r *Permission) SetName(n string) {
+	r.Name = n
+}
+
+func (r Permission) GetName() string {
+	return r.Name
+}
+
+func (p Permission) GetID() string {
+	return p.Name
+}
+
+func (p *Permission) SetID(n string) error {
+	p.Name = n
+	return nil
+} 

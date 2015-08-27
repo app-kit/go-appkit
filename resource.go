@@ -15,7 +15,7 @@ type Resource struct {
 	UserHandler ApiUserHandler
 
 	Model db.Model
-
+	
 	FindOneRequiresAuth bool
 	FindRequiresAuth bool
 	
@@ -70,6 +70,14 @@ func(res *Resource) GetModel() db.Model {
 
 func(res *Resource) SetModel(x db.Model) {
 	res.Model = x
+}
+
+func (res *Resource) NewModel() db.Model {
+	 n, err := res.Backend.NewModel(res.Model.GetCollection())
+	 if err != nil {
+	 	return nil
+	 }
+	 return n.(db.Model)
 }
 
 func (res *Resource) SetHooks(h ApiHooks) {

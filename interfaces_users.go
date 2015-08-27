@@ -39,10 +39,18 @@ type ApiUserHandler interface{
 
 	SetUserResource(ApiResource)
 	GetUserResource() ApiResource
+
 	SetSessionResource(ApiResource)
 	GetSessionResource() ApiResource
+
 	SetAuthItemResource(ApiResource)
 	GetAuthItemResource() ApiResource
+
+	SetRoleResource(ApiResource)
+	GetRoleResource() ApiResource
+
+	SetPermissionResource(ApiResource)
+	GetPermissionResource() ApiResource
 }
 
 type ApiUserProfile interface {
@@ -70,6 +78,13 @@ type ApiUser interface {
 
 	SetUpdatedAt(time.Time)
 	GetUpdatedAt() time.Time
+
+	GetRoles() []ApiRole
+	AddRole(ApiRole)
+	RemoveRole(ApiRole)
+	ClearRoles()
+	HasRole(ApiRole) bool
+	HasRoleStr(string) bool
 }
 
 type ApiSession interface {
@@ -91,4 +106,14 @@ type ApiSession interface {
 	GetValidUntil() time.Time
 
 	IsGuest() bool
+}
+
+type ApiRole interface {
+	GetName() string
+	SetName(string) 
+}
+
+type ApiPermission interface {
+	GetName() string
+	SetName(string)
 }

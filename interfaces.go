@@ -41,6 +41,7 @@ type ApiResponse interface {
 
  	GetModel() db.Model
  	SetModel(db.Model)
+ 	NewModel() db.Model
 
  	Query(*db.Query) ([]db.Model, ApiError)
  	GetQuery() *db.Query
@@ -179,4 +180,3 @@ type UserCanDeleteHook interface {
 type AfterDeleteHook interface {
 	AfterDelete(res ApiResource, obj db.Model, user ApiUser) ApiError
 }
-
