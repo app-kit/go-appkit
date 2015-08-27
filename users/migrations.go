@@ -9,7 +9,7 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 	migrations := make([]db.Migration, 0)
 
 	v1 := db.Migration{
-		Name: "Create User, UserProfile, Session, AuthItem, Roles and Permissions tables",
+		Name: "Create user system tables",
 		Up: func(b db.MigrationBackend) error {
 			if err := b.CreateCollection("users"); err != nil {
 				return err
@@ -33,12 +33,28 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 	migrations = append(migrations, v1)
 
 	v2 := db.Migration{
-		Name: "Create admin user",
+		Name: "Create admin role and user",
 		Up: func(b db.MigrationBackend) error {
 			userHandler := app.GetUserHandler()
+			
+			permissions := userHandler.GetPermissionResource()
+			allPerm := &Permission{Name: "all"}
+			if err := permissions.Create(allPerm, nil); err != nil {
+				return err
+			}
+
+			// Create admin role.
+			adminRole := &Role{Name: "admin"}
+			adminRole.Permissions = []*Permission{allPerm}
+			roles := userHandler.GetRoleResource()
+			if err := roles.Create(adminRole, nil); err != nil {
+				return err
+			}
+
 			user := userHandler.GetUserResource().NewModel().(kit.ApiUser)
 			user.SetUsername("admin")
 			user.SetEmail("admin@admin.com")
+			user.AddRole(adminRole)
 
 			userHandler.CreateUser(user, "password", map[string]interface{}{"password": "admin"})
 

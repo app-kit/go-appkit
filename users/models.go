@@ -227,8 +227,7 @@ func (u *BaseUser) HasRoleStr(role string) bool {
 type BaseUserIntID struct {
 	BaseUser
 
-	ID uint64 `sql:"not null"`
-	Roles []*Role `gorm:"many2many:user_roles;" db:"m2m;"`
+	ID uint64 `gorm:"primary_key" sql:"not null"`
 }
 
 // For api2go!
