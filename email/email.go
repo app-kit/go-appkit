@@ -23,34 +23,6 @@ import (
     "gopkg.in/gomail.v2-unstable"
 )
 
-type Email struct {
-    UID uint32 `json:"-"`
-    Subject string 
-    From string `json:"from"`
-    Recipients string 
-    Date time.Time `json:"date"`
-
-    Body string `json:"body"`
-    HtmlBody string `jsonapi:"name=html-body"`
-
-    Read bool
-
-    Attachments []EmailAttachment `json:"-"`
-}
-
-type EmailAttachment struct {
-    ID string
-    EmailID string
-
-    Mime string
-    Encoding string
-    Data string
-    Filename string
-
-    Content string // Base 64 encoded content.
-    StrContent string // String content.
-}
-
 type Client struct {
     Username string
     Password string
@@ -58,9 +30,6 @@ type Client struct {
     ImapHost string
     ImapPort int
     ImapClient *imap.Client
-
-    SmtpHost string
-    SmtpPort int
 }
 
 func NewClient() (*Client, error) {
@@ -79,19 +48,11 @@ func (c *Client) Init() error {
     if c.Password == "" {
         return errors.New("no_password")
     }
+    if c.ImapHost == "" {
+        return errors.New("no_imap_host")
+    }
 
     return nil
-}
-
-func (c *Client) SendEmail(email *Email) error {
-    m := gomail.NewMessage()
-    m.SetHeader("From", email.From)
-    m.SetHeader("To", email.Recipients)
-    m.SetHeader("Subject", email.Subject)
-    m.SetBody("text/plain", email.Body)
-
-    d := gomail.NewPlainDialer(c.SmtpHost, c.Username, c.Password, c.SmtpPort)
-    return d.DialAndSend(m)
 }
 
 func (c *Client) ImapConnect() error {

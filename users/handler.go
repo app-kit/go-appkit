@@ -15,18 +15,25 @@ type UserHandler struct {
 	Roles kit.ApiResource
 	Permissions kit.ApiResource
 
+	profileModel kit.ApiUserProfile
+
 	AuthAdaptors map[string]kit.ApiAuthAdaptor
 }
 
-func NewUserHandler() *UserHandler {
-	h := UserHandler{}
+func NewUserHandler(profileModel kit.ApiUserProfile) *UserHandler {
+	h := UserHandler{
+		profileModel: profileModel,
+	}
+
 	h.AuthAdaptors = make(map[string]kit.ApiAuthAdaptor)
 
 	// Register auth adaptors.
 	h.AddAuthAdaptor(auth.AuthAdaptorPassword{})
 
 	// Build resources.
-	users := kit.NewResource(&BaseUserIntID{}, UserResourceHooks{})
+	users := kit.NewResource(&BaseUserIntID{}, UserResourceHooks{
+		ProfileModel: profileModel,
+	})
 	h.Users = users
 
 	sessions := kit.NewResource(&BaseSessionIntID{}, SessionResourceHooks{
@@ -84,6 +91,10 @@ func(h *UserHandler) SetAuthItemResource(x kit.ApiResource) {
 	h.AuthItems = x
 }
 
+func (h *UserHandler) GetProfileModel() kit.ApiUserProfile {
+	return h.profileModel
+}
+
 /**
  * RBAC resources.
  */
@@ -122,7 +133,7 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	}
 	
 	// Check if user with same username or email exists.
-	oldUser, err2 := h.Users.GetQuery().
+	oldUser, err2 := h.Users.Q().
 	  Filter("email", user.GetEmail()).Or("username", user.GetUsername()).First()
 	if err2 != nil {
 		return err2
@@ -134,8 +145,23 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	}
 
 	user.SetIsActive(true)
+
+	if h.profileModel != nil && user.GetProfile() == nil {
+		newProfile, _ := h.Users.GetBackend().NewModel(h.profileModel.GetCollection())
+		user.SetProfile(newProfile.(kit.ApiUserProfile))
+	}
+
 	if err := h.Users.Create(user, nil); err != nil {
 		return err
+	}
+
+	// Create profile if one exists.
+	if profile := user.GetProfile(); profile != nil {
+		profile.SetID(user.GetID())
+		if err := h.Users.GetBackend().Create(profile); err != nil {
+			h.Users.GetBackend().Delete(user)
+			return err
+		}
 	}
 
 	rawAuth, _ := h.AuthItems.GetBackend().NewModel(h.AuthItems.GetModel().GetCollection())
@@ -164,7 +190,7 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
 
-	rawAuth, err := h.AuthItems.GetQuery().
+	rawAuth, err := h.AuthItems.Q().
 	  Filter("typ", authAdaptorName).And("user_id", user.GetID()).First()
 
 	if err != nil {

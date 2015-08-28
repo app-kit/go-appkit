@@ -73,11 +73,11 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
 	// Find user.
 	userResource := res.GetUserHandler().GetUserResource()
 
-	rawUser, err := userResource.GetQuery().
+	rawUser, err := userResource.Q().
 	  Filter("username", userIdentifier).Or("email", userIdentifier).First()
 
 	if err != nil {
-		return kit.Response{Error: err}
+		return &kit.Response{Error: err}
 	} else if rawUser == nil {
 		return kit.NewErrorResponse("user_not_found", "User not found for identifier: " + userIdentifier)
 	}
@@ -96,15 +96,15 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
 
 	err = res.GetUserHandler().AuthenticateUser(user, adaptor, data)
 	if err != nil {
-		return kit.Response{Error: err}
+		return &kit.Response{Error: err}
 	}
 
 	session, err := StartSession(res, user)
 	if err != nil {
-		return kit.Response{Error: err}
+		return &kit.Response{Error: err}
 	}
 		
-	return kit.Response{
+	return &kit.Response{
 		Data: session,
 	}
 }
@@ -115,6 +115,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
  */
 
 type UserResourceHooks struct {
+	ProfileModel kit.ApiUserProfile
 }
 
 func (hooks UserResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
@@ -132,20 +133,25 @@ func (hooks UserResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r ki
 
 	user := obj.(kit.ApiUser)
 	if err := res.GetUserHandler().CreateUser(user, adaptor, data); err != nil {
-		return kit.Response{Error: err}
+		return &kit.Response{Error: err}
 	}
 
-	return kit.Response{
+	return &kit.Response{
 		Data: user,
 	}
 }
 
-func (hooks UserResourceHooks) UserCanUpdate(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
-	return obj.GetID() == user.GetID()
+func (hooks UserResourceHooks) AllowFind(res kit.ApiResource, obj db.Model, user kit.ApiUser) bool {
+	u := obj.(kit.ApiUser)
+	return u.GetID() == user.GetID()
 }
 
-func (hooks UserResourceHooks) UserCanDelete(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
-	return obj.GetID() == user.GetID()
+func (hooks UserResourceHooks) AllowUpdate(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
+	return user != nil && obj.GetID() == user.GetID()
+}
+
+func (hooks UserResourceHooks) AllowDelete(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
+	return false
 }
 
 type RoleResourceHooks struct {

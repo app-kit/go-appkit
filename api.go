@@ -107,12 +107,16 @@ func (r Response) GetMeta() map[string]interface{} {
 	return r.Meta
 }
 
+func (r *Response) SetMeta(m map[string]interface{}) {
+	r.Meta = m
+}
+
 func (r Response) GetData() interface{} {
 	return r.Data
 }
 
-func NewErrorResponse(code, message string) Response {
-	return Response{
+func NewErrorResponse(code, message string) *Response {
+	return &Response{
 		Error: Error{Code: code, Message: message},
 	}
 }

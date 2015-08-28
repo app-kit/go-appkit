@@ -127,11 +127,6 @@ func start() error {
 
 	app.PrepareBackends()
 
-	u, _ := backend.FindOne("roles", "admin")
-	roles, err := backend.GetM2MCollection(u, "Permissions")
-
-	log.Printf("err: %v\nUser: %+v\n", err, roles)
-
 	app.RegisterMethod(&kit.Method{
 		Name: "todo-count",
 		RequiresUser: false,

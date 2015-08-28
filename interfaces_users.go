@@ -40,6 +40,8 @@ type ApiUserHandler interface{
 	SetUserResource(ApiResource)
 	GetUserResource() ApiResource
 
+	GetProfileModel() ApiUserProfile
+
 	SetSessionResource(ApiResource)
 	GetSessionResource() ApiResource
 
@@ -54,8 +56,7 @@ type ApiUserHandler interface{
 }
 
 type ApiUserProfile interface {
-	SetUserID(string)
-	GetUserID() string
+	db.Model
 }
 
 type ApiUser interface {
@@ -78,6 +79,9 @@ type ApiUser interface {
 
 	SetUpdatedAt(time.Time)
 	GetUpdatedAt() time.Time
+
+	SetProfile(ApiUserProfile)
+	GetProfile() ApiUserProfile
 
 	GetRoles() []ApiRole
 	AddRole(ApiRole)

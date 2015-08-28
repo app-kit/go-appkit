@@ -1,10 +1,6 @@
 package appkit
 
 import (
-	"reflect"
-	//"log"
-	//"fmt"
-
 	db "github.com/theduke/dukedb"	
 )
 
@@ -15,26 +11,10 @@ type Resource struct {
 	UserHandler ApiUserHandler
 
 	Model db.Model
-	
-	FindOneRequiresAuth bool
-	FindRequiresAuth bool
-	
-	ApiCreateAllowed bool	
-	CreateRequiresAuth bool
-
-	ApiDeleteAllowed bool
-	DeleteRequiresAuth bool
-
-	ApiUpdateAllowed bool
-	UpdateRequiresAuth bool
 }
 
 func NewResource(model db.Model, hooks ApiHooks) ApiResource {
-	r := Resource{
-		ApiCreateAllowed: true,
-		ApiUpdateAllowed: true,
-		ApiDeleteAllowed: true,
-	}
+	r := Resource{}
 	r.SetModel(model)
 	r.SetHooks(hooks)
 	return &r
@@ -82,55 +62,23 @@ func (res *Resource) NewModel() db.Model {
 
 func (res *Resource) SetHooks(h ApiHooks) {
 	res.Hooks = h
-
-	if h == nil {
-		return
-	}
-
-	r := reflect.ValueOf(h)
-	if field := r.FieldByName("Debug"); field.IsValid() {
-		res.Debug = field.Bool()
-	}
-
-	// Set permission fields.
-	if field := r.FieldByName("FindOneRequiresAuth"); field.IsValid() {
-		res.FindOneRequiresAuth = field.Bool()
-	}
-	if field := r.FieldByName("FindRequiresAuth"); field.IsValid() {
-		res.FindRequiresAuth = field.Bool()
-	}
-
-	if field := r.FieldByName("ApiCreateAllowed"); field.IsValid() {
-		res.ApiCreateAllowed = field.Bool()
-	}
-	if field := r.FieldByName("CreateRequiresAuth"); field.IsValid() {
-		res.CreateRequiresAuth = field.Bool()
-	}
-
-	if field := r.FieldByName("ApiUpdateAllowed"); field.IsValid() {
-		res.ApiUpdateAllowed = field.Bool()
-	}
-	if field := r.FieldByName("UpdateRequiresAuth"); field.IsValid() {
-		res.UpdateRequiresAuth = field.Bool()
-	}
-
-	if field := r.FieldByName("ApiDeleteAllowed"); field.IsValid() {
-		res.ApiDeleteAllowed = field.Bool()
-	}
-	if field := r.FieldByName("DeleteRequiresAuth"); field.IsValid() {
-		res.DeleteRequiresAuth = field.Bool()
-	}
 }
 
 /**
  * Queries.
  */
 
+/**
+ * Perform a query.
+ */
 func (res Resource) Query(q *db.Query) ([]db.Model, ApiError) {
 	return res.Backend.Query(q)
 }
 
-func (res Resource) GetQuery() *db.Query {
+/**
+ * Return a new query initialized with the backend.
+ */
+func (res Resource) Q() *db.Query {
 	return res.Backend.Q(res.Model.GetCollection())
 }
 
@@ -142,35 +90,6 @@ func (res *Resource) FindOne(rawId string) (db.Model, ApiError) {
 	return res.Backend.FindOne(res.Model.GetCollection(), rawId)
 }
 
-func (res *Resource) ApiFindOne(rawId string, r ApiRequest) ApiResponse {
-	findOneHook, ok := res.Hooks.(ApiFindOneHook)
-	if ok {
-		return findOneHook.ApiFindOne(res, rawId, r)
-	}
-
-	user := r.GetUser()
-	if res.FindOneRequiresAuth {
-		if user == nil {
-			return NewErrorResponse("permission_denied", "")
-		}
-	}
-
-  result, err := res.FindOne(rawId)
-  if err != nil {
-  	return Response{Error: err}
-  }
-
-  userCanFindOneHook, ok := res.Hooks.(UserCanFindOneHook)
-  if ok && !userCanFindOneHook.UserCanFindOne(res, result, user){
-  	return NewErrorResponse("permission_denied", "")
-  }
-
-  return Response{
-  	Data: result,
-  }
-}
-
-
 /**
  * Find.
  */
@@ -179,35 +98,64 @@ func (res Resource) Find(query *db.Query) ([]db.Model, ApiError) {
 	return res.Backend.Query(query)
 }
 
-func (res *Resource) ApiFind(query *db.Query, r ApiRequest) ApiResponse {
-	user := r.GetUser()
+func (res *Resource) ApiFindOne(rawId string, r ApiRequest) ApiResponse {
+  result, err := res.FindOne(rawId)
+  if err != nil {
+    return &Response{Error: err}
+  } else if result == nil {
+  	return NewErrorResponse("not_found", "")
+  }
 
+  user := r.GetUser()
+  if allowFind, ok := res.Hooks.(AllowFindHook); ok {
+	  if !allowFind.AllowFind(res, result, user) {
+	  	return NewErrorResponse("permission_denied", "")
+	  }
+  }
+
+  return &Response{
+  	Data: result,
+  }
+}
+
+func (res *Resource) ApiFind(query *db.Query, r ApiRequest) ApiResponse {
 	apiFindHook, ok := res.Hooks.(ApiFindHook)
 	if ok {
 		return apiFindHook.ApiFind(res, query, r)
 	}
 
-	if res.FindRequiresAuth {
-		if user == nil {
-			return NewErrorResponse("permission_denied", "")
-		}
+	if alterQuery, ok := res.Hooks.(ApiAlterQueryHook); ok {
+		alterQuery.ApiAlterQuery(res, query, r)
 	}
 
   result, err := res.Query(query)
   if err != nil {
-  	return Response{Error: err}
+  	return &Response{Error: err}
   }
 
-  canFindHook, ok := res.Hooks.(UserCanFindHook)
-  if ok && !canFindHook.UserCanFind(res, result, user) {
-  	return NewErrorResponse("permission_denied", "")
+	user := r.GetUser()
+  if allowFind, ok := res.Hooks.(AllowFindHook); ok {
+  	for _, item := range result {
+		  if !allowFind.AllowFind(res, item, user) {
+		  	return NewErrorResponse("permission_denied", "")
+		  }
+  	}
   }
 
-  return Response{
+  return &Response{
   	Data: result,
   }
 }
 
+func (res *Resource) ApiFindPaginated(query *db.Query, r ApiRequest) ApiResponse {
+	resp := res.ApiFind(query, r)
+	if resp.GetError() == nil {
+		count, _ := res.Backend.Count(query)
+		resp.SetMeta(map[string]interface{}{"count": count})
+	}
+
+	return resp
+}
 
 /**
  * Create.
@@ -217,14 +165,6 @@ func (res *Resource) Create(obj db.Model, user ApiUser) ApiError {
 	if beforeCreate, ok := res.Hooks.(BeforeCreateHook); ok {
 		if err := beforeCreate.BeforeCreate(res, obj, user); err != nil {
 			return err
-		}
-	}
-
-	if user != nil {
-		if canCreateHook, ok := res.Hooks.(UserCanCreateHook); ok {
-			if !canCreateHook.UserCanCreate(res, obj, user) {
-				return Error{Code: "permission_denied"}
-			}
 		}
 	}
 
@@ -246,23 +186,19 @@ func (res *Resource) ApiCreate(obj db.Model, r ApiRequest) ApiResponse {
 		return createHook.ApiCreate(res, obj, r)
 	}
 
-	if !res.ApiCreateAllowed {
-		return NewErrorResponse("not_allowed", "")
-	}
-
 	user := r.GetUser()
-	if res.CreateRequiresAuth {
-		if user == nil {
+	if allowCreate, ok := res.Hooks.(AllowCreateHook); ok {
+		if !allowCreate.AllowCreate(res, obj, user) {
 			return NewErrorResponse("permission_denied", "")
 		}
 	}
 
 	err := res.Create(obj, user)
 	if err != nil {
-		return Response{Error: err}
+		return &Response{Error: err}
 	}
 
-	return Response{
+	return &Response{
   	Data: obj,
   }
 }
@@ -285,14 +221,6 @@ func (res *Resource) Update(obj db.Model, user ApiUser) ApiError {
 		}
 	}
 
-	if user != nil {
-		if canUpdateHook, ok := res.Hooks.(UserCanUpdateHook); ok {
-			if !canUpdateHook.UserCanUpdate(res, obj, oldObj, user) {
-				return Error{Code: "permission_denied"}
-			}
-		}
-	}
-
 	if err := res.Backend.Update(obj); err != nil {
 		return err
 	}
@@ -311,20 +239,37 @@ func (res *Resource) ApiUpdate(obj db.Model, r ApiRequest) ApiResponse {
 		return updateHook.ApiUpdate(res, obj, r)
 	}
 
-	if !res.ApiUpdateAllowed {
-		return NewErrorResponse("not_allowed", "")
+	oldObj, err := res.FindOne(obj.GetID())
+	if err != nil {
+		return &Response{Error: err}
+	} else if oldObj == nil {
+		return NewErrorResponse("not_found", "")
 	}
 
 	user := r.GetUser()
-	if res.UpdateRequiresAuth && user == nil {
-		return NewErrorResponse("permission_denied", "")
+	if allowUpdate, ok := res.Hooks.(AllowUpdateHook); ok {
+		if !allowUpdate.AllowUpdate(res, obj, oldObj, user) {
+			return NewErrorResponse("permission_denied", "")
+		}
 	}
 
-	if err := res.Update(obj, user); err != nil {
-		return Response{Error: err}
+	if beforeUpdate, ok := res.Hooks.(BeforeUpdateHook); ok {
+		if err := beforeUpdate.BeforeUpdate(res, obj, oldObj, user); err != nil {
+			return &Response{Error: err}
+		}
 	}
 
-	return Response{
+	if err := res.Backend.Update(obj); err != nil {
+		return &Response{Error: err}
+	}
+
+	if afterUpdate, ok := res.Hooks.(AfterUpdateHook); ok {
+		if err := afterUpdate.AfterUpdate(res, obj, oldObj, user); err != nil {
+			return &Response{Error: err}
+		}
+	}
+
+	return &Response{
   	Data: obj,
   }
 }
@@ -338,14 +283,6 @@ func (res *Resource) Delete(obj db.Model, user ApiUser) ApiError {
 	if beforeDelete, ok := res.Hooks.(BeforeDeleteHook); ok {
 		if err := beforeDelete.BeforeDelete(res, obj, user); err != nil {
 			return err
-		}
-	}
-
-	if user != nil {
-		if canDeleteHook, ok := res.Hooks.(UserCanDeleteHook); ok {
-			if !canDeleteHook.UserCanDelete(res, obj, user) {
-				return Error{Code: "permission_denied"}
-			}
 		}
 	}
 
@@ -363,22 +300,18 @@ func (res *Resource) Delete(obj db.Model, user ApiUser) ApiError {
 }
 
 func (res *Resource) ApiDelete(id string, r ApiRequest) ApiResponse {
-	if !res.ApiDeleteAllowed {
-		return NewErrorResponse("not_allowed", "")
+	oldObj, err := res.FindOne(id)
+	if err != nil {
+		return &Response{Error: err}
+	} else if oldObj == nil {
+		return NewErrorResponse("not_found", "")
 	}
 
 	user := r.GetUser()
-	if res.DeleteRequiresAuth {
-		if user == nil {
+	if allowDelete, ok := res.Hooks.(AllowDeleteHook); ok {
+		if !allowDelete.AllowDelete(res, oldObj, user) {
 			return NewErrorResponse("permission_denied", "")
 		}
-	}
-
-	oldObj, err := res.FindOne(id)
-	if err != nil {
-		return Response{Error: err}
-	} else if oldObj == nil {
-		return NewErrorResponse("not_found", "")
 	}
 
 	if deleteHook, ok := res.Hooks.(ApiDeleteHook); ok {
@@ -386,10 +319,28 @@ func (res *Resource) ApiDelete(id string, r ApiRequest) ApiResponse {
 	}
 
 	if err := res.Delete(oldObj, user); err != nil {
-		return Response{Error: err}
+		return &Response{Error: err}
 	}
 
-	return Response{
+	return &Response{
   	Data: oldObj,
   }
+}
+
+/**
+ * Read only resource hooks template
+ */
+
+type ReadOnlyResource struct {}
+
+func (r ReadOnlyResource) AllowCreate(res ApiResource, obj db.Model, user ApiUser) bool {
+	return false
+}
+
+func (r ReadOnlyResource) AllowUpdate(res ApiResource, obj db.Model, user ApiUser) bool {
+	return false
+}
+
+func (r ReadOnlyResource) AllowDelete(res ApiResource, obj db.Model, user ApiUser) bool {
+	return false
 }

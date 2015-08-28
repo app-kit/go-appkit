@@ -17,6 +17,7 @@ import (
 
 type App struct {
 	Debug bool
+
 	ENV string
 	AutoMigrate bool
 
@@ -51,16 +52,16 @@ func (a *App) ReadConfig(path string) {
 	var cfg *config.Config	
 
 	if f, err := os.Open(path); err != nil {
-		log.Printf("Could not find or read config at '%v' - Using default settings\n", path)
+		panic(fmt.Sprintf("Could not find or read config at '%v' - Using default settings\n", path))
 	} else {
 		defer f.Close()
 		content, err := ioutil.ReadAll(f)
 		if err != nil {
-			log.Printf("Could not read config at '%v': %v\n", path, err)
+			panic(fmt.Sprintf("Could not read config at '%v': %v\n", path, err))
 		} else {
 			cfg, err = config.ParseYaml(string(content))
 			if err != nil {
-				log.Printf("YAML error while parsing config at '%v': %v\n", path, err)
+				panic(fmt.Sprintf("YAML error while parsing config at '%v': %v\n", path, err))
 			}
 		}	
 	}
@@ -70,12 +71,12 @@ func (a *App) ReadConfig(path string) {
 		cfg = c
 	}
 
-	cfg.Flag().Env()
+	cfg.Env()
 
-	env := cfg.UString("ENV")
-	if env == "" {
-		env = "dev"
+	env := cfg.UString("ENV", "dev")
+	if env == "dev" {
 		log.Printf("No environment specified, defaulting to 'dev'\n")
+		a.Debug = true
 	}
 	a.ENV = env
 
@@ -144,6 +145,8 @@ func (a *App) Run() {
 }
 
 func (a *App) RegisterBackend(name string, b db.Backend) {
+	b.SetDebug(a.Debug)
+
 	a.backends[name] = b
 	if a.DefaultBackend == nil {
 		a.DefaultBackend = b
@@ -179,9 +182,6 @@ func (a *App) RegisterCustomResource(res ApiResource) {
 			panic("Registering resource without backend, but no default backend set.")
 		}
 
-		log.Printf("Using default backend %v for resource %v", 
-			a.DefaultBackend.GetName(), res.GetModel().GetCollection())
-
 		// Set backend.
 		res.SetBackend(a.DefaultBackend)
 	} 
@@ -211,6 +211,10 @@ func (a *App) RegisterUserHandler(h ApiUserHandler) {
 	a.RegisterCustomResource(h.GetUserResource())
 	a.RegisterCustomResource(h.GetSessionResource())
 
+	if profileModel := h.GetProfileModel(); profileModel != nil {
+		a.DefaultBackend.RegisterModel(profileModel)
+	}
+
 	auth := h.GetAuthItemResource()
 	if auth.GetBackend() == nil {
 		a.DefaultBackend.RegisterModel(auth.GetModel())
@@ -219,7 +223,6 @@ func (a *App) RegisterUserHandler(h ApiUserHandler) {
 
 	roles := h.GetRoleResource()
 	if roles.GetBackend() == nil {
-		log.Printf("registering roles model: %v\n", roles.GetModel())
 		a.DefaultBackend.RegisterModel(roles.GetModel())
 		roles.SetBackend(a.DefaultBackend)
 	}

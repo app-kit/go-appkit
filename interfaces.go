@@ -19,6 +19,7 @@ type ApiRequest interface {
 type ApiResponse interface {
 	GetError() ApiError	
 	GetMeta() map[string]interface{}
+	SetMeta(map[string]interface{})
 	GetData() interface{}
 }
 
@@ -43,14 +44,15 @@ type ApiResponse interface {
  	SetModel(db.Model)
  	NewModel() db.Model
 
- 	Query(*db.Query) ([]db.Model, ApiError)
- 	GetQuery() *db.Query
-
- 	FindOne(id string) (db.Model, ApiError)
- 	ApiFindOne(id string, r ApiRequest) ApiResponse
+ 	Q() *db.Query
 
  	Find(*db.Query) ([]db.Model, ApiError)
+ 	FindOne(id string) (db.Model, ApiError)
+
+ 	ApiFindOne(string, ApiRequest) ApiResponse
  	ApiFind(*db.Query, ApiRequest) ApiResponse
+ 	// Same as find, but response meta will contain a total count.
+ 	ApiFindPaginated(*db.Query, ApiRequest) ApiResponse
 
  	Create(obj db.Model, user ApiUser) ApiError
  	ApiCreate(obj db.Model, r ApiRequest) ApiResponse
@@ -67,43 +69,23 @@ type ApiHooks interface {
 }
 
 /**
- * Query hook.
- */
-
-type UserCanQueryHook interface {
-	UserCanQuery(q db.Query, user ApiUser)
-}
-
-/**
- * FindOne hooks.
- */
-
-type ApiFindOneHook interface {
-	ApiFindOne(res ApiResource, id string, r ApiRequest) ApiResponse
-}
-
-type UserCanFindOneHook interface {
-	UserCanFindOne(res ApiResource, obj db.Model, user ApiUser) bool
-}
-
-type ApiAfterFindOneHook interface {
-	ApiAfterFindOne(res ApiResource, obj db.Model, user ApiUser) ApiError
-}
-
-/**
  * Find hooks.
  */
+
+type AllowFindHook interface {
+	AllowFind(res ApiResource, model db.Model, user ApiUser) bool
+}
 
 type ApiFindHook interface {
 	ApiFind(res ApiResource, query *db.Query, r ApiRequest) ApiResponse
 }
 
-type UserCanFindHook interface {
-	UserCanFind(res ApiResource, objs []db.Model, user ApiUser) bool
+type ApiAlterQueryHook interface {
+	ApiAlterQuery(res ApiResource, query *db.Query, r ApiRequest)  ApiError
 }
 
 type ApiAfterFindHook interface {
-	ApiAfterFind(res ApiResource, objs []db.Model, user ApiUser) ApiError
+	ApiAfterFind(res ApiResource, obj []db.Model, user ApiUser) ApiError
 }
 
 /**
@@ -122,14 +104,13 @@ type BeforeCreateHook interface {
 	BeforeCreate(res ApiResource, obj db.Model, user ApiUser) ApiError
 }
 
-type UserCanCreateHook interface {
-	UserCanCreate(res ApiResource, obj db.Model, user ApiUser) bool
+type AllowCreateHook interface {
+	AllowCreate(res ApiResource, obj db.Model, user ApiUser) bool
 }
 
 type AfterCreateHook interface {
 	AfterCreate(res ApiResource, obj db.Model, user ApiUser) ApiError
 }
-
 
 /**
  * Update hooks.
@@ -143,17 +124,16 @@ type UpdateHook interface {
 	Update(res ApiResource, obj db.Model, r ApiRequest) ApiError
 }
 
-
 type BeforeUpdateHook interface {
 	BeforeUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
 }
 
-type AfterUpdateHook interface {
-	AfterUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
+type AllowUpdateHook interface {
+	AllowUpdate(res ApiResource, obj db.Model, old db.Model, user ApiUser) bool
 }
 
-type UserCanUpdateHook interface {
-	UserCanUpdate(res ApiResource, obj db.Model, old db.Model, user ApiUser) bool
+type AfterUpdateHook interface {
+	AfterUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
 }
 
 
@@ -173,8 +153,8 @@ type BeforeDeleteHook interface {
 	BeforeDelete(res ApiResource, obj db.Model, user ApiUser) ApiError
 }
 
-type UserCanDeleteHook interface {
-	UserCanDelete(res ApiResource, obj db.Model, user ApiUser) bool
+type AllowDeleteHook interface {
+	AllowDelete(res ApiResource, obj db.Model, user ApiUser) bool
 }
 
 type AfterDeleteHook interface {

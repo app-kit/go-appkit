@@ -117,6 +117,14 @@ func (a BaseUser) TableName() string {
 	return "users"
 }
 
+func (a BaseUser) GetProfile() kit.ApiUserProfile {
+	return nil
+}
+
+func (a BaseUser) SetProfile(p kit.ApiUserProfile) {
+	
+}
+
 // Implement User interface.
 
 

@@ -15,7 +15,6 @@ func (app *App) InitCli() {
 		Long:  `Start the server`,
 
 		Run: func(cmd *cobra.Command, args []string) {
-			app.ReadConfig(configPath)
 			app.Run()
 		},
 	}
