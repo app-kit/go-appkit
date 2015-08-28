@@ -5,7 +5,7 @@ import (
 	"time"
 	"encoding/json"
 
-	kit "github.com/theduke/appkit"
+	kit "github.com/theduke/go-appkit"
 )
 
 type BaseAuthItem struct {

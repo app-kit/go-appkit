@@ -5,8 +5,8 @@ import(
 	"math/big"	
 	"time"
 
-	kit "github.com/theduke/appkit"
-	db "github.com/theduke/dukedb"
+	kit "github.com/theduke/go-appkit"
+	db "github.com/theduke/go-dukedb"
 )
 
 func randomToken() string {

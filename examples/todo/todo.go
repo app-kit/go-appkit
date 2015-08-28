@@ -6,14 +6,14 @@ import (
 	"strconv"
 
 
-	//"github.com/theduke/appkit"
+	//"github.com/theduke/go-appkit"
 	_ "github.com/lib/pq"
 	"github.com/jinzhu/gorm"
 
-	kit "github.com/theduke/appkit"
-	db "github.com/theduke/dukedb"
-	dbgorm "github.com/theduke/dukedb/backends/gorm"
-	"github.com/theduke/appkit/users"
+	kit "github.com/theduke/go-appkit"
+	db "github.com/theduke/go-dukedb"
+	dbgorm "github.com/theduke/go-dukedb/backends/gorm"
+	"github.com/theduke/go-appkit/users"
 )
 
 type Project struct {

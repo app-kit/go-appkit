@@ -1,8 +1,8 @@
 package users
 
 import (
-	db "github.com/theduke/dukedb"
-	kit "github.com/theduke/appkit"
+	db "github.com/theduke/go-dukedb"
+	kit "github.com/theduke/go-appkit"
 )
 
 func GetUserMigrations(app *kit.App) []db.Migration {

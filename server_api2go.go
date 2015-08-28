@@ -12,7 +12,7 @@ import (
 
 	"github.com/manyminds/api2go"
 
-	db "github.com/theduke/dukedb"
+	db "github.com/theduke/go-dukedb"
 )
 
 func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, ApiError) {

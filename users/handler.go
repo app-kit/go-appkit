@@ -3,8 +3,8 @@ package users
 import(
 	"time"
 
-	kit "github.com/theduke/appkit"
-	"github.com/theduke/appkit/users/auth"
+	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/users/auth"
 )
 
 type UserHandler struct {

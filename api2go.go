@@ -7,7 +7,7 @@ import (
 
 	"github.com/manyminds/api2go/jsonapi"
 
-	db "github.com/theduke/dukedb"
+	db "github.com/theduke/go-dukedb"
 )
 
 type Api2GoModelInterface interface {

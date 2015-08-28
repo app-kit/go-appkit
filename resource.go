@@ -1,7 +1,7 @@
 package appkit
 
 import (
-	db "github.com/theduke/dukedb"	
+	db "github.com/theduke/go-dukedb"	
 )
 
 type Resource struct {

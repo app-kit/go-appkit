@@ -2,7 +2,7 @@ package appkit
 
 import (
 	"time"
-	db "github.com/theduke/dukedb"	
+	db "github.com/theduke/go-dukedb"	
 )
 
 type ApiAuthAdaptor interface {

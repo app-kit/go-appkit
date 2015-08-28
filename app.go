@@ -12,7 +12,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/julienschmidt/httprouter"	
 
-	db "github.com/theduke/dukedb"
+	db "github.com/theduke/go-dukedb"
 )
 
 type App struct {
