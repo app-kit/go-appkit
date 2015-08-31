@@ -145,8 +145,6 @@ func (a *App) Run() {
 }
 
 func (a *App) RegisterBackend(name string, b db.Backend) {
-	b.SetDebug(a.Debug)
-
 	a.backends[name] = b
 	if a.DefaultBackend == nil {
 		a.DefaultBackend = b
