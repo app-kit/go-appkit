@@ -91,6 +91,15 @@ type ApiUser interface {
 	HasRoleStr(string) bool
 }
 
+type ApiUserModel interface {
+	db.Model
+	User() ApiUser
+	SetUser(ApiUser)
+
+	UserID() string
+	SetUserID(string) error
+}
+
 type ApiSession interface {
 	db.Model
 
