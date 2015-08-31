@@ -136,7 +136,58 @@ func buildRequest(
 	return req
 }
 
-func BuildQuery(r api2go.Request, q *db.Query) (*db.Query, error) {
+type Api2GoResponse struct {
+	Res  interface{}
+	Status int
+	Meta map[string]interface{}
+}
+
+// Metadata returns additional meta data
+func (r Api2GoResponse) Metadata() map[string]interface{} {
+	return r.Meta
+}
+
+// Result returns the actual payload
+func (r Api2GoResponse) Result() interface{} {
+	return r.Res
+}
+
+// StatusCode sets the return status code
+func (r Api2GoResponse) StatusCode() int {
+	return r.Status
+}
+
+type Api2GoResource struct {
+	AppResource ApiResource
+	App *App
+}
+
+func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, ApiError) {
+
+	// Handle a json query in metadata.
+	if r.Meta != nil {
+		if rawQuery, ok := r.Meta["query"]; ok {
+			queryData, ok := rawQuery.(map[string]interface{})
+			if !ok {
+				return nil, db.Error{
+					Code: "invalid_query",
+					Message: "Expected query to be dictionary",
+				}
+			}
+
+			collection := res.AppResource.GetModel().Collection()
+			query, err := db.ParseQuery(collection, queryData)
+			if err != nil {
+				return nil, err
+			}
+
+			return query, nil
+		}
+	}
+
+	// Not a custom query.
+	q := res.AppResource.Q()
+
 	// Handle paging params.
 	rawPerPage := r.QueryParams.Get("page[size]")
 	rawPage := r.QueryParams.Get("page[number]")
@@ -172,32 +223,6 @@ func BuildQuery(r api2go.Request, q *db.Query) (*db.Query, error) {
 	return q, nil
 }
 
-type Api2GoResponse struct {
-	Res  interface{}
-	Status int
-	Meta map[string]interface{}
-}
-
-// Metadata returns additional meta data
-func (r Api2GoResponse) Metadata() map[string]interface{} {
-	return r.Meta
-}
-
-// Result returns the actual payload
-func (r Api2GoResponse) Result() interface{} {
-	return r.Res
-}
-
-// StatusCode sets the return status code
-func (r Api2GoResponse) StatusCode() int {
-	return r.Status
-}
-
-type Api2GoResource struct {
-	AppResource ApiResource
-	App *App
-}
-
 func (r Api2GoResource) convertResult(res ApiResponse, status int) (api2go.Responder, error) {
 	if err := res.GetError(); err != nil {
 		status := 500
@@ -219,14 +244,12 @@ func (r Api2GoResource) convertResult(res ApiResponse, status int) (api2go.Respo
 	data := res.GetData()
 	if apiModel, ok := data.(Api2GoModel); ok {
 		apiModel.SetFullModel(data.(db.Model))
-		info := r.AppResource.GetBackend().GetModelInfo(r.AppResource.GetModel().GetCollection())
+		info := r.AppResource.GetBackend().GetModelInfo(r.AppResource.GetModel().Collection())
 		apiModel.SetModelInfo(info)
 	}
 
 	return response, nil
 }
-
-
 
 func (res Api2GoResource) FindOne(rawId string, r api2go.Request) (api2go.Responder, error) {
 	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
@@ -235,7 +258,7 @@ func (res Api2GoResource) FindOne(rawId string, r api2go.Request) (api2go.Respon
 }
 
 func (res Api2GoResource) FindAll(r api2go.Request) (api2go.Responder, error) {
-	q, err := BuildQuery(r, res.AppResource.Q())
+	q, err := res.buildQuery(r)
 	if err != nil {
 		return nil, api2go.NewHTTPError(errors.New("invalid_query"), err.Error(), 500)
 	}
@@ -246,7 +269,7 @@ func (res Api2GoResource) FindAll(r api2go.Request) (api2go.Responder, error) {
 }
 
 func (res Api2GoResource) PaginatedFindAll(r api2go.Request) (uint, api2go.Responder, error) {
-	q, err := BuildQuery(r, res.AppResource.Q())
+	q, err := res.buildQuery(r)
 	if err != nil {
 		return 0, nil, api2go.NewHTTPError(errors.New("invalid_query"), err.Error(), 500)
 	}
@@ -259,9 +282,9 @@ func (res Api2GoResource) PaginatedFindAll(r api2go.Request) (uint, api2go.Respo
  		count = response.GetMeta()["count"].(uint64)
  	}
  	
- 	apiResp, err := res.convertResult(response, 200)
+ 	apiResp, err2 := res.convertResult(response, 200)
 
- 	return uint(count), apiResp, err
+ 	return uint(count), apiResp, err2
 }
 
 func (res Api2GoResource) Create(obj interface{}, r api2go.Request) (api2go.Responder, error) {
