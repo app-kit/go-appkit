@@ -39,7 +39,7 @@ func (b Project) SetID(rawId string) error {
 	return nil
 }
 
-func (p Project) GetCollection() string {
+func (p Project) Collection() string {
 	return "projects"
 }
 
@@ -76,7 +76,7 @@ func (b Todo) SetID(rawId string) error {
 	return nil
 }
 
-func (t Todo) GetCollection() string {
+func (t Todo) Collection() string {
 	return "todos"
 }
 

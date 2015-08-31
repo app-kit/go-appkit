@@ -36,7 +36,7 @@ func (m Api2GoModel) GetReferences() []jsonapi.Reference {
 
 		if fieldInfo.RelationItem != nil {
 			refs = append(refs, jsonapi.Reference{
-				Type: fieldInfo.RelationItem.GetCollection(),
+				Type: fieldInfo.RelationItem.Collection(),
 				Name: fieldInfo.Name,
 			})
 		}
@@ -77,7 +77,7 @@ func (m Api2GoModel) GetReferencedIDs() []jsonapi.ReferenceID {
 				model := sliceItem.Interface().(db.Model)
 				result = append(result, jsonapi.ReferenceID{
 					ID:   model.GetID(),
-					Type: model.GetCollection(),
+					Type: model.Collection(),
 					Name: fieldInfo.Name,
 				})
 			}
@@ -85,7 +85,7 @@ func (m Api2GoModel) GetReferencedIDs() []jsonapi.ReferenceID {
 			model := fieldVal.Interface().(db.Model)
 			result = append(result, jsonapi.ReferenceID{
 				ID:   model.GetID(),
-				Type: model.GetCollection(),
+				Type: model.Collection(),
 				Name: fieldInfo.Name,
 			})
 		}

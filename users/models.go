@@ -15,7 +15,7 @@ type BaseAuthItem struct {
 	Data string `sql:type:text; not null`
 }
 
-func(a *BaseAuthItem) GetCollection() string {
+func(a *BaseAuthItem) Collection() string {
 	return "auth_items"
 }
 
@@ -104,7 +104,7 @@ type BaseUser struct {
 	Roles []*Role `gorm:"many2many:user_roles;" db:"m2m;"`
 }
 
-func (u BaseUser) GetCollection() string {
+func (u BaseUser) Collection() string {
 	return "users"
 }
 
@@ -300,7 +300,7 @@ type BaseSession struct {
 	Typ string `sql:"size:100; not null"`
 }
 
-func (b BaseSession) GetCollection() string {
+func (b BaseSession) Collection() string {
 	return "sessions"
 }
 
@@ -393,7 +393,7 @@ type Role struct {
 	Permissions []*Permission `gorm:"many2many:role_permissions;" db:"m2m"`
 }
 
-func (r Role) GetCollection() string {
+func (r Role) Collection() string {
 	return "roles"
 }
 
@@ -426,7 +426,7 @@ type Permission struct {
 	Name string `gorm:"primary_key" db:"primary_key" sql:"type: varchar(200)"`
 }
 
-func (r Permission) GetCollection() string {
+func (r Permission) Collection() string {
 	return "permissions"
 }
 

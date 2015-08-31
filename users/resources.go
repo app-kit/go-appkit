@@ -43,7 +43,7 @@ func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, kit.Ap
 		return nil, kit.Error{Code: "token_creation_failed"}
 	}
 
-	rawSession, err := res.GetBackend().NewModel(res.GetModel().GetCollection())
+	rawSession, err := res.GetBackend().NewModel(res.GetModel().Collection())
 	if err != nil  {
 		return nil, err
 	}

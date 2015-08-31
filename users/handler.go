@@ -147,7 +147,7 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	user.SetIsActive(true)
 
 	if h.profileModel != nil && user.GetProfile() == nil {
-		newProfile, _ := h.Users.GetBackend().NewModel(h.profileModel.GetCollection())
+		newProfile, _ := h.Users.GetBackend().NewModel(h.profileModel.Collection())
 		user.SetProfile(newProfile.(kit.ApiUserProfile))
 	}
 
@@ -164,7 +164,7 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 		}
 	}
 
-	rawAuth, _ := h.AuthItems.GetBackend().NewModel(h.AuthItems.GetModel().GetCollection())
+	rawAuth, _ := h.AuthItems.GetBackend().NewModel(h.AuthItems.GetModel().Collection())
 	auth := rawAuth.(kit.ApiAuthItem)
 	auth.SetUserID(user.GetID())
 	auth.SetType(adaptorName)

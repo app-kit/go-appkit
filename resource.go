@@ -53,7 +53,7 @@ func(res *Resource) SetModel(x db.Model) {
 }
 
 func (res *Resource) NewModel() db.Model {
-	 n, err := res.Backend.NewModel(res.Model.GetCollection())
+	 n, err := res.Backend.NewModel(res.Model.Collection())
 	 if err != nil {
 	 	return nil
 	 }
@@ -79,7 +79,7 @@ func (res Resource) Query(q *db.Query) ([]db.Model, ApiError) {
  * Return a new query initialized with the backend.
  */
 func (res Resource) Q() *db.Query {
-	return res.Backend.Q(res.Model.GetCollection())
+	return res.Backend.Q(res.Model.Collection())
 }
 
 /**
@@ -87,7 +87,7 @@ func (res Resource) Q() *db.Query {
  */
 
 func (res *Resource) FindOne(rawId string) (db.Model, ApiError) {
-	return res.Backend.FindOne(res.Model.GetCollection(), rawId)
+	return res.Backend.FindOne(res.Model.Collection(), rawId)
 }
 
 /**

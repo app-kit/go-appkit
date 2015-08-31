@@ -192,7 +192,7 @@ func (a *App) RegisterCustomResource(res ApiResource) {
 		res.SetUserHandler(a.userHandler)
 	}
 
-	a.resources[res.GetModel().GetCollection()] = res
+	a.resources[res.GetModel().Collection()] = res
 }
 
 func (a App) GetResource(name string) ApiResource {

@@ -29,7 +29,7 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 
 			if userHandler := app.GetUserHandler(); userHandler != nil {
 				if profile := userHandler.GetProfileModel(); profile != nil {
-					b.CreateCollection(profile.GetCollection())
+					b.CreateCollection(profile.Collection())
 				}
 			}
 
