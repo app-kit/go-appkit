@@ -1,6 +1,8 @@
 package appkit
 
 import (
+	"github.com/julienschmidt/httprouter"
+
 	db "github.com/theduke/go-dukedb"	
 )
 
@@ -29,9 +31,13 @@ type ApiResponse interface {
  */
 
  type ApiResource interface {
+ 	App() *App
+ 	SetApp(*App)
+
  	GetBackend() db.Backend
  	SetBackend(db.Backend)
 
+ 	Hooks() ApiHooks
  	SetHooks(ApiHooks)
 
  	GetDebug() bool
@@ -66,6 +72,16 @@ type ApiResponse interface {
 
 type ApiHooks interface {
 
+}
+
+type ApiWithApp interface {
+	SetApp(*App)
+}
+
+// Allow resource hooks to specify custom http routes.
+type ApiHttpRoutes interface {
+	// Allows to set up custom http handlers with the httprouter directly.
+	HttpRoutes(ApiResource, *httprouter.Router)
 }
 
 /**
