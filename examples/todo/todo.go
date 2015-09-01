@@ -14,6 +14,7 @@ import (
 	db "github.com/theduke/go-dukedb"
 	dbgorm "github.com/theduke/go-dukedb/backends/gorm"
 	"github.com/theduke/go-appkit/users"
+	"github.com/theduke/go-appkit/files"
 )
 
 type Project struct {
@@ -115,13 +116,17 @@ func start() error {
 	backend := dbgorm.New(&db)
 	backend.SetDebug(true)
 
-	userHandler := users.NewUserHandler()
 	//userResource := userHandler.GetUserResource()
 
 	app := kit.NewApp("")	
 	app.RegisterBackend("gorm", backend)
 
+	userHandler := users.NewUserHandler(nil)
 	app.RegisterUserHandler(userHandler)
+
+	fileHandler := files.NewFileHandlerWithFs("data")
+	app.RegisterFileHandler(fileHandler)
+
 	app.RegisterResource(&Project{}, ProjectHooks{})
 	app.RegisterResource(&Todo{}, nil)
 
@@ -131,8 +136,9 @@ func start() error {
 		Name: "todo-count",
 		RequiresUser: false,
 		Run: func(app *kit.App, request *kit.Request) (interface{}, kit.ApiError) {
-			todos := app.GetResource("projects")
-			count, _ := todos.GetQuery().Last()
+			//todos := app.GetResource("projects")
+			//count, _ := todos.GetQuery().Last()
+			count := 10
 
 			return map[string]interface{}{
 				"count": count,

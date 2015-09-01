@@ -28,8 +28,12 @@ type App struct {
 
 	resources map[string]ApiResource
 	userHandler ApiUserHandler
+	fileHandler ApiFileHandler
 
 	methods map[string]*Method
+
+	api2go *api2go.API
+	router *httprouter.Router
 
 	Cli *cobra.Command
 }
@@ -40,8 +44,17 @@ func NewApp(cfgPath string) *App {
 	app.backends = make(map[string]db.Backend)
 	app.methods = make(map[string]*Method)
 
+	app.api2go = api2go.NewAPI("api")
+	app.router = app.api2go.Router()
+
 	app.InitCli()
+	app.ReadConfig(cfgPath)
+
 	return &app
+}
+
+func (a *App) Router() *httprouter.Router {
+	return a.router
 }
 
 func (a *App) ReadConfig(path string) {
@@ -52,7 +65,7 @@ func (a *App) ReadConfig(path string) {
 	var cfg *config.Config	
 
 	if f, err := os.Open(path); err != nil {
-		panic(fmt.Sprintf("Could not find or read config at '%v' - Using default settings\n", path))
+		log.Printf("Could not find or read config at '%v' - Using default settings\n", path)
 	} else {
 		defer f.Close()
 		content, err := ioutil.ReadAll(f)
@@ -67,12 +80,13 @@ func (a *App) ReadConfig(path string) {
 	}
 	
 	if cfg == nil {
-		c, _ := config.ParseYaml("ENV: dev\n")
+		c, _ := config.ParseYaml("ENV: dev\ntmpDir: tmp")
 		cfg = c
 	}
 
 	cfg.Env()
 
+	// Set default values if not present.
 	env := cfg.UString("ENV", "dev")
 	if env == "dev" {
 		log.Printf("No environment specified, defaulting to 'dev'\n")
@@ -80,8 +94,17 @@ func (a *App) ReadConfig(path string) {
 	}
 	a.ENV = env
 
+
 	if envConf, _ := cfg.Get(env); envConf != nil {
 		cfg = envConf
+	}
+
+	// Fill in default values into the config and ensure they are valid.
+
+	// Ensure a tmp directory exists and is readable.
+	tmpDir := cfg.UString("tmpDir", "tmp")
+	if err := os.MkdirAll(tmpDir, 0777); err != nil {
+		panic(fmt.Sprintf("Could not read or create tmp dir at '%v': %v", tmpDir, err))
 	}
 
 	a.Config = cfg
@@ -107,19 +130,15 @@ func (a *App) PrepareForRun() {
 func (a *App) Run() {
 	a.PrepareForRun()
 
-	api := api2go.NewAPI("api")
-
-	// Register methods.
-	router := api.Router()
-
+	// Register all method routes.
 	for key := range a.methods {
 		method := a.methods[key]
 
 		// Use both POST and GET to allow for easier debugging.
-		router.GET("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		a.router.GET("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			JsonWrapHandler(w, r, a, method)
 		})
-		router.POST("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		a.router.POST("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			JsonWrapHandler(w, r, a, method)
 		})
 	}
@@ -127,17 +146,16 @@ func (a *App) Run() {
 	// Register api2json resources.
 	for key := range a.resources {
 		res := a.resources[key]
-		api.AddResource(res.GetModel(), Api2GoResource{
+		a.api2go.AddResource(res.GetModel(), Api2GoResource{
 			AppResource: res,
 			App: a,
 		})
 	}
 
-	handler := api.Handler()
-
 	url := a.Config.UString("host", "localhost") + ":" + a.Config.UString("port", "8000")
-	log.Printf("Serving on %v\n", url)
+	log.Printf("Serving on %v", url)
 	
+	handler := a.api2go.Handler()
 	err := http.ListenAndServe(url, handler)
 	if err != nil {
 		log.Printf("Could not start server: %v\n", err)
@@ -174,7 +192,9 @@ func (a *App) RegisterResource(model db.Model, hooks ApiHooks) {
 }
 
 func (a *App) RegisterCustomResource(res ApiResource) {
+	res.SetApp(a)
 	res.SetDebug(a.Debug)
+	
 	if res.GetBackend() == nil {
 		if a.DefaultBackend == nil {
 			panic("Registering resource without backend, but no default backend set.")
@@ -192,13 +212,20 @@ func (a *App) RegisterCustomResource(res ApiResource) {
 		res.SetUserHandler(a.userHandler)
 	}
 
+	// Allow a resource to register custom http routes.
+	if res.Hooks() != nil {
+		if resRoutes, ok := res.Hooks().(ApiHttpRoutes); ok {
+			resRoutes.HttpRoutes(res, a.router)
+		}
+	}
+
 	a.resources[res.GetModel().Collection()] = res
 }
 
 func (a App) GetResource(name string) ApiResource {
 	r, ok := a.resources[name]
 	if !ok {
-		panic("Unknown resource: " + name)
+		return nil
 	}
 
 	return r
@@ -230,6 +257,22 @@ func (a *App) RegisterUserHandler(h ApiUserHandler) {
 		a.DefaultBackend.RegisterModel(permissions.GetModel())
 		permissions.SetBackend(a.DefaultBackend)
 	}
+}
+
+func (a *App) RegisterFileHandler(f ApiFileHandler) {
+	r := f.Resource()
+	if r == nil {
+		panic("Trying to register file handler without resource")
+	}
+
+	a.RegisterCustomResource(r)
+	f.SetApp(a)
+
+	a.fileHandler = f
+}
+
+func (a *App) FileHandler() ApiFileHandler {
+	return a.fileHandler
 }
 
 func (a *App) MigrateBackend(name string, version int, force bool) ApiError {

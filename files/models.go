@@ -23,6 +23,9 @@ type BaseFile struct {
 	extension string
 	fullName string
 
+	title string
+	description string
+
 	size int64
 	mime string 	
 
@@ -95,6 +98,23 @@ func(f *BaseFile) SetFullName(x string) {
 	}
 
 	f.fullName = x
+}
+
+
+func(f *BaseFile) Title() string {
+	return f.title
+}
+
+func(f *BaseFile) SetTitle(x string) {
+	f.title = x
+}
+
+func(f *BaseFile) Description() string {
+	return f.description
+}
+
+func(f *BaseFile) SetDescription(x string) {
+	f.description = x
 }
 
 

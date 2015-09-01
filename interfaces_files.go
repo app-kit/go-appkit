@@ -39,6 +39,12 @@ type ApiFile interface {
 	FullName() string
 	SetFullName(string)
 
+	Title() string
+	SetTitle(string)
+
+	Description() string
+	SetDescription(string)
+
 	// File size in bytes if available.	
 	Size() int64
 	SetSize(int64)
@@ -115,11 +121,13 @@ type ApiFileBackend interface {
 }
 
 type ApiFileHandler interface {
+	SetApp(*App)
+
 	Resource() ApiResource
 	SetResource(ApiResource)
 
 	Backend(string) ApiFileBackend
-	AddBackend(string, ApiFileBackend)
+	AddBackend(ApiFileBackend)
 
 	DefaultBackend() ApiFileBackend
 	SetDefaultBackend(string)
