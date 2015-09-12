@@ -11,6 +11,12 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 	v1 := db.Migration{
 		Name: "Create user system tables",
 		Up: func(b db.MigrationBackend) error {
+			if err := b.CreateCollection("permissions"); err != nil {
+				return err
+			}
+			if err := b.CreateCollection("roles"); err != nil {
+				return err
+			}
 			if err := b.CreateCollection("users"); err != nil {
 				return err
 			}
@@ -18,12 +24,6 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 				return err
 			}
 			if err := b.CreateCollection("auth_items"); err != nil {
-				return err
-			}
-			if err := b.CreateCollection("roles"); err != nil {
-				return err
-			}
-			if err := b.CreateCollection("permissions"); err != nil {
 				return err
 			}
 

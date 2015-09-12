@@ -5,11 +5,12 @@ import (
 	"time"
 	"encoding/json"
 
+	db "github.com/theduke/go-dukedb"
 	kit "github.com/theduke/go-appkit"
 )
 
 type BaseAuthItem struct {
-	UserID string `sql:"-" db:"primary_key"`
+	UserID string `sql:"-" db:"primary-key"`
 	Typ string `sql:"size: 100; not null"`
 
 	Data string `sql:type:text; not null`
@@ -73,7 +74,7 @@ func (b *BaseAuthItem) GetData() (interface{}, error) {
 type BaseAuthItemIntID struct {
 	ID uint64
 	BaseAuthItem
-	UserID uint64 `gorm:"primary_key" sql:"not null;"`
+	UserID uint64 `gorm:"primary-key" sql:"not null;"`
 }
 
 func (u *BaseAuthItemIntID) SetUserID(x string) {
@@ -231,11 +232,25 @@ func (u *BaseUser) HasRoleStr(role string) bool {
 	return false
 }
 
+type BaseUserStrID struct {
+	BaseUser
+	ID string
+}
+
+func (u *BaseUserStrID) SetID(x string) error {
+	u.ID = x
+	return nil
+}
+
+func (u *BaseUserStrID) GetID() string {
+	return u.ID
+}
+
 
 type BaseUserIntID struct {
 	BaseUser
 
-	ID uint64 `gorm:"primary_key" sql:"not null"`
+	ID uint64 `gorm:"primary-key" sql:"not null"`
 }
 
 // For api2go!
@@ -275,7 +290,7 @@ func (p BaseUserProfile) GetUserID() string {
 }
 
 type BaseUserProfileIntID struct {
-	UserID uint64 `gorm:"primary_key" sql:"not null"`
+	UserID uint64 `gorm:"primary-key" sql:"not null"`
 }
 
 func (p *BaseUserProfileIntID) SetUserID(x string) {
@@ -292,7 +307,7 @@ func (p *BaseUserProfileIntID) GetUserID() string {
  */
 
 type BaseSession struct {
-	Token string `gorm:"primary_key" db:"primary_key" sql:"size:100"`
+	Token string `gorm:"primary-key" db:"primary-key" sql:"size:100"`
 	UserID string `sql:"-"`
 	StartedAt  time.Time `sql:"not null" jsonapi:"name=started-at"`
 	ValidUntil time.Time `sql:"not null" jsonapi:"name=valid-until"`	
@@ -368,7 +383,7 @@ func (s *BaseSession) IsGuest() bool {
 
 type BaseSessionIntID struct {
 	BaseSession
-	UserID uint64 `gorm:"primary_key" sql:"not null;"`
+	UserID uint64 `gorm:"primary-key" sql:"not null;"`
 }
 
 func (u *BaseSessionIntID) SetUserID(x string) {
@@ -389,7 +404,7 @@ func (s *BaseSessionIntID) IsGuest() bool {
  */
 
 type Role struct {
-	Name string `gorm:"primary_key" db:"primary_key" sql:"type: varchar(200)"`
+	Name string `gorm:"primary-key" db:"primary-key" sql:"type: varchar(200)"`
 	Permissions []*Permission `gorm:"many2many:role_permissions;" db:"m2m"`
 }
 
@@ -423,7 +438,7 @@ func (r *Role) SetID(n string) error {
  */
 
 type Permission struct {
-	Name string `gorm:"primary_key" db:"primary_key" sql:"type: varchar(200)"`
+	Name string `gorm:"primary-key" db:"primary-key" sql:"type: varchar(200)"`
 }
 
 func (r Permission) Collection() string {
@@ -449,4 +464,63 @@ func (p Permission) GetID() string {
 func (p *Permission) SetID(n string) error {
 	p.Name = n
 	return nil
-} 
+}
+
+/**
+ * Extendable models that are related to a user.
+ */
+
+type BaseUserModelStrID struct {
+	db.BaseModelStrID
+	
+	user *BaseUserStrID
+	userID string
+}
+
+func(m *BaseUserModelStrID) User() kit.ApiUser {
+	return m.user
+}
+
+func(m *BaseUserModelStrID) SetUser(x kit.ApiUser) {
+	m.user = x.(*BaseUserStrID)
+	m.SetUserID(x.GetID())
+}
+
+func(m *BaseUserModelStrID) UserID() string {
+	return m.userID
+}
+
+func(m *BaseUserModelStrID) SetUserID(x string) error {
+	m.userID = x
+	return nil
+}
+
+
+type BaseUserModelIntID struct {
+	db.BaseModelIntID
+	
+	user *BaseUserIntID	
+	userID uint64
+}
+
+func(m *BaseUserModelIntID) User() kit.ApiUser {
+	return m.user
+}
+
+func(m *BaseUserModelIntID) SetUser(x kit.ApiUser) {
+	m.user = x.(*BaseUserIntID)
+	m.SetUserID(x.GetID())
+}
+
+func(m *BaseUserModelIntID) UserID() string {
+	return strconv.FormatUint(m.userID, 10)
+}
+
+func(m *BaseUserModelIntID) SetUserID(rawId string) error {
+	id, err := strconv.ParseUint(rawId, 10, 64)	
+	if err != nil {
+		return err
+	}
+	m.userID = id
+	return nil
+}

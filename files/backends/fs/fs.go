@@ -252,7 +252,7 @@ func (fs Fs) FileIDs(bucket string) ([]string, kit.ApiError) {
 }
 
 func (fs Fs) HasFile(f kit.ApiFile) (bool, kit.ApiError) {
-	return fs.HasFileById(f.Bucket(), f.FullName())
+	return fs.HasFileById(f.GetBucket(), f.GetFullName())
 }
 
 func (fs Fs) HasFileById(bucket, id string) (bool, kit.ApiError) {
@@ -267,7 +267,7 @@ func (fs Fs) HasFileById(bucket, id string) (bool, kit.ApiError) {
 }
 
 func (fs Fs) DeleteFile(f kit.ApiFile) kit.ApiError {
-	return fs.DeleteFileById(f.Bucket(), f.FullName())
+	return fs.DeleteFileById(f.GetBucket(), f.GetFullName())
 }
 
 func (fs Fs) DeleteFileById(bucket, id string) kit.ApiError {
@@ -283,7 +283,7 @@ func (fs Fs) DeleteFileById(bucket, id string) kit.ApiError {
 }
 
 func (fs Fs) Reader(f kit.ApiFile) (*bufio.Reader, kit.ApiError) {
-	return fs.ReaderById(f.Bucket(), f.BackendID())
+	return fs.ReaderById(f.GetBucket(), f.GetBackendID())
 }
 
 func (fs Fs) ReaderById(bucket, id string) (*bufio.Reader, kit.ApiError) {
@@ -304,7 +304,7 @@ func (fs Fs) ReaderById(bucket, id string) (*bufio.Reader, kit.ApiError) {
 }
 
 func (fs Fs) Writer(f kit.ApiFile, create bool) (string, *bufio.Writer, kit.ApiError) {
-	return fs.WriterById(f.Bucket(), f.BackendID(), create)
+	return fs.WriterById(f.GetBucket(), f.GetFullName(), create)
 }
 
 func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, kit.ApiError) {
@@ -315,9 +315,15 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, 
 	if flag, err := fs.HasBucket(bucket); err != nil {
 		return "", nil, err
 	} else if !flag {
-		return "", nil, kit.Error{
-			Code: "unknown_bucket",
-			Message: fmt.Sprintf("Trying to get writer for file %v in non-existant bucket %v", id, bucket),
+		if create {
+			if err := fs.CreateBucket(bucket, nil); err != nil {
+				return "", nil, err
+			}
+		} else {
+			return "", nil, kit.Error{
+				Code: "unknown_bucket",
+				Message: fmt.Sprintf("Trying to get writer for file %v in non-existant bucket %v", id, bucket),
+			}
 		}
 	}
 

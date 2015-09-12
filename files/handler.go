@@ -89,7 +89,7 @@ func(h *FileHandler) SetModel(x interface{}) {
 	h.model = x
 }
 
-func (h FileHandler) BuildFile(bucket, filePath string, user kit.ApiUser) (kit.ApiFile, kit.ApiError) {
+func (h FileHandler) BuildFile(bucket, filePath string, user kit.ApiUser, deleteDir bool) (kit.ApiFile, kit.ApiError) {
 	if h.DefaultBackend == nil {
 		return nil, kit.Error{
 			Code: "no_default_backend",
@@ -97,10 +97,10 @@ func (h FileHandler) BuildFile(bucket, filePath string, user kit.ApiUser) (kit.A
 		}
 	}
 
-	return h.BuildFileInBackend(h.defaultBackend.Name(), bucket, filePath, user)
+	return h.BuildFileInBackend(h.defaultBackend.Name(), bucket, filePath, user, deleteDir)
 }
 
-func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, user kit.ApiUser) (kit.ApiFile, kit.ApiError) {
+func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, user kit.ApiUser, deleteDir bool) (kit.ApiFile, kit.ApiError) {
 	backend := h.backends[backendName]
 	if backend == nil {
 		return nil, kit.Error{
@@ -190,6 +190,11 @@ func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, us
 	// Delete tmp file.
 	os.Remove(filePath)
 
+	if deleteDir {
+		dir := strings.Join(pathParts[:len(pathParts) - 1], string(os.PathSeparator))
+		os.RemoveAll(dir)
+	}
+
 	return file, nil
 }
 
@@ -209,8 +214,8 @@ func (h *FileHandler) FindOne(id string) (kit.ApiFile, kit.ApiError) {
 		file := file.(kit.ApiFile)
 
 		// Set backend on the file if found.
-		if file.BackendName() != "" {
-			if backend, ok := h.backends[file.BackendName()]; ok {
+		if file.GetBackendName() != "" {
+			if backend, ok := h.backends[file.GetBackendName()]; ok {
 				file.SetBackend(backend)
 			}
 		}
@@ -230,8 +235,8 @@ func (h *FileHandler) Find(q *db.Query) ([]kit.ApiFile, kit.ApiError) {
 		file := rawFile.(kit.ApiFile)
 
 		// Set backend on the file if found.
-		if file.BackendName() != "" {
-			if backend, ok := h.backends[file.BackendName()]; ok {
+		if file.GetBackendName() != "" {
+			if backend, ok := h.backends[file.GetBackendName()]; ok {
 				file.SetBackend(backend)
 			}
 		}

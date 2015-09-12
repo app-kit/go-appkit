@@ -4,15 +4,14 @@ import (
 	"log"
 	"time"
 	"strconv"
+	"io/ioutil"
 
 
-	//_ "github.com/lib/pq"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/jinzhu/gorm"
+	_ "github.com/lib/pq"
 
 	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
-	dbgorm "github.com/theduke/go-dukedb/backends/gorm"
+	"github.com/theduke/go-dukedb/backends/sql"
 	"github.com/theduke/go-appkit/users"
 	"github.com/theduke/go-appkit/files"
 )
@@ -109,14 +108,10 @@ func InitMigrations(app *kit.App) {
 }
 
 func start() error {
-	// Build backend.
-	//db, err := gorm.Open("postgres", "user=theduke dbname=docduke sslmode=disable")
-	db, err := gorm.Open("sqlite3", "todo.sqlite3")
+	backend, err := sql.New("postgres", "postgres://test:test@localhost/test?sslmode=disable")
 	if err != nil {
 		return err
 	}
-
-	backend := dbgorm.New(&db)
 	backend.SetDebug(true)
 
 	//userResource := userHandler.GetUserResource()
@@ -156,8 +151,22 @@ func start() error {
 		fs.CreateBucket("test", nil)
 	}
 
-	file, err := fileHandler.BuildFile("test", "tmp/25f58026-5887-464a-be5b-30a2e86e37f0/html.py", nil)
-	log.Printf("file: %+v\nerr: %v", file, err)	
+	dirs, _ := ioutil.ReadDir("tmp/uploads")
+	for _, dir := range dirs {
+		if dir.IsDir() {
+			dirs, _ := ioutil.ReadDir("tmp/uploads/" + dir.Name())
+
+			if len(dirs) < 1 {
+				continue
+			}
+
+			filepath := "tmp/uploads/" + dir.Name() + "/" + dirs[0].Name()
+			log.Printf("Adding file " + filepath)
+
+			file, err := fileHandler.BuildFile("test", filepath, nil, true)
+			log.Printf("file: %+v\nerr: %v", file, err)	
+		}
+	}
 
 	app.RunCli()
 

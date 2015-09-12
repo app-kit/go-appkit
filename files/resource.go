@@ -5,6 +5,7 @@ import(
 	"os"
 	"io"
 	"encoding/json"
+	"strconv"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/twinj/uuid"
@@ -45,7 +46,7 @@ func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string
 
 
 		id := uuid.NewV4().String()
-		path := tmpPath + string(os.PathSeparator) + id
+		path := tmpPath + string(os.PathSeparator) + "uploads" + string(os.PathSeparator) + id
 		
 		if err := os.MkdirAll(path, 0777); err != nil {
 			return nil, kit.Error{
@@ -101,6 +102,7 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource, router *httprouter.Ro
 		panic("Empty tmp path")
 	}
 
+	// Route for uploading files.
 	router.POST("/api/files/upload", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		var data map[string]interface{}
 		code := 200
@@ -157,5 +159,54 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource, router *httprouter.Ro
 
 		w.WriteHeader(code)
 		w.Write(json)
+	})
+
+	router.GET("/files/:id/*rest", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		file, err := res.App().FileHandler().FindOne(params.ByName("id"))
+
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte("Error: " + err.Error()))
+			return
+		}
+
+		if file == nil {
+			w.WriteHeader(404)
+			w.Write([]byte("File not found"))
+		}
+
+		reader, err := file.Reader()
+		if err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte("Error: " + err.Error()))
+			return
+		}
+
+		header := w.Header()
+
+		if file.GetMime() != "" {
+			header.Set("Content-Type", file.GetMime())
+		}
+		if file.GetSize() != 0 {
+			header.Set("Test", strconv.FormatInt(file.GetSize(), 10))
+		}
+
+		buffer := make([]byte, 1024)
+		flusher, canFlush := res.(http.Flusher)
+
+		w.WriteHeader(200)
+
+		for {
+			n, err := reader.Read(buffer)
+			if err != nil {
+				break
+			}
+			if _, err := w.Write(buffer[:n]); err != nil {
+				break
+			}
+			if canFlush {
+				flusher.Flush()
+			}
+		}
 	})
 }

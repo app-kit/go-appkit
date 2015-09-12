@@ -17,53 +17,53 @@ type ApiFile interface {
 
 	// Retrieve the backend the file is stored in or should be stored in.
 	// WARNING: can return nil.
-	Backend() ApiFileBackend
+	GetBackend() ApiFileBackend
 	SetBackend(ApiFileBackend)
 
-	BackendName() string
+	GetBackendName() string
 	SetBackendName(string)
 
-	BackendID() string
+	GetBackendID() string
 	SetBackendID(string) error
 
 	// File bucket.
-	Bucket() string
+	GetBucket() string
 	SetBucket(string)
 
 	// File name without extension.
-	Name() string
+	GetName() string
 	SetName(string)
 
 	// File extension if available.
-	Extension()  string
+	GetExtension()  string
 	SetExtension(string)
 
 	// Name with extension.
-	FullName() string
+	GetFullName() string
 	SetFullName(string)
 
-	Title() string
+	GetTitle() string
 	SetTitle(string)
 
-	Description() string
+	GetDescription() string
 	SetDescription(string)
 
 	// File size in bytes if available.	
-	Size() int64
+	GetSize() int64
 	SetSize(int64)
 
 	// Mime type if available.
-	Mime() string
+	GetMime() string
 	SetMime(string)
 
-	IsImage() bool
+	GetIsImage() bool
 	SetIsImage(bool)
 
 	// File width and hight in pixels for images and videos.
-	Width() int
+	GetWidth() int
 	SetWidth(int)
 
-	Height() int
+	GetHeight() int
 	SetHeight(int)
 
 	// Get a reader for the file.
@@ -141,9 +141,9 @@ type ApiFileHandler interface {
 	// Taken a file in the file system, gather information about it,
 	// store it in the default backend and return a file modelfile in the file system, gather information about it,
 	// store it in the default backend and return a file model
-	BuildFile(bucket, filePath string, user ApiUser) (ApiFile, ApiError)
+	BuildFile(bucket, filePath string, user ApiUser, deleteDir bool) (ApiFile, ApiError)
 
-	BuildFileInBackend(backend, bucket, filePath string, user ApiUser) (ApiFile, ApiError)
+	BuildFileInBackend(backend, bucket, filePath string, user ApiUser, deleteDir bool) (ApiFile, ApiError)
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.
