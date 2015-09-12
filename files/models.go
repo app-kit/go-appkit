@@ -3,6 +3,7 @@ package files
 import(
 	"strings"
 	"bufio"
+	"strconv"
 	
 	kit "github.com/theduke/go-appkit"
 )
@@ -36,6 +37,11 @@ type BaseFile struct {
 }
 
 func (f *BaseFile) Collection() string {
+	return "files"
+}
+
+// Gorm.
+func (f *BaseFile) TableName() string {
 	return "files"
 }
 
@@ -167,6 +173,17 @@ func(f *BaseFile) SetHeight(x int) {
 type FileStrID struct {
 	kit.BaseUserModelStrID
 	BaseFile
+
+	backendID string
+}
+
+func(f *FileStrID) BackendID() string {
+	return f.backendID
+}
+
+func(f *FileStrID) SetBackendID(x string) error {
+	f.backendID = x
+	return nil
 }
 
 // Ensure FileStrID implements ApiFile interface.
@@ -179,11 +196,11 @@ func (f *FileStrID) Reader() (*bufio.Reader, kit.ApiError) {
 	return f.backend.Reader(f)
 }
 
-func (f *FileStrID) Writer() (*bufio.Writer, kit.ApiError) {
+func (f *FileStrID) Writer(create bool) (string, *bufio.Writer, kit.ApiError) {
 	if f.backend == nil {
-		return nil, nil
+		return "", nil, nil
 	}
-	return f.backend.Writer(f)
+	return f.backend.Writer(f, create)
 }
 
 
@@ -194,10 +211,26 @@ func (f *FileStrID) Writer() (*bufio.Writer, kit.ApiError) {
 type FileIntID struct {
 	kit.BaseUserModelIntID
 	BaseFile
+
+	backendID uint64
 }
 
 // Ensure FileIntID implements ApiFile interface.
 var _ kit.ApiFile = (*FileIntID)(nil)
+
+func(f *FileIntID) BackendID() string {
+	return strconv.FormatUint(f.backendID, 10)
+}
+
+func(f *FileIntID) SetBackendID(x string) error {
+	id, err := strconv.ParseUint(x, 10, 64)
+	if err != nil {
+		return err
+	}
+
+	f.backendID = id
+	return nil
+}
 
 func (f *FileIntID) Reader() (*bufio.Reader, kit.ApiError) {
 	if f.backend == nil {
@@ -206,9 +239,9 @@ func (f *FileIntID) Reader() (*bufio.Reader, kit.ApiError) {
 	return f.backend.Reader(f)
 }
 
-func (f *FileIntID) Writer() (*bufio.Writer, kit.ApiError) {
+func (f *FileIntID) Writer(create bool) (string, *bufio.Writer, kit.ApiError) {
 	if f.backend == nil {
-		return nil, nil
+		return "", nil, nil
 	}
-	return f.backend.Writer(f)
+	return f.backend.Writer(f, create)
 }

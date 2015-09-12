@@ -4,9 +4,63 @@ import(
 	"os"
 	"fmt"
 	"bufio"
+	"strings"
+	"strconv"
 
 	kit "github.com/theduke/go-appkit"
 )
+
+func fileExists(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if err == os.ErrNotExist {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	f.Close()
+
+	return true, nil
+}
+
+func findUniqueFilePath(path string) (string, error) {
+	if ok, err := fileExists(path); !ok {
+		return path, nil
+	} else if err != nil {
+		return "", err
+	}
+
+	// File already exists.
+
+	pathParts := strings.Split(path, string(os.PathSeparator))
+	dir := strings.Join(pathParts[:len(pathParts) - 1], string(os.PathSeparator))
+
+	name := pathParts[len(pathParts) - 1]
+	extension := ""
+	index := 1
+
+	parts := strings.Split(name, ".")
+	if len(parts) > 1 {
+		name = strings.Join(parts[:len(parts) - 1], ".")
+		extension = parts[len(parts) - 1]	
+	}
+
+	for {
+		path = dir + string(os.PathSeparator) + name + "_" + strconv.Itoa(index) + "." + extension
+
+		if ok, err := fileExists(path); !ok {
+			// Found non-existant file name!
+			break
+		} else if err != nil {
+			return "", err
+		} else {
+			index++
+		}
+	}
+
+	return path, nil
+}
 
 type Fs struct {
 	name string
@@ -229,10 +283,14 @@ func (fs Fs) DeleteFileById(bucket, id string) kit.ApiError {
 }
 
 func (fs Fs) Reader(f kit.ApiFile) (*bufio.Reader, kit.ApiError) {
-	return fs.ReaderById(f.Bucket(), f.FullName())
+	return fs.ReaderById(f.Bucket(), f.BackendID())
 }
 
 func (fs Fs) ReaderById(bucket, id string) (*bufio.Reader, kit.ApiError) {
+	if id == "" {
+		return nil, kit.Error{Code: "empty_file_id"}
+	}
+
 	path := fs.filePath(bucket, id)
 	f, err := os.Open(path)
 	if err != nil {
@@ -245,28 +303,49 @@ func (fs Fs) ReaderById(bucket, id string) (*bufio.Reader, kit.ApiError) {
 	return bufio.NewReader(f), nil
 }
 
-func (fs Fs) Writer(f kit.ApiFile) (*bufio.Writer, kit.ApiError) {
-	return fs.WriterById(f.Bucket(), f.FullName())
+func (fs Fs) Writer(f kit.ApiFile, create bool) (string, *bufio.Writer, kit.ApiError) {
+	return fs.WriterById(f.Bucket(), f.BackendID(), create)
 }
 
-func (fs Fs) WriterById(bucket, id string) (*bufio.Writer, kit.ApiError) {
+func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, kit.ApiError) {
+	if id == "" {
+		return "", nil, kit.Error{Code: "empty_file_id"}
+	}
+
 	if flag, err := fs.HasBucket(bucket); err != nil {
-		return nil, err
+		return "", nil, err
 	} else if !flag {
-		return nil, kit.Error{
+		return "", nil, kit.Error{
 			Code: "unknown_bucket",
 			Message: fmt.Sprintf("Trying to get writer for file %v in non-existant bucket %v", id, bucket),
 		}
 	}
 
 	path := fs.filePath(bucket, id)
+
+	// When creating, check if a file with the same name already exists,
+	// and if so, append _x to the name.
+	if create {
+		var err error
+		path, err = findUniqueFilePath(path)
+		if err != nil {
+			return "", nil, kit.Error{
+				Code: "read_error",
+				Message: err.Error(),
+			}
+		}
+	}
+
 	f, err := os.Create(path)
 	if err != nil {
-		return nil, kit.Error{
+		return "", nil, kit.Error{
 			Code: "create_failed",
 			Message: fmt.Sprintf("Could not create file %v: %v", path, err),
 		}
 	}
 
-	return bufio.NewWriter(f), nil
+	pathParts := strings.Split(path, string(os.PathSeparator))
+	name := pathParts[len(pathParts) - 1]
+
+	return name, bufio.NewWriter(f), nil
 }

@@ -23,6 +23,9 @@ type ApiFile interface {
 	BackendName() string
 	SetBackendName(string)
 
+	BackendID() string
+	SetBackendID(string) error
+
 	// File bucket.
 	Bucket() string
 	SetBucket(string)
@@ -70,7 +73,7 @@ type ApiFile interface {
 
 	// Get a writer for the file.
 	// Might return an error if the file is not connected to a backend.
-	Writer() (*bufio.Writer, ApiError)
+	Writer(create bool) (string, *bufio.Writer, ApiError)
 }
 
 type ApiFileBackend interface {
@@ -115,9 +118,9 @@ type ApiFileBackend interface {
 	ReaderById(bucket, id string) (*bufio.Reader, ApiError)
 
 	// Retrieve a writer for a file in a bucket.
-	Writer(ApiFile) (*bufio.Writer, ApiError)
+	Writer(f ApiFile, create bool) (string, *bufio.Writer, ApiError)
 	// Retrieve a writer for a file in a bucket.
-	WriterById(bucket, id string) (*bufio.Writer, ApiError)
+	WriterById(bucket, id string, create bool) (string, *bufio.Writer, ApiError)
 }
 
 type ApiFileHandler interface {
@@ -134,6 +137,13 @@ type ApiFileHandler interface {
 
 	Model() interface{}
 	SetModel(interface{})
+
+	// Taken a file in the file system, gather information about it,
+	// store it in the default backend and return a file modelfile in the file system, gather information about it,
+	// store it in the default backend and return a file model
+	BuildFile(bucket, filePath string, user ApiUser) (ApiFile, ApiError)
+
+	BuildFileInBackend(backend, bucket, filePath string, user ApiUser) (ApiFile, ApiError)
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.

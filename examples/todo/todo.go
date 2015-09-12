@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 
-	//"github.com/theduke/go-appkit"
-	_ "github.com/lib/pq"
+	//_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/jinzhu/gorm"
 
 	kit "github.com/theduke/go-appkit"
@@ -86,17 +86,19 @@ func InitMigrations(app *kit.App) {
 	
 	userMigrations := users.GetUserMigrations(app)
 	handler.Add(userMigrations[0])
-	handler.Add(userMigrations[1])
+	//handler.Add(userMigrations[1])
 
 
 	v2 := db.Migration{
 		Name: "create tables",
 		Up: func(b db.MigrationBackend) error {
-			db := b.(*dbgorm.Backend).Db
-			if err := db.CreateTable(&Todo{}).Error; err != nil {
+			if err := b.CreateCollection("todos"); err != nil {
 				return err
 			}
-			if err := db.CreateTable(&Project{}).Error; err != nil {
+			if err := b.CreateCollection("projects"); err != nil {
+				return err
+			}
+			if err := b.CreateCollection("files"); err != nil {
 				return err
 			}
 
@@ -108,7 +110,8 @@ func InitMigrations(app *kit.App) {
 
 func start() error {
 	// Build backend.
-	db, err := gorm.Open("postgres", "user=theduke dbname=docduke sslmode=disable")
+	//db, err := gorm.Open("postgres", "user=theduke dbname=docduke sslmode=disable")
+	db, err := gorm.Open("sqlite3", "todo.sqlite3")
 	if err != nil {
 		return err
 	}
@@ -147,6 +150,14 @@ func start() error {
 	})
 
 	InitMigrations(app)
+
+	fs := fileHandler.Backend("fs")
+	if ok, _ := fs.HasBucket("test"); !ok {
+		fs.CreateBucket("test", nil)
+	}
+
+	file, err := fileHandler.BuildFile("test", "tmp/25f58026-5887-464a-be5b-30a2e86e37f0/html.py", nil)
+	log.Printf("file: %+v\nerr: %v", file, err)	
 
 	app.RunCli()
 

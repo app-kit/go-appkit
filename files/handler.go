@@ -2,6 +2,10 @@ package files
 
 import (
 	"fmt"
+	"os"
+	"mime"
+	"strings"
+	"io"
 	
 	db "github.com/theduke/go-dukedb"	
 	kit "github.com/theduke/go-appkit"
@@ -83,6 +87,110 @@ func(h *FileHandler) Model() interface{} {
 
 func(h *FileHandler) SetModel(x interface{}) {
 	h.model = x
+}
+
+func (h FileHandler) BuildFile(bucket, filePath string, user kit.ApiUser) (kit.ApiFile, kit.ApiError) {
+	if h.DefaultBackend == nil {
+		return nil, kit.Error{
+			Code: "no_default_backend",
+			Message: "Cant build a file without a default backend.",
+		}
+	}
+
+	return h.BuildFileInBackend(h.defaultBackend.Name(), bucket, filePath, user)
+}
+
+func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, user kit.ApiUser) (kit.ApiFile, kit.ApiError) {
+	backend := h.backends[backendName]
+	if backend == nil {
+		return nil, kit.Error{
+			Code: "unknown_backend",
+			Message: fmt.Sprintf("Backend '%v' was not registered with file handler", backendName),
+		}
+	}
+
+	if filePath == "" || filePath == "." || filePath == ".." {
+		return nil, kit.Error{
+			Code: "invalid_filepath",
+		}
+	}
+
+	stat, err := os.Stat(filePath)
+	if err != nil {
+		return nil, kit.Error{
+			Code: "stat_error",
+			Message: fmt.Sprintf("Could not get file stats for file at %v", filePath),
+		}
+	}
+
+	if stat.IsDir() {
+		return nil, kit.Error{Code: "path_is_directory"}
+	}
+
+	pathParts := strings.Split(filePath, string(os.PathSeparator))
+	fullName := pathParts[len(pathParts) - 1]
+	nameParts := strings.Split(fullName, ".")
+	extension := ""
+
+	if len(nameParts) > 1 {
+		extension = nameParts[len(nameParts) - 1]
+	}
+
+	file := h.New()
+	file.SetBucket(bucket)
+	file.SetFullName(fullName)
+	file.SetSize(stat.Size())
+	file.SetMime(mime.TypeByExtension("." + extension))
+
+	// Todo: isImage, width, height
+
+	// Store the file in the backend.
+	backendId, writer, err2 := file.Writer(true)
+	if err2 != nil {
+		return nil, kit.Error{
+			Code: "backend_error",
+			Message: err2.Error(),
+		}
+	}
+
+	// Open file for reading.
+	f, err := os.Open(filePath)
+	if err != nil {
+		return nil, kit.Error{
+			Code: "read_error",
+			Message: fmt.Sprintf("Could not read file at %v", filePath),
+		}
+	}
+
+	_, err = io.Copy(writer, f)
+	if err != nil {
+		f.Close()
+		return nil, kit.Error{
+			Code: "copy_to_backend_failed",
+			Message: err.Error(),
+		}
+	}
+	f.Close()
+
+	// File is stored in backend now!
+	file.SetBackendID(backendId)
+	file.SetBackendName(backendName)
+
+	// Persist file to db.
+	err2 = h.resource.Create(file, user)
+	if err2 != nil {
+		// Delete file from backend again.
+		backend.DeleteFile(file)
+		return nil, kit.Error{
+			Code: "db_error",
+			Message: fmt.Sprintf("Could not save file to database: %v\n", err2),
+		}
+	}
+
+	// Delete tmp file.
+	os.Remove(filePath)
+
+	return file, nil
 }
 
 func (h *FileHandler) New() kit.ApiFile {

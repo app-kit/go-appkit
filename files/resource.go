@@ -16,10 +16,10 @@ type FilesResource struct {
 }
 
 
-func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string, error) {
+func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string, kit.ApiError) {
 	reader, err := r.MultipartReader()
 	if err != nil {
-		return nil, err
+		return nil, kit.Error{Code: "multipart_error", Message: err.Error()}
 	}
 
 	files := make([]string, 0)
@@ -102,24 +102,56 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource, router *httprouter.Ro
 	}
 
 	router.POST("/api/files/upload", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		files, err := hooks.handleUpload(tmpPath, r)
-
 		var data map[string]interface{}
 		code := 200
+
+		var err kit.ApiError = nil
+
+		if res.App().Config.UBool("fileHandler.requiresAuth", false) {
+			// Authentication is required, so authenticate user first.
+			authHeaderName := res.App().Config.UString("authHeader", "Authentication")
+			token := r.Header.Get(authHeaderName)
+
+			if token == "" {
+				err = kit.Error{
+					Code: "auth_header_missing",
+					Message: "Authentication is required, but Authentication header is missing",
+				}
+				code = 403
+			}
+
+			_, session, err := res.GetUserHandler().VerifySession(token)
+			if err != nil {
+				err = kit.Error{Code: "auth_error"}
+				code = 500
+			}
+			if session == nil {
+				err = kit.Error{Code: "invalid_token"}
+				code = 403
+			}
+		}
+
+		var files []string
+
+		if err == nil {
+			files, err = hooks.handleUpload(tmpPath, r)
+			if err != nil {
+				code = 500
+			}
+		}
 
 		if err != nil {
 			data = map[string]interface{}{
 				"errors": []error{err},
 			}
-			code = 500
 		} else {
 			data = map[string]interface{}{
 				"data": files,
 			}
 		}
 
-		json, err := json.Marshal(data)
-		if err != nil {
+		json, err2 := json.Marshal(data)
+		if err2 != nil {
 			json = []byte(`{"errors": [{code: "json_marshal_failed"}]}`)
 		}
 
