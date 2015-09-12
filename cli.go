@@ -75,7 +75,8 @@ func (app *App) InitCli() {
 					app.RebuildAllBackends()
 					return
 				} else {
-					log.Printf("Need to specify backend.")
+					log.Printf("Usage: db-rebuild BACKEND")
+					return
 				}
 			}
 
