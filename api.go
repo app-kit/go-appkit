@@ -176,6 +176,12 @@ func NewErrorResponse(code, message string) *Response {
 
 type HttpHandler func(*App, ApiRequest, http.ResponseWriter) (ApiResponse, bool)
 
+type HttpRoute struct {
+	Route string
+	Method string
+	Handler HttpHandler
+}
+
 func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
 	code := 200
 	respData := map[string]interface{} {

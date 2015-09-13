@@ -3,8 +3,6 @@ package appkit
 import (
 	"net/http"
 
-	"github.com/julienschmidt/httprouter"
-
 	db "github.com/theduke/go-dukedb"
 )
 
@@ -87,7 +85,7 @@ type ApiWithApp interface {
 // Allow resource hooks to specify custom http routes.
 type ApiHttpRoutes interface {
 	// Allows to set up custom http handlers with the httprouter directly.
-	HttpRoutes(ApiResource, *httprouter.Router)
+	HttpRoutes(ApiResource) []*HttpRoute
 }
 
 /**

@@ -1,13 +1,11 @@
 package files
 
 import (
-	"encoding/json"
 	"io"
 	"net/http"
 	"os"
 	"strconv"
 
-	"github.com/julienschmidt/httprouter"
 	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
@@ -71,7 +69,8 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	}
 }
 
-func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string, kit.ApiError) {
+func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.ApiError) {
+	a.Logger.Info("handling upload")
 	reader, err := r.MultipartReader()
 	if err != nil {
 		return nil, kit.Error{Code: "multipart_error", Message: err.Error()}
@@ -137,129 +136,127 @@ func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string
 	return files, nil
 }
 
-func (hooks FilesResource) HttpRoutes(res kit.ApiResource, router *httprouter.Router) {
-	router.OPTIONS("/api/files/upload", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		header := w.Header()
+func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
+	routes := make([]*kit.HttpRoute, 0)
 
-		allowedOrigins := res.App().Config.UString("fileHandler.allowedOrigins", "*")
-		header.Set("Access-Control-Allow-Origin", allowedOrigins)
+	// Upload route.
+	uploadOptionsRoute := &kit.HttpRoute{
+		Route: "/api/files/upload",
+		Method: "OPTIONS", 
+		Handler: func(a *kit.App, r kit.ApiRequest, w http.ResponseWriter) (kit.ApiResponse, bool) {
+			header := w.Header()
 
-		header.Set("Access-Control-Allow-Methods", "OPTIONS, POST")
-		header.Set("Access-Control-Allow-Headers", "Authentication, Content-Type, Content-Range, Content-Disposition")
+			allowedOrigins := a.Config.UString("fileHandler.allowedOrigins", "*")
+			header.Set("Access-Control-Allow-Origin", allowedOrigins)
 
-		w.WriteHeader(200)
-	})
+			header.Set("Access-Control-Allow-Methods", "OPTIONS, POST")
+
+			allowedHeaders := a.Config.UString("accessControl.allowedHeaders")
+			if allowedHeaders == "" {
+				allowedHeaders = "Authentication, Content-Type, Content-Range, Content-Disposition"
+			} else {
+				allowedHeaders += ", Authentication, Content-Type, Content-Range, Content-Disposition"
+			}
+			header.Set("Access-Control-Allow-Headers", allowedHeaders)
+
+			w.WriteHeader(200)
+			return nil, true
+		},
+	}
+	routes = append(routes, uploadOptionsRoute)
 
 	tmpPath := getTmpPath(res)
 	if tmpPath == "" {
 		panic("Empty tmp path")
 	}
 
-	// Route for uploading files.
-	router.POST("/api/files/upload", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		var data map[string]interface{}
-		code := 200
+	uploadRoute := &kit.HttpRoute{
+		Route: "/api/files/upload",
+		Method: "POST",
+		Handler: func(a *kit.App, r kit.ApiRequest, w http.ResponseWriter) (kit.ApiResponse, bool) {
 
-		var err kit.ApiError = nil
-
-		if res.App().Config.UBool("fileHandler.requiresAuth", false) {
-			// Authentication is required, so authenticate user first.
-			authHeaderName := res.App().Config.UString("authHeader", "Authentication")
-			token := r.Header.Get(authHeaderName)
-
-			if token == "" {
-				err = kit.Error{
-					Code:    "auth_header_missing",
-					Message: "Authentication is required, but Authentication header is missing",
+			if a.Config.UBool("fileHandler.requiresAuth", false) {
+				if r.GetUser() == nil {
+					return kit.NewErrorResponse("permission_denied", ""), false
 				}
-				code = 403
 			}
 
-			_, session, err := res.GetUserHandler().VerifySession(token)
-			if err != nil {
-				err = kit.Error{Code: "auth_error"}
-				code = 500
-			}
-			if session == nil {
-				err = kit.Error{Code: "invalid_token"}
-				code = 403
-			}
-		}
+			var files []string
+			var err kit.ApiError
 
-		var files []string
-
-		if err == nil {
-			files, err = hooks.handleUpload(tmpPath, r)
-			if err != nil {
-				code = 500
+			if err == nil {
+				files, err = handleUpload(a, tmpPath, r.GetHttpRequest())
+				if err != nil {
+					return &kit.Response{Error: err}, false
+				}
 			}
-		}
 
-		if err != nil {
-			data = map[string]interface{}{
-				"errors": []error{err},
-			}
-		} else {
-			data = map[string]interface{}{
+			data := map[string]interface{}{
 				"data": files,
 			}
-		}
 
-		json, err2 := json.Marshal(data)
-		if err2 != nil {
-			json = []byte(`{"errors": [{code: "json_marshal_failed"}]}`)
-		}
+			return &kit.Response{Data: data}, false
+		},
+	}
+	routes = append(routes, uploadRoute)
 
-		w.WriteHeader(code)
-		w.Write(json)
-	})
+	serveFileRoute := &kit.HttpRoute{
+		Route: "/files/:id/*rest",
+		Method: "POST",
+		Handler: func(a *kit.App, r kit.ApiRequest, w http.ResponseWriter) (kit.ApiResponse, bool) {
+			file, err := a.FileHandler().FindOne(r.GetContext().String("id"))
+			a.Logger.Info("serving file %+v", file)
 
-	router.GET("/files/:id/*rest", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		file, err := res.App().FileHandler().FindOne(params.ByName("id"))
-
-		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte("Error: " + err.Error()))
-			return
-		}
-
-		if file == nil {
-			w.WriteHeader(404)
-			w.Write([]byte("File not found"))
-		}
-
-		reader, err := file.Reader()
-		if err != nil {
-			w.WriteHeader(500)
-			w.Write([]byte("Error: " + err.Error()))
-			return
-		}
-
-		header := w.Header()
-
-		if file.GetMime() != "" {
-			header.Set("Content-Type", file.GetMime())
-		}
-		if file.GetSize() != 0 {
-			header.Set("Test", strconv.FormatInt(file.GetSize(), 10))
-		}
-
-		buffer := make([]byte, 1024)
-		flusher, canFlush := res.(http.Flusher)
-
-		w.WriteHeader(200)
-
-		for {
-			n, err := reader.Read(buffer)
 			if err != nil {
-				break
+				w.WriteHeader(500)
+				w.Write([]byte("Error: " + err.Error()))
+				return nil, true
 			}
-			if _, err := w.Write(buffer[:n]); err != nil {
-				break
+
+			if file == nil {
+				w.WriteHeader(404)
+				w.Write([]byte("File not found"))
+				return nil, true
 			}
-			if canFlush {
-				flusher.Flush()
+
+			reader, err := file.Reader()
+			if err != nil {
+				w.WriteHeader(500)
+				w.Write([]byte("Error: " + err.Error()))
+				return nil, true
 			}
-		}
-	})
+
+			header := w.Header()
+
+			if file.GetMime() != "" {
+				header.Set("Content-Type", file.GetMime())
+			}
+			if file.GetSize() != 0 {
+				header.Set("Test", strconv.FormatInt(file.GetSize(), 10))
+			}
+
+			buffer := make([]byte, 1024)
+			flusher, canFlush := w.(http.Flusher)
+
+			w.WriteHeader(200)
+
+			for {
+				n, err := reader.Read(buffer)
+				if err != nil {
+					break
+				}
+				if _, err := w.Write(buffer[:n]); err != nil {
+					break
+				}
+				if canFlush {
+					flusher.Flush()
+				}
+			}
+
+			return nil, true
+		},
+	}
+	routes = append(routes, serveFileRoute)
+
+	return routes
 }

@@ -296,7 +296,15 @@ func (a *App) RegisterCustomResource(res ApiResource) {
 	// Allow a resource to register custom http routes.
 	if res.Hooks() != nil {
 		if resRoutes, ok := res.Hooks().(ApiHttpRoutes); ok {
-			resRoutes.HttpRoutes(res, a.router)
+			for _, route := range resRoutes.HttpRoutes(res) {
+				// Need to wrap this in a lambda, because otherwise, the last routes 
+				// handler will always be called.
+				func(route *HttpRoute) {
+					a.Router().Handle(route.Method, route.Route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) { 
+						httpRequestMiddleware(w, r, params, a, route.Handler)
+					})
+				}(route)
+			}
 		}
 	}
 
