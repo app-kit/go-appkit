@@ -158,7 +158,7 @@ type AfterUpdateHook interface {
  */
 
 type ApiDeleteHook interface {
-	ApiDelete(res ApiResource, obj db.Model, r ApiRequest) ApiResponse
+	ApiDelete(res ApiResource, id string, r ApiRequest) ApiResponse
 }
 
 type DeleteHook interface {

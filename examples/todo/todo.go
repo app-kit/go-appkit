@@ -163,8 +163,11 @@ func start() error {
 			filepath := "tmp/uploads/" + dir.Name() + "/" + dirs[0].Name()
 			log.Printf("Adding file " + filepath)
 
-			file, err := fileHandler.BuildFile("test", filepath, nil, true)
-			log.Printf("file: %+v\nerr: %v", file, err)	
+			f := fileHandler.New()
+			f.SetBucket("test")
+
+			err := fileHandler.BuildFile(f, nil, filepath, true)
+			log.Printf("file: %+v\nerr: %v", f, err)	
 		}
 	}
 

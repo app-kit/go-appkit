@@ -80,7 +80,9 @@ func (a *App) ReadConfig(path string) {
 	}
 	
 	if cfg == nil {
-		c, _ := config.ParseYaml("ENV: dev\ntmpDir: tmp")
+		defaultConfig := "ENV: dev\ntmpDir: tmp"
+
+		c, _ := config.ParseYaml(defaultConfig)
 		cfg = c
 	}
 

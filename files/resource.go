@@ -10,10 +10,65 @@ import(
 	"github.com/julienschmidt/httprouter"
 	"github.com/twinj/uuid"
 
+	db "github.com/theduke/go-dukedb"
 	kit "github.com/theduke/go-appkit"
 )
 
-type FilesResource struct {
+type FilesResource struct {}
+
+func getTmpPath(res kit.ApiResource) string {
+	tmpPath := res.App().Config.UString("tmpDirUploads")
+	if tmpPath == "" {
+		tmpPath = res.App().Config.UString("tmpDir")
+		if tmpPath != "" {
+			tmpPath += string(os.PathSeparator) + "uploads"
+		}
+	}
+
+	return tmpPath
+}
+
+func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
+	tmpPath := getTmpPath(res)
+	if tmpPath == "" {
+		return &kit.Response{
+			Error: kit.Error{
+				Code: "no_tmp_path",
+				Message: "Tmp path is not configured",
+			},
+		}
+	}
+
+	tmpFile := r.GetMeta().GetString("file")
+	if tmpFile == "" {
+		return &kit.Response{
+			Error: kit.Error{
+				Code: "missing_file_in_meta",
+				Message: "Expected 'file' in metadata with id of tmp file",
+			},
+		}
+	}
+
+	tmpPath = tmpPath  + string(os.PathSeparator) + tmpFile
+
+	user := r.GetUser()
+	if allowCreate, ok := r.(kit.AllowCreateHook); ok {
+		if !allowCreate.AllowCreate(res, obj, user) {
+			return kit.NewErrorResponse("permission_denied", "")
+		}
+	}
+
+	file := obj.(kit.ApiFile)
+	err := res.App().FileHandler().BuildFile(file, user, tmpPath, true)
+
+	err = res.Create(obj, user)
+	if err != nil {
+		return &kit.Response{Error: err}
+	}
+
+	return &kit.Response{
+  	Data: obj,
+  }
 }
 
 
@@ -46,7 +101,7 @@ func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string
 
 
 		id := uuid.NewV4().String()
-		path := tmpPath + string(os.PathSeparator) + "uploads" + string(os.PathSeparator) + id
+		path := tmpPath + string(os.PathSeparator) + id
 		
 		if err := os.MkdirAll(path, 0777); err != nil {
 			return nil, kit.Error{
@@ -97,7 +152,7 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource, router *httprouter.Ro
 		w.WriteHeader(200)
 	})
 
-	tmpPath := res.App().Config.UString("tmpDir")
+	tmpPath := getTmpPath(res)
 	if tmpPath == "" {
 		panic("Empty tmp path")
 	}

@@ -138,12 +138,14 @@ type ApiFileHandler interface {
 	Model() interface{}
 	SetModel(interface{})
 
-	// Taken a file in the file system, gather information about it,
-	// store it in the default backend and return a file modelfile in the file system, gather information about it,
-	// store it in the default backend and return a file model
-	BuildFile(bucket, filePath string, user ApiUser, deleteDir bool) (ApiFile, ApiError)
-
-	BuildFileInBackend(backend, bucket, filePath string, user ApiUser, deleteDir bool) (ApiFile, ApiError)
+	// Given a file instance with a specified bucket, read the file from filePath, upload it 
+	// to the backend and then store it in the database.
+	// If no file.GetBackendName() is empty, the default backend will be used.
+	// The file will be deleted if everything succeeds. Otherwise, 
+	// it will be left in the file system.
+	// If deleteDir is true, the directory holding the file will be deleted 
+	// also.
+	BuildFile(file ApiFile, user ApiUser, filePath string, deleteDir bool) ApiError
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.

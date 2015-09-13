@@ -89,42 +89,51 @@ func(h *FileHandler) SetModel(x interface{}) {
 	h.model = x
 }
 
-func (h FileHandler) BuildFile(bucket, filePath string, user kit.ApiUser, deleteDir bool) (kit.ApiFile, kit.ApiError) {
+func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath string, deleteDir bool) kit.ApiError {
 	if h.DefaultBackend == nil {
-		return nil, kit.Error{
+		return kit.Error{
 			Code: "no_default_backend",
 			Message: "Cant build a file without a default backend.",
 		}
 	}
 
-	return h.BuildFileInBackend(h.defaultBackend.Name(), bucket, filePath, user, deleteDir)
-}
+	if file.GetBackendName() == "" {
+		file.SetBackendName(h.DefaultBackend().Name())
+	}
 
-func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, user kit.ApiUser, deleteDir bool) (kit.ApiFile, kit.ApiError) {
-	backend := h.backends[backendName]
+	backend := h.Backend(file.GetBackendName())
 	if backend == nil {
-		return nil, kit.Error{
+		return kit.Error{
 			Code: "unknown_backend",
-			Message: fmt.Sprintf("Backend '%v' was not registered with file handler", backendName),
+			Message: fmt.Sprintf("The backend %v does not exist", file.GetBackendName()),
 		}
 	}
 
-	if filePath == "" || filePath == "." || filePath == ".." {
-		return nil, kit.Error{
-			Code: "invalid_filepath",
+	if file.GetBucket() == "" {
+		return kit.Error{
+			Code: "missing_bucket",
+			Message: "Bucket must be set on the file",
 		}
 	}
 
 	stat, err := os.Stat(filePath)
 	if err != nil {
-		return nil, kit.Error{
+		if err == os.ErrNotExist {
+			return kit.Error{
+				Code: "file_not_found",
+				Message: fmt.Sprintf("File %v does not exist", filePath),
+			}
+		}
+
+		return kit.Error{
 			Code: "stat_error",
-			Message: fmt.Sprintf("Could not get file stats for file at %v", filePath),
+			Message: fmt.Sprintf("Could not get file stats for file at %v: %v", filePath, err),
+			Errors: []error{err},
 		}
 	}
 
 	if stat.IsDir() {
-		return nil, kit.Error{Code: "path_is_directory"}
+		return kit.Error{Code: "path_is_directory"}
 	}
 
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
@@ -136,8 +145,6 @@ func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, us
 		extension = nameParts[len(nameParts) - 1]
 	}
 
-	file := h.New()
-	file.SetBucket(bucket)
 	file.SetFullName(fullName)
 	file.SetSize(stat.Size())
 	file.SetMime(mime.TypeByExtension("." + extension))
@@ -147,7 +154,7 @@ func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, us
 	// Store the file in the backend.
 	backendId, writer, err2 := file.Writer(true)
 	if err2 != nil {
-		return nil, kit.Error{
+		return kit.Error{
 			Code: "backend_error",
 			Message: err2.Error(),
 		}
@@ -156,7 +163,7 @@ func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, us
 	// Open file for reading.
 	f, err := os.Open(filePath)
 	if err != nil {
-		return nil, kit.Error{
+		return kit.Error{
 			Code: "read_error",
 			Message: fmt.Sprintf("Could not read file at %v", filePath),
 		}
@@ -165,7 +172,7 @@ func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, us
 	_, err = io.Copy(writer, f)
 	if err != nil {
 		f.Close()
-		return nil, kit.Error{
+		return kit.Error{
 			Code: "copy_to_backend_failed",
 			Message: err.Error(),
 		}
@@ -174,16 +181,16 @@ func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, us
 
 	// File is stored in backend now!
 	file.SetBackendID(backendId)
-	file.SetBackendName(backendName)
 
 	// Persist file to db.
 	err2 = h.resource.Create(file, user)
 	if err2 != nil {
 		// Delete file from backend again.
 		backend.DeleteFile(file)
-		return nil, kit.Error{
+		return kit.Error{
 			Code: "db_error",
 			Message: fmt.Sprintf("Could not save file to database: %v\n", err2),
+			Errors: []error{err2},
 		}
 	}
 
@@ -195,7 +202,7 @@ func (h FileHandler) BuildFileInBackend(backendName, bucket, filePath string, us
 		os.RemoveAll(dir)
 	}
 
-	return file, nil
+	return nil
 }
 
 func (h *FileHandler) New() kit.ApiFile {
