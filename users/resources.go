@@ -1,8 +1,8 @@
 package users
 
-import(
+import (
 	"crypto/rand"
-	"math/big"	
+	"math/big"
 	"time"
 
 	kit "github.com/theduke/go-appkit"
@@ -44,7 +44,7 @@ func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, kit.Ap
 	}
 
 	rawSession, err := res.GetBackend().NewModel(res.GetModel().Collection())
-	if err != nil  {
+	if err != nil {
 		return nil, err
 	}
 	session := rawSession.(kit.ApiSession)
@@ -54,7 +54,7 @@ func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, kit.Ap
 	session.SetStartedAt(time.Now())
 	session.SetValidUntil(time.Now().Add(time.Hour * 12))
 
-	err = res.Create(session, nil	)
+	err = res.Create(session, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -74,12 +74,12 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
 	userResource := res.GetUserHandler().GetUserResource()
 
 	rawUser, err := userResource.Q().
-	  Filter("username", userIdentifier).Or("email", userIdentifier).First()
+		Filter("username", userIdentifier).Or("email", userIdentifier).First()
 
 	if err != nil {
 		return &kit.Response{Error: err}
 	} else if rawUser == nil {
-		return kit.NewErrorResponse("user_not_found", "User not found for identifier: " + userIdentifier)
+		return kit.NewErrorResponse("user_not_found", "User not found for identifier: "+userIdentifier)
 	}
 
 	user := rawUser.(kit.ApiUser)
@@ -103,12 +103,11 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
 	if err != nil {
 		return &kit.Response{Error: err}
 	}
-		
+
 	return &kit.Response{
 		Data: session,
 	}
 }
-
 
 /**
  * User resource.
@@ -121,7 +120,7 @@ type UserResourceHooks struct {
 func (hooks UserResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
 	meta := r.GetMeta()
 
- 	adaptor := meta.GetString("adaptor")
+	adaptor := meta.GetString("adaptor")
 	if adaptor == "" {
 		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
 	}
@@ -155,9 +154,7 @@ func (hooks UserResourceHooks) AllowDelete(res kit.ApiResource, obj db.Model, ol
 }
 
 type RoleResourceHooks struct {
-
 }
 
 type PermissionResourceHooks struct {
-	
 }

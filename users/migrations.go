@@ -1,8 +1,8 @@
 package users
 
 import (
-	db "github.com/theduke/go-dukedb"
 	kit "github.com/theduke/go-appkit"
+	db "github.com/theduke/go-dukedb"
 )
 
 func GetUserMigrations(app *kit.App) []db.Migration {
@@ -42,7 +42,7 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 		Name: "Create admin role and user",
 		Up: func(b db.MigrationBackend) error {
 			userHandler := app.GetUserHandler()
-			
+
 			permissions := userHandler.GetPermissionResource()
 			allPerm := &Permission{Name: "all"}
 			if err := permissions.Create(allPerm, nil); err != nil {

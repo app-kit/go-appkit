@@ -1,11 +1,9 @@
 package appkit
 
-import (
-
-)
+import ()
 
 type Context struct {
-	Data map[string]interface{}	
+	Data map[string]interface{}
 }
 
 func NewContext() Context {
@@ -37,12 +35,12 @@ func (c *Context) SetString(key, val string) {
 }
 
 type Request struct {
-	User ApiUser
+	User    ApiUser
 	Session ApiSession
 
 	Context Context
-	Meta Context
-	Data interface{}
+	Meta    Context
+	Data    interface{}
 }
 
 func NewRequest() *Request {
@@ -53,50 +51,50 @@ func NewRequest() *Request {
 	return &r
 }
 
-func(r *Request) GetUser() ApiUser {
+func (r *Request) GetUser() ApiUser {
 	return r.User
 }
 
-func(r *Request) SetUser(x ApiUser) {
+func (r *Request) SetUser(x ApiUser) {
 	r.User = x
 }
 
-func(r *Request) GetSession() ApiSession {
+func (r *Request) GetSession() ApiSession {
 	return r.Session
 }
 
-func(r *Request) SetSession(x ApiSession) {
+func (r *Request) SetSession(x ApiSession) {
 	r.Session = x
 }
 
-func(r *Request) GetContext() Context {
+func (r *Request) GetContext() Context {
 	return r.Context
 }
 
-func(r *Request) SetContext(x Context) {
+func (r *Request) SetContext(x Context) {
 	r.Context = x
 }
 
-func(r *Request) GetMeta() Context {
+func (r *Request) GetMeta() Context {
 	return r.Meta
 }
 
-func(r *Request) SetMeta(x Context) {
+func (r *Request) SetMeta(x Context) {
 	r.Meta = x
 }
 
-func(r *Request) GetData() interface{} {
+func (r *Request) GetData() interface{} {
 	return r.Data
 }
 
-func(r *Request) SetData(x interface{}) {
+func (r *Request) SetData(x interface{}) {
 	r.Data = x
 }
 
 type Response struct {
 	Error ApiError
-	Meta map[string]interface{}
-	Data interface{}
+	Meta  map[string]interface{}
+	Data  interface{}
 }
 
 func (r Response) GetError() ApiError {

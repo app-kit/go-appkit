@@ -1,20 +1,20 @@
 package files
 
-import(
+import (
+	"encoding/json"
+	"io"
 	"net/http"
 	"os"
-	"io"
-	"encoding/json"
 	"strconv"
 
 	"github.com/julienschmidt/httprouter"
 	"github.com/twinj/uuid"
 
-	db "github.com/theduke/go-dukedb"
 	kit "github.com/theduke/go-appkit"
+	db "github.com/theduke/go-dukedb"
 )
 
-type FilesResource struct {}
+type FilesResource struct{}
 
 func getTmpPath(res kit.ApiResource) string {
 	tmpPath := res.App().Config.UString("tmpDirUploads")
@@ -33,7 +33,7 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	if tmpPath == "" {
 		return &kit.Response{
 			Error: kit.Error{
-				Code: "no_tmp_path",
+				Code:    "no_tmp_path",
 				Message: "Tmp path is not configured",
 			},
 		}
@@ -43,13 +43,13 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	if tmpFile == "" {
 		return &kit.Response{
 			Error: kit.Error{
-				Code: "missing_file_in_meta",
+				Code:    "missing_file_in_meta",
 				Message: "Expected 'file' in metadata with id of tmp file",
 			},
 		}
 	}
 
-	tmpPath = tmpPath  + string(os.PathSeparator) + tmpFile
+	tmpPath = tmpPath + string(os.PathSeparator) + tmpFile
 
 	user := r.GetUser()
 	if allowCreate, ok := r.(kit.AllowCreateHook); ok {
@@ -67,10 +67,9 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	}
 
 	return &kit.Response{
-  	Data: obj,
-  }
+		Data: obj,
+	}
 }
-
 
 func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string, kit.ApiError) {
 	reader, err := r.MultipartReader()
@@ -87,7 +86,7 @@ func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string
 				break
 			} else {
 				return nil, kit.Error{
-					Code: "read_error",
+					Code:    "read_error",
 					Message: err.Error(),
 				}
 			}
@@ -99,13 +98,12 @@ func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string
 			continue
 		}
 
-
 		id := uuid.NewV4().String()
 		path := tmpPath + string(os.PathSeparator) + id
-		
+
 		if err := os.MkdirAll(path, 0777); err != nil {
 			return nil, kit.Error{
-				Code: "create_dir_failed",
+				Code:    "create_dir_failed",
 				Message: err.Error(),
 			}
 		}
@@ -120,7 +118,7 @@ func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string
 		file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
 			return nil, kit.Error{
-				Code: "file_create_failed",
+				Code:    "file_create_failed",
 				Message: err.Error(),
 			}
 		}
@@ -128,12 +126,12 @@ func (res FilesResource) handleUpload(tmpPath string, r *http.Request) ([]string
 		_, err = io.Copy(file, part)
 		if err != nil {
 			return nil, kit.Error{
-				Code: "file_create_failed",
+				Code:    "file_create_failed",
 				Message: err.Error(),
 			}
 		}
 
-		files = append(files, id + string(os.PathSeparator) + filename)
+		files = append(files, id+string(os.PathSeparator)+filename)
 	}
 
 	return files, nil
@@ -171,7 +169,7 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource, router *httprouter.Ro
 
 			if token == "" {
 				err = kit.Error{
-					Code: "auth_header_missing",
+					Code:    "auth_header_missing",
 					Message: "Authentication is required, but Authentication header is missing",
 				}
 				code = 403

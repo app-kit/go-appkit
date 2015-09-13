@@ -13,10 +13,10 @@ type ApiError interface {
 }
 
 type Error struct {
-	Code string  `json:"code,omitempty"`
-	Message string  `json:"title,omitempty"`
-	Data interface{} `json:"-"`
-	Errors []error
+	Code    string      `json:"code,omitempty"`
+	Message string      `json:"title,omitempty"`
+	Data    interface{} `json:"-"`
+	Errors  []error
 }
 
 func (e Error) GetCode() string {

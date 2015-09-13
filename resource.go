@@ -1,14 +1,14 @@
 package appkit
 
 import (
-	db "github.com/theduke/go-dukedb"	
+	db "github.com/theduke/go-dukedb"
 )
 
 type Resource struct {
-	app *App
-	Debug bool
-	Backend db.Backend
-	hooks ApiHooks
+	app         *App
+	Debug       bool
+	Backend     db.Backend
+	hooks       ApiHooks
 	UserHandler ApiUserHandler
 
 	Model db.Model
@@ -29,44 +29,44 @@ func (res *Resource) SetApp(app *App) {
 	res.app = app
 }
 
-func(res *Resource) GetBackend() db.Backend {
+func (res *Resource) GetBackend() db.Backend {
 	return res.Backend
 }
 
-func(res *Resource) SetBackend(x db.Backend) {
+func (res *Resource) SetBackend(x db.Backend) {
 	res.Backend = x
 }
 
-func(res *Resource) GetDebug() bool {
+func (res *Resource) GetDebug() bool {
 	return res.Debug
 }
 
-func(res *Resource) SetDebug(x bool) {
+func (res *Resource) SetDebug(x bool) {
 	res.Debug = x
 }
 
-func(res *Resource) GetUserHandler() ApiUserHandler {
+func (res *Resource) GetUserHandler() ApiUserHandler {
 	return res.UserHandler
 }
 
-func(res *Resource) SetUserHandler(x ApiUserHandler) {
+func (res *Resource) SetUserHandler(x ApiUserHandler) {
 	res.UserHandler = x
 }
 
-func(res *Resource) GetModel() db.Model {
+func (res *Resource) GetModel() db.Model {
 	return res.Model
 }
 
-func(res *Resource) SetModel(x db.Model) {
+func (res *Resource) SetModel(x db.Model) {
 	res.Model = x
 }
 
 func (res *Resource) NewModel() db.Model {
-	 n, err := res.Backend.NewModel(res.Model.Collection())
-	 if err != nil {
-	 	return nil
-	 }
-	 return n.(db.Model)
+	n, err := res.Backend.NewModel(res.Model.Collection())
+	if err != nil {
+		return nil
+	}
+	return n.(db.Model)
 }
 
 func (res *Resource) Hooks() ApiHooks {
@@ -112,23 +112,23 @@ func (res Resource) Find(query *db.Query) ([]db.Model, ApiError) {
 }
 
 func (res *Resource) ApiFindOne(rawId string, r ApiRequest) ApiResponse {
-  result, err := res.FindOne(rawId)
-  if err != nil {
-    return &Response{Error: err}
-  } else if result == nil {
-  	return NewErrorResponse("not_found", "")
-  }
+	result, err := res.FindOne(rawId)
+	if err != nil {
+		return &Response{Error: err}
+	} else if result == nil {
+		return NewErrorResponse("not_found", "")
+	}
 
-  user := r.GetUser()
-  if allowFind, ok := res.hooks.(AllowFindHook); ok {
-	  if !allowFind.AllowFind(res, result, user) {
-	  	return NewErrorResponse("permission_denied", "")
-	  }
-  }
+	user := r.GetUser()
+	if allowFind, ok := res.hooks.(AllowFindHook); ok {
+		if !allowFind.AllowFind(res, result, user) {
+			return NewErrorResponse("permission_denied", "")
+		}
+	}
 
-  return &Response{
-  	Data: result,
-  }
+	return &Response{
+		Data: result,
+	}
 }
 
 func (res *Resource) ApiFind(query *db.Query, r ApiRequest) ApiResponse {
@@ -141,23 +141,23 @@ func (res *Resource) ApiFind(query *db.Query, r ApiRequest) ApiResponse {
 		alterQuery.ApiAlterQuery(res, query, r)
 	}
 
-  result, err := res.Query(query)
-  if err != nil {
-  	return &Response{Error: err}
-  }
+	result, err := res.Query(query)
+	if err != nil {
+		return &Response{Error: err}
+	}
 
 	user := r.GetUser()
-  if allowFind, ok := res.hooks.(AllowFindHook); ok {
-  	for _, item := range result {
-		  if !allowFind.AllowFind(res, item, user) {
-		  	return NewErrorResponse("permission_denied", "")
-		  }
-  	}
-  }
+	if allowFind, ok := res.hooks.(AllowFindHook); ok {
+		for _, item := range result {
+			if !allowFind.AllowFind(res, item, user) {
+				return NewErrorResponse("permission_denied", "")
+			}
+		}
+	}
 
-  return &Response{
-  	Data: result,
-  }
+	return &Response{
+		Data: result,
+	}
 }
 
 func (res *Resource) ApiFindPaginated(query *db.Query, r ApiRequest) ApiResponse {
@@ -212,8 +212,8 @@ func (res *Resource) ApiCreate(obj db.Model, r ApiRequest) ApiResponse {
 	}
 
 	return &Response{
-  	Data: obj,
-  }
+		Data: obj,
+	}
 }
 
 /**
@@ -265,14 +265,13 @@ func (res *Resource) ApiUpdate(obj db.Model, r ApiRequest) ApiResponse {
 	}
 
 	return &Response{
-  	Data: obj,
-  }
+		Data: obj,
+	}
 }
 
 /**
  * Delete.
  */
-
 
 func (res *Resource) Delete(obj db.Model, user ApiUser) ApiError {
 	if allowDelete, ok := res.hooks.(AllowDeleteHook); ok {
@@ -318,15 +317,15 @@ func (res *Resource) ApiDelete(id string, r ApiRequest) ApiResponse {
 	}
 
 	return &Response{
-  	Data: oldObj,
-  }
+		Data: oldObj,
+	}
 }
 
 /**
  * Read only resource hooks template
  */
 
-type ReadOnlyResource struct {}
+type ReadOnlyResource struct{}
 
 func (r ReadOnlyResource) AllowCreate(res ApiResource, obj db.Model, user ApiUser) bool {
 	return false

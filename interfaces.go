@@ -3,7 +3,7 @@ package appkit
 import (
 	"github.com/julienschmidt/httprouter"
 
-	db "github.com/theduke/go-dukedb"	
+	db "github.com/theduke/go-dukedb"
 )
 
 /**
@@ -19,59 +19,57 @@ type ApiRequest interface {
 }
 
 type ApiResponse interface {
-	GetError() ApiError	
+	GetError() ApiError
 	GetMeta() map[string]interface{}
 	SetMeta(map[string]interface{})
 	GetData() interface{}
 }
 
-
 /**
  * Resource.
  */
 
- type ApiResource interface {
- 	App() *App
- 	SetApp(*App)
+type ApiResource interface {
+	App() *App
+	SetApp(*App)
 
- 	GetBackend() db.Backend
- 	SetBackend(db.Backend)
+	GetBackend() db.Backend
+	SetBackend(db.Backend)
 
- 	Hooks() ApiHooks
- 	SetHooks(ApiHooks)
+	Hooks() ApiHooks
+	SetHooks(ApiHooks)
 
- 	GetDebug() bool
- 	SetDebug(bool)
+	GetDebug() bool
+	SetDebug(bool)
 
- 	SetUserHandler(ApiUserHandler)
+	SetUserHandler(ApiUserHandler)
 	GetUserHandler() ApiUserHandler
 
- 	GetModel() db.Model
- 	SetModel(db.Model)
- 	NewModel() db.Model
+	GetModel() db.Model
+	SetModel(db.Model)
+	NewModel() db.Model
 
- 	Q() *db.Query
+	Q() *db.Query
 
- 	Find(*db.Query) ([]db.Model, ApiError)
- 	FindOne(id string) (db.Model, ApiError)
+	Find(*db.Query) ([]db.Model, ApiError)
+	FindOne(id string) (db.Model, ApiError)
 
- 	ApiFindOne(string, ApiRequest) ApiResponse
- 	ApiFind(*db.Query, ApiRequest) ApiResponse
- 	// Same as find, but response meta will contain a total count.
- 	ApiFindPaginated(*db.Query, ApiRequest) ApiResponse
+	ApiFindOne(string, ApiRequest) ApiResponse
+	ApiFind(*db.Query, ApiRequest) ApiResponse
+	// Same as find, but response meta will contain a total count.
+	ApiFindPaginated(*db.Query, ApiRequest) ApiResponse
 
- 	Create(obj db.Model, user ApiUser) ApiError
- 	ApiCreate(obj db.Model, r ApiRequest) ApiResponse
+	Create(obj db.Model, user ApiUser) ApiError
+	ApiCreate(obj db.Model, r ApiRequest) ApiResponse
 
- 	Update(obj db.Model, user ApiUser) ApiError
- 	ApiUpdate(obj db.Model, r ApiRequest) ApiResponse
+	Update(obj db.Model, user ApiUser) ApiError
+	ApiUpdate(obj db.Model, r ApiRequest) ApiResponse
 
- 	Delete(obj db.Model, user ApiUser) ApiError
- 	ApiDelete(id string, r ApiRequest) ApiResponse
+	Delete(obj db.Model, user ApiUser) ApiError
+	ApiDelete(id string, r ApiRequest) ApiResponse
 }
 
 type ApiHooks interface {
-
 }
 
 type ApiWithApp interface {
@@ -97,7 +95,7 @@ type ApiFindHook interface {
 }
 
 type ApiAlterQueryHook interface {
-	ApiAlterQuery(res ApiResource, query *db.Query, r ApiRequest)  ApiError
+	ApiAlterQuery(res ApiResource, query *db.Query, r ApiRequest) ApiError
 }
 
 type ApiAfterFindHook interface {
@@ -151,7 +149,6 @@ type AllowUpdateHook interface {
 type AfterUpdateHook interface {
 	AfterUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
 }
-
 
 /**
  * Delete hooks.

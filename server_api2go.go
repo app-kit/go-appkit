@@ -1,14 +1,14 @@
 package appkit
 
 import (
-	"log"
-	"strings"
-	"errors"
-	"net/http"
-	"io/ioutil"
-	"fmt"
 	"encoding/json"
+	"errors"
+	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/manyminds/api2go"
 
@@ -21,7 +21,7 @@ func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, ApiErr
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		return nil, Error{
-			Code: "read_post_error",
+			Code:    "read_post_error",
 			Message: fmt.Sprintf("Request body could not be read: %v", err),
 		}
 	}
@@ -35,7 +35,7 @@ func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, ApiErr
 		err = json.Unmarshal(body, &rawData)
 		if err != nil {
 			return nil, Error{
-				Code: "invalid_json_body",
+				Code:    "invalid_json_body",
 				Message: fmt.Sprintf("POST body json could not be unmarshaled: %v", err),
 			}
 		}
@@ -75,11 +75,11 @@ func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app *App, method *M
 
 	data, err := JsonHandler(r, app, method)
 	code := 200
-	
+
 	resp := map[string]interface{}{
 		"data": data,
-	}	
-	
+	}
+
 	if err != nil {
 		resp["errors"] = []error{err}
 		code = 500
@@ -91,7 +91,7 @@ func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app *App, method *M
 		code = 500
 		resp["errors"] = []error{
 			&Error{
-				Code: "json_encode_error",
+				Code:    "json_encode_error",
 				Message: err.Error(),
 			},
 		}
@@ -108,17 +108,17 @@ func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app *App, method *M
 }
 
 func buildRequest(
-	userHandler ApiUserHandler, 
+	userHandler ApiUserHandler,
 	header http.Header,
 	data interface{},
 	meta map[string]interface{}) *Request {
-	
+
 	req := NewRequest()
-			
+
 	// Handle authentication.
 	if token := header.Get("Authentication"); token != "" {
 		if userHandler != nil {
-			user, session, err := userHandler.VerifySession(token)	
+			user, session, err := userHandler.VerifySession(token)
 			if err == nil {
 				req.User = user
 				req.Session = session
@@ -127,7 +127,7 @@ func buildRequest(
 			}
 		}
 	}
-	
+
 	req.Meta = NewContext()
 	req.Meta.Data = meta
 
@@ -137,9 +137,9 @@ func buildRequest(
 }
 
 type Api2GoResponse struct {
-	Res  interface{}
+	Res    interface{}
 	Status int
-	Meta map[string]interface{}
+	Meta   map[string]interface{}
 }
 
 // Metadata returns additional meta data
@@ -159,7 +159,7 @@ func (r Api2GoResponse) StatusCode() int {
 
 type Api2GoResource struct {
 	AppResource ApiResource
-	App *App
+	App         *App
 }
 
 func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, ApiError) {
@@ -170,7 +170,7 @@ func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, ApiError) {
 			queryData, ok := rawQuery.(map[string]interface{})
 			if !ok {
 				return nil, db.Error{
-					Code: "invalid_query",
+					Code:    "invalid_query",
 					Message: "Expected query to be dictionary",
 				}
 			}
@@ -194,12 +194,12 @@ func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, ApiError) {
 
 	if rawPerPage != "" && rawPage != "" {
 		var page, perPage int
-		
+
 		perPage, _ = strconv.Atoi(rawPerPage)
 		page, _ = strconv.Atoi(rawPage)
 
 		q = q.Limit(perPage)
-		if (page > 1) {
+		if page > 1 {
 			q = q.Offset((page - 1) * perPage)
 		}
 	}
@@ -210,7 +210,7 @@ func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, ApiError) {
 			order := part
 			asc := true
 
-			subParts := strings.Split(part, " ")	
+			subParts := strings.Split(part, " ")
 			if len(subParts) == 2 {
 				order = subParts[0]
 				asc = subParts[1] == "asc"
@@ -236,8 +236,8 @@ func (r Api2GoResource) convertResult(res ApiResponse, status int) (api2go.Respo
 	}
 
 	response := &Api2GoResponse{
-		Res: res.GetData(),
-		Meta: res.GetMeta(),
+		Res:    res.GetData(),
+		Meta:   res.GetMeta(),
 		Status: status,
 	}
 
@@ -253,8 +253,8 @@ func (r Api2GoResource) convertResult(res ApiResponse, status int) (api2go.Respo
 
 func (res Api2GoResource) FindOne(rawId string, r api2go.Request) (api2go.Responder, error) {
 	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
- 	response := res.AppResource.ApiFindOne(rawId, request)
- 	return res.convertResult(response, 200)
+	response := res.AppResource.ApiFindOne(rawId, request)
+	return res.convertResult(response, 200)
 }
 
 func (res Api2GoResource) FindAll(r api2go.Request) (api2go.Responder, error) {
@@ -265,7 +265,7 @@ func (res Api2GoResource) FindAll(r api2go.Request) (api2go.Responder, error) {
 
 	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiFind(q, request)
- 	return res.convertResult(response, 200)
+	return res.convertResult(response, 200)
 }
 
 func (res Api2GoResource) PaginatedFindAll(r api2go.Request) (uint, api2go.Responder, error) {
@@ -276,33 +276,33 @@ func (res Api2GoResource) PaginatedFindAll(r api2go.Request) (uint, api2go.Respo
 
 	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiFindPaginated(q, request)
- 	
- 	var count uint64
- 	if response.GetError() == nil {
- 		count = response.GetMeta()["count"].(uint64)
- 	}
- 	
- 	apiResp, err2 := res.convertResult(response, 200)
 
- 	return uint(count), apiResp, err2
+	var count uint64
+	if response.GetError() == nil {
+		count = response.GetMeta()["count"].(uint64)
+	}
+
+	apiResp, err2 := res.convertResult(response, 200)
+
+	return uint(count), apiResp, err2
 }
 
 func (res Api2GoResource) Create(obj interface{}, r api2go.Request) (api2go.Responder, error) {
 	model := obj.(db.Model)
 	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiCreate(model, request)
- 	return res.convertResult(response, 201)
+	return res.convertResult(response, 201)
 }
 
 func (res Api2GoResource) Update(obj interface{}, r api2go.Request) (api2go.Responder, error) {
 	model := obj.(db.Model)
 	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiUpdate(model, request)
- 	return res.convertResult(response, 200)
+	return res.convertResult(response, 200)
 }
 
 func (res Api2GoResource) Delete(rawId string, r api2go.Request) (api2go.Responder, error) {
 	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiDelete(rawId, request)
- 	return res.convertResult(response, 200)
+	return res.convertResult(response, 200)
 }

@@ -1,28 +1,27 @@
 package main
 
 import (
-	"log"
-	"time"
-	"strconv"
 	"io/ioutil"
-
+	"log"
+	"strconv"
+	"time"
 
 	_ "github.com/lib/pq"
 
 	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/files"
+	"github.com/theduke/go-appkit/users"
 	db "github.com/theduke/go-dukedb"
 	"github.com/theduke/go-dukedb/backends/sql"
-	"github.com/theduke/go-appkit/users"
-	"github.com/theduke/go-appkit/files"
 )
 
 type Project struct {
-	ID uint64 `gorm:"primary_key"`
+	ID   uint64 `gorm:"primary_key"`
 	Name string
 
 	Todos []*Todo
 
-	Todo *Todo
+	Todo   *Todo
 	TodoID uint64
 }
 
@@ -54,12 +53,12 @@ func (p ProjectHooks) BeforeCreate(res kit.ApiResource, obj db.Model, user kit.A
 type Todo struct {
 	ID uint64 `gorm:"primary_key"`
 
-	Name string
+	Name     string
 	Comments string
-	DueDate time.Time
+	DueDate  time.Time
 	Priority int
 
-	Project *Project
+	Project   *Project
 	ProjectID uint64
 }
 
@@ -82,11 +81,10 @@ func (t Todo) Collection() string {
 
 func InitMigrations(app *kit.App) {
 	handler := app.GetBackend("gorm").(db.MigrationBackend).GetMigrationHandler()
-	
+
 	userMigrations := users.GetUserMigrations(app)
 	handler.Add(userMigrations[0])
 	//handler.Add(userMigrations[1])
-
 
 	v2 := db.Migration{
 		Name: "create tables",
@@ -116,7 +114,7 @@ func start() error {
 
 	//userResource := userHandler.GetUserResource()
 
-	app := kit.NewApp("")	
+	app := kit.NewApp("")
 	app.RegisterBackend("gorm", backend)
 
 	userHandler := users.NewUserHandler(nil)
@@ -131,7 +129,7 @@ func start() error {
 	app.PrepareBackends()
 
 	app.RegisterMethod(&kit.Method{
-		Name: "todo-count",
+		Name:         "todo-count",
 		RequiresUser: false,
 		Run: func(app *kit.App, request *kit.Request) (interface{}, kit.ApiError) {
 			//todos := app.GetResource("projects")
@@ -167,7 +165,7 @@ func start() error {
 			f.SetBucket("test")
 
 			err := fileHandler.BuildFile(f, nil, filepath, true)
-			log.Printf("file: %+v\nerr: %v", f, err)	
+			log.Printf("file: %+v\nerr: %v", f, err)
 		}
 	}
 
@@ -180,4 +178,3 @@ func main() {
 	err := start()
 	log.Printf("error: %v\n", err)
 }
-

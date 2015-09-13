@@ -1,14 +1,14 @@
 package files
 
-import(
-	"strings"
+import (
 	"bufio"
 	"strconv"
-	
+	"strings"
+
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/users"
 )
- 
+
 /**
  * Base file.
  */
@@ -19,21 +19,21 @@ type BaseFile struct {
 	Backend kit.ApiFileBackend `db:"-"`
 
 	BackendName string
-	Bucket string
-	
-	Name string
-	Extension string
-	FullName string
+	Bucket      string
 
-	Title string
+	Name      string
+	Extension string
+	FullName  string
+
+	Title       string
 	Description string
 
 	Size int64
-	Mime string 	
+	Mime string
 
 	IsImage bool
 
-	Width int
+	Width  int
 	Height int
 }
 
@@ -46,59 +46,57 @@ func (f *BaseFile) TableName() string {
 	return "files"
 }
 
-func(f *BaseFile) GetBackend() kit.ApiFileBackend {
+func (f *BaseFile) GetBackend() kit.ApiFileBackend {
 	return f.Backend
 }
 
-func(f *BaseFile) SetBackend(x kit.ApiFileBackend) {
+func (f *BaseFile) SetBackend(x kit.ApiFileBackend) {
 	f.Backend = x
 	f.BackendName = x.Name()
 }
 
-func(f *BaseFile) GetBackendName() string {
+func (f *BaseFile) GetBackendName() string {
 	return f.BackendName
 }
 
-func(f *BaseFile) SetBackendName(x string) {
+func (f *BaseFile) SetBackendName(x string) {
 	f.BackendName = x
 }
 
-func(f *BaseFile) GetBucket() string {
+func (f *BaseFile) GetBucket() string {
 	return f.Bucket
 }
 
-func(f *BaseFile) SetBucket(x string) {
+func (f *BaseFile) SetBucket(x string) {
 	f.Bucket = x
 }
 
-
-
-func(f *BaseFile) GetName() string {
+func (f *BaseFile) GetName() string {
 	return f.Name
 }
 
-func(f *BaseFile) SetName(x string) {
+func (f *BaseFile) SetName(x string) {
 	f.Name = x
 }
 
-func(f *BaseFile) GetExtension() string {
+func (f *BaseFile) GetExtension() string {
 	return f.Extension
 }
 
-func(f *BaseFile) SetExtension(x string) {
+func (f *BaseFile) SetExtension(x string) {
 	f.Extension = x
 }
 
-func(f *BaseFile) GetFullName() string {
+func (f *BaseFile) GetFullName() string {
 	return f.FullName
 }
 
-func(f *BaseFile) SetFullName(x string) {
+func (f *BaseFile) SetFullName(x string) {
 	parts := strings.Split(x, ".")
 
 	if len(parts) > 1 {
-		f.Name = strings.Join(parts[:len(parts) - 1], ".")
-		f.Extension = parts[len(parts) - 1]
+		f.Name = strings.Join(parts[:len(parts)-1], ".")
+		f.Extension = parts[len(parts)-1]
 	} else {
 		f.Name = x
 		f.Extension = ""
@@ -107,65 +105,61 @@ func(f *BaseFile) SetFullName(x string) {
 	f.FullName = x
 }
 
-
-func(f *BaseFile) GetTitle() string {
+func (f *BaseFile) GetTitle() string {
 	return f.Title
 }
 
-func(f *BaseFile) SetTitle(x string) {
+func (f *BaseFile) SetTitle(x string) {
 	f.Title = x
 }
 
-func(f *BaseFile) GetDescription() string {
+func (f *BaseFile) GetDescription() string {
 	return f.Description
 }
 
-func(f *BaseFile) SetDescription(x string) {
+func (f *BaseFile) SetDescription(x string) {
 	f.Description = x
 }
 
-
-func(f *BaseFile) GetSize() int64 {
+func (f *BaseFile) GetSize() int64 {
 	return f.Size
 }
 
-func(f *BaseFile) SetSize(x int64) {
+func (f *BaseFile) SetSize(x int64) {
 	f.Size = x
 }
 
-func(f *BaseFile) GetMime() string {
+func (f *BaseFile) GetMime() string {
 	return f.Mime
 }
 
-func(f *BaseFile) SetMime(x string) {
+func (f *BaseFile) SetMime(x string) {
 	f.Mime = x
 }
 
-func(f *BaseFile) GetIsImage() bool {
+func (f *BaseFile) GetIsImage() bool {
 	return f.IsImage
 }
 
-func(f *BaseFile) SetIsImage(x bool) {
+func (f *BaseFile) SetIsImage(x bool) {
 	f.IsImage = x
 }
 
-
-func(f *BaseFile) GetWidth() int {
+func (f *BaseFile) GetWidth() int {
 	return f.Width
 }
 
-func(f *BaseFile) SetWidth(x int) {
+func (f *BaseFile) SetWidth(x int) {
 	f.Width = x
 }
 
-func(f *BaseFile) GetHeight() int {
+func (f *BaseFile) GetHeight() int {
 	return f.Height
 }
 
-func(f *BaseFile) SetHeight(x int) {
+func (f *BaseFile) SetHeight(x int) {
 	f.Height = x
 }
-
 
 /**
  * File with string id.
@@ -178,11 +172,11 @@ type FileStrID struct {
 	BackendID string
 }
 
-func(f *FileStrID) GetBackendID() string {
+func (f *FileStrID) GetBackendID() string {
 	return f.BackendID
 }
 
-func(f *FileStrID) SetBackendID(x string) error {
+func (f *FileStrID) SetBackendID(x string) error {
 	f.BackendID = x
 	return nil
 }
@@ -204,7 +198,6 @@ func (f *FileStrID) Writer(create bool) (string, *bufio.Writer, kit.ApiError) {
 	return f.Backend.Writer(f, create)
 }
 
-
 /**
  * File with int id.
  */
@@ -219,11 +212,11 @@ type FileIntID struct {
 // Ensure FileIntID implements ApiFile interface.
 var _ kit.ApiFile = (*FileIntID)(nil)
 
-func(f *FileIntID) GetBackendID() string {
+func (f *FileIntID) GetBackendID() string {
 	return strconv.FormatUint(f.BackendID, 10)
 }
 
-func(f *FileIntID) SetBackendID(x string) error {
+func (f *FileIntID) SetBackendID(x string) error {
 	id, err := strconv.ParseUint(x, 10, 64)
 	if err != nil {
 		return err

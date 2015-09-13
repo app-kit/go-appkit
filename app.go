@@ -1,16 +1,16 @@
 package appkit
 
 import (
-	"log"
-	"os"
-	"io/ioutil"
-	"net/http"
 	"fmt"
+	"io/ioutil"
+	"log"
+	"net/http"
+	"os"
 
+	"github.com/julienschmidt/httprouter"
 	"github.com/manyminds/api2go"
 	"github.com/olebedev/config"
 	"github.com/spf13/cobra"
-	"github.com/julienschmidt/httprouter"	
 
 	db "github.com/theduke/go-dukedb"
 )
@@ -18,15 +18,15 @@ import (
 type App struct {
 	Debug bool
 
-	ENV string
+	ENV         string
 	AutoMigrate bool
 
 	Config *config.Config
 
 	DefaultBackend db.Backend
-	backends map[string]db.Backend
+	backends       map[string]db.Backend
 
-	resources map[string]ApiResource
+	resources   map[string]ApiResource
 	userHandler ApiUserHandler
 	fileHandler ApiFileHandler
 
@@ -59,10 +59,10 @@ func (a *App) Router() *httprouter.Router {
 
 func (a *App) ReadConfig(path string) {
 	if path == "" {
-		path  = "conf.yaml"
+		path = "conf.yaml"
 	}
 
-	var cfg *config.Config	
+	var cfg *config.Config
 
 	if f, err := os.Open(path); err != nil {
 		log.Printf("Could not find or read config at '%v' - Using default settings\n", path)
@@ -76,9 +76,9 @@ func (a *App) ReadConfig(path string) {
 			if err != nil {
 				panic(fmt.Sprintf("YAML error while parsing config at '%v': %v\n", path, err))
 			}
-		}	
+		}
 	}
-	
+
 	if cfg == nil {
 		defaultConfig := "ENV: dev\ntmpDir: tmp"
 
@@ -95,7 +95,6 @@ func (a *App) ReadConfig(path string) {
 		a.Debug = true
 	}
 	a.ENV = env
-
 
 	if envConf, _ := cfg.Get(env); envConf != nil {
 		cfg = envConf
@@ -122,7 +121,7 @@ func (a *App) PrepareForRun() {
 	a.PrepareBackends()
 
 	// Auto migrate if enabled or not explicitly disabled and env is debug.
-	if auto, err := a.Config.Bool("autoMigrate"); (err == nil && auto) || (err != nil && a.ENV=="dev") {
+	if auto, err := a.Config.Bool("autoMigrate"); (err == nil && auto) || (err != nil && a.ENV == "dev") {
 		if err := a.MigrateAllBackends(false); err != nil {
 			log.Printf("Migration FAILED: %v\n", err)
 		}
@@ -137,10 +136,10 @@ func (a *App) Run() {
 		method := a.methods[key]
 
 		// Use both POST and GET to allow for easier debugging.
-		a.router.GET("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		a.router.GET("/api/method/"+method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			JsonWrapHandler(w, r, a, method)
 		})
-		a.router.POST("/api/method/" + method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		a.router.POST("/api/method/"+method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 			JsonWrapHandler(w, r, a, method)
 		})
 	}
@@ -150,13 +149,13 @@ func (a *App) Run() {
 		res := a.resources[key]
 		a.api2go.AddResource(res.GetModel(), Api2GoResource{
 			AppResource: res,
-			App: a,
+			App:         a,
 		})
 	}
 
 	url := a.Config.UString("host", "localhost") + ":" + a.Config.UString("port", "8000")
 	log.Printf("Serving on %v", url)
-	
+
 	handler := a.api2go.Handler()
 	err := http.ListenAndServe(url, handler)
 	if err != nil {
@@ -183,7 +182,7 @@ func (a *App) GetBackend(name string) db.Backend {
 func (a *App) RegisterMethod(method *Method) {
 	if _, exists := a.methods[method.Name]; exists {
 		panic(fmt.Sprintf("Method name '%v' already registered.", method.Name))
-	}	
+	}
 
 	a.methods[method.Name] = method
 }
@@ -196,7 +195,7 @@ func (a *App) RegisterResource(model db.Model, hooks ApiHooks) {
 func (a *App) RegisterCustomResource(res ApiResource) {
 	res.SetApp(a)
 	res.SetDebug(a.Debug)
-	
+
 	if res.GetBackend() == nil {
 		if a.DefaultBackend == nil {
 			panic("Registering resource without backend, but no default backend set.")
@@ -204,7 +203,7 @@ func (a *App) RegisterCustomResource(res ApiResource) {
 
 		// Set backend.
 		res.SetBackend(a.DefaultBackend)
-	} 
+	}
 
 	// Register model with the backend.
 	res.GetBackend().RegisterModel(res.GetModel())
@@ -282,7 +281,7 @@ func (a *App) MigrateBackend(name string, version int, force bool) ApiError {
 	backend := a.GetBackend(name)
 	if backend == nil {
 		return Error{
-			Code: "unknown_backend",
+			Code:    "unknown_backend",
 			Message: fmt.Sprint("The backend '%v' does not exist", name),
 		}
 	}
@@ -290,7 +289,7 @@ func (a *App) MigrateBackend(name string, version int, force bool) ApiError {
 	migrationBackend, ok := backend.(db.MigrationBackend)
 	if !ok {
 		return Error{
-			Code: "backend_cant_migrate",
+			Code:    "backend_cant_migrate",
 			Message: fmt.Sprintf("The backend '%v' does not support migrations", name),
 		}
 	}
@@ -353,11 +352,11 @@ func (a *App) RebuildBackend(name string) ApiError {
 	if err := a.DropBackend(name); err != nil {
 		return err
 	}
-	
+
 	if err := a.MigrateBackend(name, 0, false); err != nil {
 		log.Printf("Migration failed: %v", err)
 		return Error{
-			Code: "backend_migration_failed",
+			Code:    "backend_migration_failed",
 			Message: err.Error(),
 		}
 	}

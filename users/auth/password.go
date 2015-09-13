@@ -20,7 +20,7 @@ func GetStringFromMap(rawData interface{}, field string) (string, bool) {
 	return pw, true
 }
 
-type AuthAdaptorPassword struct {}
+type AuthAdaptorPassword struct{}
 
 func (a AuthAdaptorPassword) GetName() string {
 	return "password"

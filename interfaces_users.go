@@ -1,8 +1,8 @@
 package appkit
 
 import (
+	db "github.com/theduke/go-dukedb"
 	"time"
-	db "github.com/theduke/go-dukedb"	
 )
 
 type ApiAuthAdaptor interface {
@@ -29,7 +29,7 @@ type ApiAuthItem interface {
  * Users
  */
 
-type ApiUserHandler interface{
+type ApiUserHandler interface {
 	CreateUser(user ApiUser, adaptor string, data interface{}) ApiError
 	AuthenticateUser(user ApiUser, adaptor string, data interface{}) ApiError
 	VerifySession(token string) (ApiUser, ApiSession, ApiError)
@@ -123,7 +123,7 @@ type ApiSession interface {
 
 type ApiRole interface {
 	GetName() string
-	SetName(string) 
+	SetName(string)
 }
 
 type ApiPermission interface {

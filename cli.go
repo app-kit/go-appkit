@@ -23,9 +23,9 @@ func (app *App) InitCli() {
 	var migrateForce bool
 	var migrateAll bool
 	cmdMigrate := &cobra.Command{
-		Use: "migrate [backend] ([version])",
+		Use:   "migrate [backend] ([version])",
 		Short: "Migrate a backend.",
-		Long: "Migrate a backend to newest or optionally specified version",
+		Long:  "Migrate a backend to newest or optionally specified version",
 		Run: func(cmd *cobra.Command, args []string) {
 
 			if migrateAll {
@@ -106,7 +106,7 @@ func (app *App) InitCli() {
 		},
 	}
 	cmdDbDrop.Flags().BoolVarP(&dropAll, "all", "a", false, "Drop all backends")
-	cli.AddCommand(cmdDbDrop	)
+	cli.AddCommand(cmdDbDrop)
 
 	app.Cli = cli
 }

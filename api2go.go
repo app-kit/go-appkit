@@ -1,9 +1,9 @@
 package appkit
 
 import (
+	"errors"
 	"reflect"
 	"strings"
-	"errors"
 
 	"github.com/manyminds/api2go/jsonapi"
 
@@ -17,7 +17,7 @@ type Api2GoModelInterface interface {
 
 type Api2GoModel struct {
 	modelInfo *db.ModelInfo
-	model db.Model
+	model     db.Model
 }
 
 func (m *Api2GoModel) SetModelInfo(info *db.ModelInfo) {
@@ -41,7 +41,7 @@ func (m Api2GoModel) GetReferences() []jsonapi.Reference {
 			})
 		}
 	}
-	
+
 	return refs
 }
 
@@ -142,7 +142,7 @@ func (m *Api2GoModel) SetToOneReferenceID(name, ID string) error {
 		return errors.New("Unknown relation " + name)
 	}
 
-	fieldInfo := m.modelInfo.FieldInfo[fieldName]	
+	fieldInfo := m.modelInfo.FieldInfo[fieldName]
 
 	if fieldInfo.RelationItem == nil {
 		return errors.New(name + " is not a relationship")

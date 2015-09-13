@@ -1,26 +1,26 @@
 package users
 
 import (
+	"encoding/json"
 	"strconv"
 	"time"
-	"encoding/json"
 
-	db "github.com/theduke/go-dukedb"
 	kit "github.com/theduke/go-appkit"
+	db "github.com/theduke/go-dukedb"
 )
 
 type BaseAuthItem struct {
 	UserID string `sql:"-" db:"primary-key"`
-	Typ string `sql:"size: 100; not null"`
+	Typ    string `sql:"size: 100; not null"`
 
 	Data string `sql:type:text; not null`
 }
 
-func(a *BaseAuthItem) Collection() string {
+func (a *BaseAuthItem) Collection() string {
 	return "auth_items"
 }
 
-func(a *BaseAuthItem) GetName() string {
+func (a *BaseAuthItem) GetName() string {
 	return "auth_items"
 }
 
@@ -28,11 +28,11 @@ func (a BaseAuthItem) TableName() string {
 	return "auth_items"
 }
 
-func(a *BaseAuthItem) GetID() string {
-		return ""
+func (a *BaseAuthItem) GetID() string {
+	return ""
 }
 
-func(a *BaseAuthItem) SetID(x string) error {
+func (a *BaseAuthItem) SetID(x string) error {
 	return nil
 }
 
@@ -90,7 +90,6 @@ func (u *BaseAuthItemIntID) GetUserID() string {
 	return strconv.FormatUint(u.UserID, 10)
 }
 
-
 type BaseUser struct {
 	Active bool `sql:"not null"`
 
@@ -110,7 +109,7 @@ func (u BaseUser) Collection() string {
 }
 
 // For api2go!
-func(a *BaseUser) GetName() string {
+func (a *BaseUser) GetName() string {
 	return "users"
 }
 
@@ -123,14 +122,13 @@ func (a BaseUser) GetProfile() kit.ApiUserProfile {
 }
 
 func (a BaseUser) SetProfile(p kit.ApiUserProfile) {
-	
+
 }
 
 // Implement User interface.
 
-
 func (u *BaseUser) SetIsActive(x bool) {
-	u.Active = x	
+	u.Active = x
 }
 
 func (u *BaseUser) IsActive() bool {
@@ -138,7 +136,7 @@ func (u *BaseUser) IsActive() bool {
 }
 
 func (u *BaseUser) SetEmail(x string) {
-	u.Email = x	
+	u.Email = x
 }
 
 func (u *BaseUser) GetEmail() string {
@@ -146,7 +144,7 @@ func (u *BaseUser) GetEmail() string {
 }
 
 func (u *BaseUser) SetUsername(x string) {
-	u.Username = x	
+	u.Username = x
 }
 
 func (u *BaseUser) GetUsername() string {
@@ -154,7 +152,7 @@ func (u *BaseUser) GetUsername() string {
 }
 
 func (u *BaseUser) SetLastLogin(x time.Time) {
-	u.LastLogin = x	
+	u.LastLogin = x
 }
 
 func (u *BaseUser) GetLastLogin() time.Time {
@@ -162,7 +160,7 @@ func (u *BaseUser) GetLastLogin() time.Time {
 }
 
 func (u *BaseUser) SetCreatedAt(x time.Time) {
-	u.CreatedAt = x	
+	u.CreatedAt = x
 }
 
 func (u *BaseUser) GetCreatedAt() time.Time {
@@ -170,7 +168,7 @@ func (u *BaseUser) GetCreatedAt() time.Time {
 }
 
 func (u *BaseUser) SetUpdatedAt(x time.Time) {
-	u.UpdatedAt = x	
+	u.UpdatedAt = x
 }
 
 func (u *BaseUser) GetUpdatedAt() time.Time {
@@ -207,7 +205,7 @@ func (u *BaseUser) RemoveRole(r kit.ApiRole) {
 		if u.Roles[i].Name == r.GetName() {
 			u.Roles = append(u.Roles[:i], u.Roles[i+1:]...)
 		}
-	}	
+	}
 }
 
 func (u *BaseUser) ClearRoles() {
@@ -245,7 +243,6 @@ func (u *BaseUserStrID) SetID(x string) error {
 func (u *BaseUserStrID) GetID() string {
 	return u.ID
 }
-
 
 type BaseUserIntID struct {
 	BaseUser
@@ -303,14 +300,14 @@ func (p *BaseUserProfileIntID) GetUserID() string {
 }
 
 /**
- * BaseSession 
+ * BaseSession
  */
 
 type BaseSession struct {
-	Token string `gorm:"primary-key" db:"primary-key" sql:"size:100"`
-	UserID string `sql:"-"`
+	Token      string    `gorm:"primary-key" db:"primary-key" sql:"size:100"`
+	UserID     string    `sql:"-"`
 	StartedAt  time.Time `sql:"not null" jsonapi:"name=started-at"`
-	ValidUntil time.Time `sql:"not null" jsonapi:"name=valid-until"`	
+	ValidUntil time.Time `sql:"not null" jsonapi:"name=valid-until"`
 
 	Typ string `sql:"size:100; not null"`
 }
@@ -337,11 +334,11 @@ func (s *BaseSession) SetID(x string) error {
 	return nil
 }
 
-func(s *BaseSession) GetType() string {
+func (s *BaseSession) GetType() string {
 	return s.Typ
 }
 
-func(s *BaseSession) SetType(x string) {
+func (s *BaseSession) SetType(x string) {
 	s.Typ = x
 }
 
@@ -404,7 +401,7 @@ func (s *BaseSessionIntID) IsGuest() bool {
  */
 
 type Role struct {
-	Name string `gorm:"primary-key" db:"primary-key" sql:"type: varchar(200)"`
+	Name        string        `gorm:"primary-key" db:"primary-key" sql:"type: varchar(200)"`
 	Permissions []*Permission `gorm:"many2many:role_permissions;" db:"m2m"`
 }
 
@@ -431,7 +428,7 @@ func (r Role) GetID() string {
 func (r *Role) SetID(n string) error {
 	r.Name = n
 	return nil
-} 
+}
 
 /**
  * Permission.
@@ -472,52 +469,51 @@ func (p *Permission) SetID(n string) error {
 
 type BaseUserModelStrID struct {
 	db.BaseModelStrID
-	
-	user *BaseUserStrID
+
+	user   *BaseUserStrID
 	userID string
 }
 
-func(m *BaseUserModelStrID) User() kit.ApiUser {
+func (m *BaseUserModelStrID) User() kit.ApiUser {
 	return m.user
 }
 
-func(m *BaseUserModelStrID) SetUser(x kit.ApiUser) {
+func (m *BaseUserModelStrID) SetUser(x kit.ApiUser) {
 	m.user = x.(*BaseUserStrID)
 	m.SetUserID(x.GetID())
 }
 
-func(m *BaseUserModelStrID) UserID() string {
+func (m *BaseUserModelStrID) UserID() string {
 	return m.userID
 }
 
-func(m *BaseUserModelStrID) SetUserID(x string) error {
+func (m *BaseUserModelStrID) SetUserID(x string) error {
 	m.userID = x
 	return nil
 }
 
-
 type BaseUserModelIntID struct {
 	db.BaseModelIntID
-	
-	user *BaseUserIntID	
+
+	user   *BaseUserIntID
 	userID uint64
 }
 
-func(m *BaseUserModelIntID) User() kit.ApiUser {
+func (m *BaseUserModelIntID) User() kit.ApiUser {
 	return m.user
 }
 
-func(m *BaseUserModelIntID) SetUser(x kit.ApiUser) {
+func (m *BaseUserModelIntID) SetUser(x kit.ApiUser) {
 	m.user = x.(*BaseUserIntID)
 	m.SetUserID(x.GetID())
 }
 
-func(m *BaseUserModelIntID) UserID() string {
+func (m *BaseUserModelIntID) UserID() string {
 	return strconv.FormatUint(m.userID, 10)
 }
 
-func(m *BaseUserModelIntID) SetUserID(rawId string) error {
-	id, err := strconv.ParseUint(rawId, 10, 64)	
+func (m *BaseUserModelIntID) SetUserID(rawId string) error {
+	id, err := strconv.ParseUint(rawId, 10, 64)
 	if err != nil {
 		return err
 	}

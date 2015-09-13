@@ -1,11 +1,11 @@
 package fs
 
-import(
-	"os"
-	"fmt"
+import (
 	"bufio"
-	"strings"
+	"fmt"
+	"os"
 	"strconv"
+	"strings"
 
 	kit "github.com/theduke/go-appkit"
 )
@@ -34,16 +34,16 @@ func findUniqueFilePath(path string) (string, error) {
 	// File already exists.
 
 	pathParts := strings.Split(path, string(os.PathSeparator))
-	dir := strings.Join(pathParts[:len(pathParts) - 1], string(os.PathSeparator))
+	dir := strings.Join(pathParts[:len(pathParts)-1], string(os.PathSeparator))
 
-	name := pathParts[len(pathParts) - 1]
+	name := pathParts[len(pathParts)-1]
 	extension := ""
 	index := 1
 
 	parts := strings.Split(name, ".")
 	if len(parts) > 1 {
-		name = strings.Join(parts[:len(parts) - 1], ".")
-		extension = parts[len(parts) - 1]	
+		name = strings.Join(parts[:len(parts)-1], ".")
+		extension = parts[len(parts)-1]
 	}
 
 	for {
@@ -79,7 +79,7 @@ func New(path string) (*Fs, kit.ApiError) {
 	// Verify root path.
 	if err := os.MkdirAll(path, 0777); err != nil {
 		return nil, kit.Error{
-			Code: "root_dir_initializiation_failed",
+			Code:    "root_dir_initializiation_failed",
 			Message: fmt.Sprintf("Could not read or create the root path %v: ", path, err.Error()),
 		}
 	}
@@ -87,11 +87,11 @@ func New(path string) (*Fs, kit.ApiError) {
 	return fs, nil
 }
 
-func(fs *Fs) Name() string {
+func (fs *Fs) Name() string {
 	return fs.name
 }
 
-func(fs *Fs) SetName(x string) {
+func (fs *Fs) SetName(x string) {
 	fs.name = x
 }
 
@@ -107,7 +107,7 @@ func (fs Fs) Buckets() ([]string, kit.ApiError) {
 	dir, err := os.Open(fs.path)
 	if err != nil {
 		return nil, kit.Error{
-			Code: "read_error",
+			Code:    "read_error",
 			Message: err.Error(),
 		}
 	}
@@ -116,7 +116,7 @@ func (fs Fs) Buckets() ([]string, kit.ApiError) {
 	dirItems, err := dir.Readdir(-1)
 	if err != nil {
 		return nil, kit.Error{
-			Code: "read_error",
+			Code:    "read_error",
 			Message: err.Error(),
 		}
 	}
@@ -144,7 +144,7 @@ func (fs Fs) HasBucket(bucket string) (bool, kit.ApiError) {
 	info, err := f.Stat()
 	if err != nil {
 		return false, kit.Error{
-			Code: "read_error",
+			Code:    "read_error",
 			Message: err.Error(),
 		}
 	}
@@ -159,7 +159,7 @@ func (fs Fs) HasBucket(bucket string) (bool, kit.ApiError) {
 func (fs Fs) CreateBucket(bucket string, _ kit.ApiBucketConfig) kit.ApiError {
 	if err := os.Mkdir(fs.bucketPath(bucket), 0777); err != nil {
 		return kit.Error{
-			Code: "create_bucket_failed",
+			Code:    "create_bucket_failed",
 			Message: err.Error(),
 		}
 	}
@@ -170,7 +170,7 @@ func (fs Fs) CreateBucket(bucket string, _ kit.ApiBucketConfig) kit.ApiError {
 func (fs Fs) DeleteBucket(bucket string) kit.ApiError {
 	if err := os.RemoveAll(fs.bucketPath(bucket)); err != nil {
 		return kit.Error{
-			Code: "bucket_delete_failed",
+			Code:    "bucket_delete_failed",
 			Message: fmt.Sprintf("Could not delete bucket %v: %v", bucket, err),
 		}
 	}
@@ -227,7 +227,7 @@ func (fs Fs) FileIDs(bucket string) ([]string, kit.ApiError) {
 	dir, err := os.Open(bucketPath)
 	if err != nil {
 		return nil, kit.Error{
-			Code: "read_error",
+			Code:    "read_error",
 			Message: err.Error(),
 		}
 	}
@@ -236,7 +236,7 @@ func (fs Fs) FileIDs(bucket string) ([]string, kit.ApiError) {
 	items, err := dir.Readdir(-1)
 	if err != nil {
 		return nil, kit.Error{
-			Code: "read_error",
+			Code:    "read_error",
 			Message: err.Error(),
 		}
 	}
@@ -274,7 +274,7 @@ func (fs Fs) DeleteFileById(bucket, id string) kit.ApiError {
 	path := fs.filePath(bucket, id)
 	if err := os.Remove(path); err != nil {
 		return kit.Error{
-			Code: "file_delete_failed",
+			Code:    "file_delete_failed",
 			Message: fmt.Sprintf("Could not delete file %v from bucket %v: %v", bucket, id, err),
 		}
 	}
@@ -295,7 +295,7 @@ func (fs Fs) ReaderById(bucket, id string) (*bufio.Reader, kit.ApiError) {
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, kit.Error{
-			Code: "read_error",
+			Code:    "read_error",
 			Message: fmt.Sprintf("Could not open file %v: %v", path, err),
 		}
 	}
@@ -321,7 +321,7 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, 
 			}
 		} else {
 			return "", nil, kit.Error{
-				Code: "unknown_bucket",
+				Code:    "unknown_bucket",
 				Message: fmt.Sprintf("Trying to get writer for file %v in non-existant bucket %v", id, bucket),
 			}
 		}
@@ -336,7 +336,7 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, 
 		path, err = findUniqueFilePath(path)
 		if err != nil {
 			return "", nil, kit.Error{
-				Code: "read_error",
+				Code:    "read_error",
 				Message: err.Error(),
 			}
 		}
@@ -345,13 +345,13 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, 
 	f, err := os.Create(path)
 	if err != nil {
 		return "", nil, kit.Error{
-			Code: "create_failed",
+			Code:    "create_failed",
 			Message: fmt.Sprintf("Could not create file %v: %v", path, err),
 		}
 	}
 
 	pathParts := strings.Split(path, string(os.PathSeparator))
-	name := pathParts[len(pathParts) - 1]
+	name := pathParts[len(pathParts)-1]
 
 	return name, bufio.NewWriter(f), nil
 }

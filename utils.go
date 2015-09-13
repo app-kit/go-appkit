@@ -1,15 +1,15 @@
 package appkit
 
-import(
-	"strings"
+import (
 	"regexp"
+	"strings"
 )
 
 func Canonicalize(str string) string {
 	str = strings.TrimSpace(strings.ToLower(str))
 	// Remove spaces.
 	str = regexp.MustCompile("\\s+").ReplaceAllString(str, "_")
-	
+
 	// Replace german umlaute.
 	str = strings.Replace(str, "ö", "oe", -1)
 	str = strings.Replace(str, "ä", "ae", -1)

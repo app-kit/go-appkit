@@ -1,6 +1,6 @@
 package users
 
-import(
+import (
 	"time"
 
 	kit "github.com/theduke/go-appkit"
@@ -8,11 +8,11 @@ import(
 )
 
 type UserHandler struct {
-	Users kit.ApiResource
-	Sessions kit.ApiResource
+	Users     kit.ApiResource
+	Sessions  kit.ApiResource
 	AuthItems kit.ApiResource
 
-	Roles kit.ApiResource
+	Roles       kit.ApiResource
 	Permissions kit.ApiResource
 
 	profileModel kit.ApiUserProfile
@@ -42,52 +42,47 @@ func NewUserHandler(profileModel kit.ApiUserProfile) *UserHandler {
 	})
 	h.Sessions = sessions
 
-	
 	auths := kit.NewResource(&BaseAuthItemIntID{}, nil)
 	h.AuthItems = auths
 
-	roles := kit.NewResource(&Role{}, RoleResourceHooks{
-
-	})
+	roles := kit.NewResource(&Role{}, RoleResourceHooks{})
 	h.Roles = roles
 
-	permissions := kit.NewResource(&Permission{}, PermissionResourceHooks{
-
-	})
+	permissions := kit.NewResource(&Permission{}, PermissionResourceHooks{})
 	h.Permissions = permissions
 
 	return &h
 }
 
 func (h *UserHandler) GetAuthAdaptor(name string) kit.ApiAuthAdaptor {
-	return h.AuthAdaptors[name];
+	return h.AuthAdaptors[name]
 }
 
 func (h *UserHandler) AddAuthAdaptor(a kit.ApiAuthAdaptor) {
 	h.AuthAdaptors[a.GetName()] = a
 }
 
-func(h *UserHandler) GetUserResource() kit.ApiResource {
+func (h *UserHandler) GetUserResource() kit.ApiResource {
 	return h.Users
 }
 
-func(h *UserHandler) SetUserResource(x kit.ApiResource) {
+func (h *UserHandler) SetUserResource(x kit.ApiResource) {
 	h.Users = x
 }
 
-func(h *UserHandler) GetSessionResource() kit.ApiResource {
+func (h *UserHandler) GetSessionResource() kit.ApiResource {
 	return h.Sessions
 }
 
-func(h *UserHandler) SetSessionResource(x kit.ApiResource) {
+func (h *UserHandler) SetSessionResource(x kit.ApiResource) {
 	h.Sessions = x
 }
 
-func(h *UserHandler) GetAuthItemResource() kit.ApiResource {
+func (h *UserHandler) GetAuthItemResource() kit.ApiResource {
 	return h.AuthItems
 }
 
-func(h *UserHandler) SetAuthItemResource(x kit.ApiResource) {
+func (h *UserHandler) SetAuthItemResource(x kit.ApiResource) {
 	h.AuthItems = x
 }
 
@@ -99,27 +94,25 @@ func (h *UserHandler) GetProfileModel() kit.ApiUserProfile {
  * RBAC resources.
  */
 
-func(u *UserHandler) GetRoleResource() kit.ApiResource {
+func (u *UserHandler) GetRoleResource() kit.ApiResource {
 	return u.Roles
 }
 
-func(u *UserHandler) SetRoleResource(x kit.ApiResource) {
+func (u *UserHandler) SetRoleResource(x kit.ApiResource) {
 	u.Roles = x
 }
 
-func(u *UserHandler) GetPermissionResource() kit.ApiResource {
+func (u *UserHandler) GetPermissionResource() kit.ApiResource {
 	return u.Permissions
 }
 
-func(u *UserHandler) SetPermissionResource(x kit.ApiResource) {
+func (u *UserHandler) SetPermissionResource(x kit.ApiResource) {
 	u.Permissions = x
 }
 
-
-
 func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData interface{}) kit.ApiError {
 	adaptor := h.GetAuthAdaptor(adaptorName)
-	if adaptor == nil  {
+	if adaptor == nil {
 		return kit.Error{Code: "unknown_auth_adaptor"}
 	}
 
@@ -131,15 +124,15 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	if user.GetUsername() == "" {
 		user.SetUsername(user.GetEmail())
 	}
-	
+
 	// Check if user with same username or email exists.
 	oldUser, err2 := h.Users.Q().
-	  Filter("email", user.GetEmail()).Or("username", user.GetUsername()).First()
+		Filter("email", user.GetEmail()).Or("username", user.GetUsername()).First()
 	if err2 != nil {
 		return err2
 	} else if oldUser != nil {
 		return kit.Error{
-			Code: "user_exists", 
+			Code:    "user_exists",
 			Message: "A user with the username or email already exists",
 		}
 	}
@@ -186,12 +179,12 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 	authAdaptor := h.GetAuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
 		return kit.Error{
-			Code: "unknown_auth_adaptor", 
+			Code:    "unknown_auth_adaptor",
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
 
 	rawAuth, err := h.AuthItems.Q().
-	  Filter("typ", authAdaptorName).And("user_id", user.GetID()).First()
+		Filter("typ", authAdaptorName).And("user_id", user.GetID()).First()
 
 	if err != nil {
 		return err
@@ -202,7 +195,7 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 	cleanData, err2 := auth.GetData()
 	if err2 != nil {
 		return kit.Error{
-			Code: "invalid_auth_data", 
+			Code:    "invalid_auth_data",
 			Message: err.Error(),
 		}
 	}

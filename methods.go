@@ -1,11 +1,9 @@
 package appkit
 
-import (
-
-)
+import ()
 
 type Method struct {
-	Name string
+	Name         string
 	RequiresUser bool
 
 	Run func(a *App, r *Request) (interface{}, ApiError)

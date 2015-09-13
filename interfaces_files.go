@@ -7,7 +7,6 @@ import (
 )
 
 type ApiBucketConfig interface {
-
 }
 
 // Interface for a File stored in a database backend.
@@ -35,7 +34,7 @@ type ApiFile interface {
 	SetName(string)
 
 	// File extension if available.
-	GetExtension()  string
+	GetExtension() string
 	SetExtension(string)
 
 	// Name with extension.
@@ -48,7 +47,7 @@ type ApiFile interface {
 	GetDescription() string
 	SetDescription(string)
 
-	// File size in bytes if available.	
+	// File size in bytes if available.
 	GetSize() int64
 	SetSize(int64)
 
@@ -80,7 +79,7 @@ type ApiFileBackend interface {
 	Name() string
 	SetName(string)
 
-	// Lists the buckets that currently exist.	
+	// Lists the buckets that currently exist.
 	Buckets() ([]string, ApiError)
 
 	// Check if a Bucket exists.
@@ -138,12 +137,12 @@ type ApiFileHandler interface {
 	Model() interface{}
 	SetModel(interface{})
 
-	// Given a file instance with a specified bucket, read the file from filePath, upload it 
+	// Given a file instance with a specified bucket, read the file from filePath, upload it
 	// to the backend and then store it in the database.
 	// If no file.GetBackendName() is empty, the default backend will be used.
-	// The file will be deleted if everything succeeds. Otherwise, 
+	// The file will be deleted if everything succeeds. Otherwise,
 	// it will be left in the file system.
-	// If deleteDir is true, the directory holding the file will be deleted 
+	// If deleteDir is true, the directory holding the file will be deleted
 	// also.
 	BuildFile(file ApiFile, user ApiUser, filePath string, deleteDir bool) ApiError
 

@@ -86,7 +86,7 @@ var _ = Describe("Backend implementations", func() {
 			Expect(err2).ToNot(HaveOccurred())
 			//reader.Close()
 
-			Expect(data).To(Equal(content))				
+			Expect(data).To(Equal(content))
 		})
 
 		It("Should clear bucket", func() {
