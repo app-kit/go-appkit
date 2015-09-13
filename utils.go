@@ -20,3 +20,13 @@ func Canonicalize(str string) string {
 
 	return str
 }
+
+func StrIn(needle string, haystack []string) bool {
+	for _, str := range haystack {
+		if str == needle {
+			return true
+		}
+	}
+
+	return false
+}

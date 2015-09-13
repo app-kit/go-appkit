@@ -3,10 +3,11 @@ package appkit
 import (
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"os"
 
+
+	"github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/manyminds/api2go"
 	"github.com/olebedev/config"
@@ -16,6 +17,8 @@ import (
 )
 
 type App struct {
+	Logger *logrus.Logger
+
 	Debug bool
 
 	ENV         string
@@ -32,6 +35,8 @@ type App struct {
 
 	methods map[string]*Method
 
+	sessionManager *SessionManager
+
 	api2go *api2go.API
 	router *httprouter.Router
 
@@ -44,11 +49,24 @@ func NewApp(cfgPath string) *App {
 	app.backends = make(map[string]db.Backend)
 	app.methods = make(map[string]*Method)
 
+	// Configure logger.
+	app.Logger = &logrus.Logger{
+	  Out: os.Stderr,
+	  Formatter: new(logrus.TextFormatter),
+	  Hooks: make(logrus.LevelHooks),
+	  Level: logrus.DebugLevel,
+	}
+
 	app.api2go = api2go.NewAPI("api")
 	app.router = app.api2go.Router()
 
 	app.InitCli()
 	app.ReadConfig(cfgPath)
+
+	app.RegisterMethod(createMethod())
+	app.RegisterMethod(updateMethod())
+	app.RegisterMethod(deleteMethod())
+	app.RegisterMethod(queryMethod())
 
 	return &app
 }
@@ -65,7 +83,7 @@ func (a *App) ReadConfig(path string) {
 	var cfg *config.Config
 
 	if f, err := os.Open(path); err != nil {
-		log.Printf("Could not find or read config at '%v' - Using default settings\n", path)
+		a.Logger.Infof("Could not find or read config at '%v' - Using default settings\n", path)
 	} else {
 		defer f.Close()
 		content, err := ioutil.ReadAll(f)
@@ -91,7 +109,7 @@ func (a *App) ReadConfig(path string) {
 	// Set default values if not present.
 	env := cfg.UString("ENV", "dev")
 	if env == "dev" {
-		log.Printf("No environment specified, defaulting to 'dev'\n")
+		a.Logger.Info("No environment specified, defaulting to 'dev'")
 		a.Debug = true
 	}
 	a.ENV = env
@@ -123,7 +141,7 @@ func (a *App) PrepareForRun() {
 	// Auto migrate if enabled or not explicitly disabled and env is debug.
 	if auto, err := a.Config.Bool("autoMigrate"); (err == nil && auto) || (err != nil && a.ENV == "dev") {
 		if err := a.MigrateAllBackends(false); err != nil {
-			log.Printf("Migration FAILED: %v\n", err)
+			a.Logger.Errorf("Migration FAILED: %v\n", err)
 		}
 	}
 }
@@ -153,17 +171,26 @@ func (a *App) Run() {
 		})
 	}
 
+	// Run the session manager.
+	a.sessionManager = NewSessionManager(a)
+	a.sessionManager.Run()
+
 	url := a.Config.UString("host", "localhost") + ":" + a.Config.UString("port", "8000")
-	log.Printf("Serving on %v", url)
+	a.Logger.Infof("Serving on %v", url)
 
 	handler := a.api2go.Handler()
 	err := http.ListenAndServe(url, handler)
 	if err != nil {
-		log.Printf("Could not start server: %v\n", err)
+		a.Logger.Panicf("Could not start server: %v\n", err)
 	}
 }
 
+/**
+ * Backends.
+ */
+
 func (a *App) RegisterBackend(name string, b db.Backend) {
+	b.SetLogger(a.Logger)
 	a.backends[name] = b
 	if a.DefaultBackend == nil {
 		a.DefaultBackend = b
@@ -179,6 +206,10 @@ func (a *App) GetBackend(name string) db.Backend {
 	return b
 }
 
+/**
+ * Methods.
+ */
+
 func (a *App) RegisterMethod(method *Method) {
 	if _, exists := a.methods[method.Name]; exists {
 		panic(fmt.Sprintf("Method name '%v' already registered.", method.Name))
@@ -186,6 +217,29 @@ func (a *App) RegisterMethod(method *Method) {
 
 	a.methods[method.Name] = method
 }
+
+func (a *App) RunMethod(name string, r ApiRequest) ApiError {
+	if r.GetSession() == nil {
+		return Error{
+			Code: "no_session",
+			Message: "Can't run a method without a session",
+		}
+	}
+
+	method := a.methods[name]
+	if method == nil {
+		return Error{
+			Code: "unknown_method",
+			Message: fmt.Sprintf("The method %v does not exist", name),
+		}
+	}
+
+	return nil
+}
+
+/**
+ * Resources.
+ */
 
 func (a *App) RegisterResource(model db.Model, hooks ApiHooks) {
 	res := NewResource(model, hooks)
@@ -232,6 +286,10 @@ func (a App) GetResource(name string) ApiResource {
 	return r
 }
 
+/**
+ * UserHandler.
+ */
+
 func (a *App) RegisterUserHandler(h ApiUserHandler) {
 	a.userHandler = h
 	a.RegisterCustomResource(h.GetUserResource())
@@ -260,6 +318,10 @@ func (a *App) RegisterUserHandler(h ApiUserHandler) {
 	}
 }
 
+/**
+ * FileHandler.
+ */
+
 func (a *App) RegisterFileHandler(f ApiFileHandler) {
 	r := f.Resource()
 	if r == nil {
@@ -276,8 +338,12 @@ func (a *App) FileHandler() ApiFileHandler {
 	return a.fileHandler
 }
 
+/**
+ * Migrations and Backend functionality.
+ */
+
 func (a *App) MigrateBackend(name string, version int, force bool) ApiError {
-	log.Printf("MIGRATE: Migrating backend '%v'", name)
+	a.Logger.Infof("MIGRATE: Migrating backend '%v'", name)
 	backend := a.GetBackend(name)
 	if backend == nil {
 		return Error{
@@ -304,7 +370,7 @@ func (a *App) MigrateBackend(name string, version int, force bool) ApiError {
 }
 
 func (a *App) MigrateAllBackends(force bool) ApiError {
-	log.Printf("MIGRATE: Migrating all backends to newest version")
+	a.Logger.Infof("MIGRATE: Migrating all backends to newest version")
 	for key := range a.backends {
 		if err := a.MigrateBackend(key, 0, force); err != nil {
 			return err
@@ -320,10 +386,10 @@ func (a *App) DropBackend(name string) ApiError {
 		panic("Unknown backend " + name)
 	}
 
-	log.Printf("Dropping all collections on backend " + name)
+	a.Logger.Infof("Dropping all collections on backend " + name)
 
 	if err := b.DropAllCollections(); err != nil {
-		log.Printf("Dropping all collections failed: %v", err)
+		a.Logger.Errorf("Dropping all collections failed: %v", err)
 		return err
 	}
 
@@ -331,13 +397,13 @@ func (a *App) DropBackend(name string) ApiError {
 }
 
 func (a *App) DropAllBackends() ApiError {
-	log.Printf("Dropping all backends")
+	a.Logger.Infof("Dropping all backends")
 	for name := range a.backends {
 		if err := a.DropBackend(name); err != nil {
 			return err
 		}
 	}
-	log.Printf("Successfully dropped all collections")
+	a.Logger.Infof("Successfully dropped all collections")
 	return nil
 }
 
@@ -347,14 +413,14 @@ func (a *App) RebuildBackend(name string) ApiError {
 		panic("Unknown backend " + name)
 	}
 
-	log.Printf("Rebuilding backend " + name)
+	a.Logger.Infof("Rebuilding backend " + name)
 
 	if err := a.DropBackend(name); err != nil {
 		return err
 	}
 
 	if err := a.MigrateBackend(name, 0, false); err != nil {
-		log.Printf("Migration failed: %v", err)
+		a.Logger.Errorf("Migration failed: %v", err)
 		return Error{
 			Code:    "backend_migration_failed",
 			Message: err.Error(),
@@ -365,14 +431,14 @@ func (a *App) RebuildBackend(name string) ApiError {
 }
 
 func (a *App) RebuildAllBackends() ApiError {
-	log.Printf("Rebuilding all backends")
+	a.Logger.Infof("Rebuilding all backends")
 	for key := range a.backends {
 		if err := a.RebuildBackend(key); err != nil {
 			return err
 		}
 	}
 
-	log.Printf("Successfully migrated all backends")
+	a.Logger.Infof("Successfully migrated all backends")
 
 	return nil
 }

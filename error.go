@@ -9,6 +9,7 @@ type ApiError interface {
 	GetMessage() string
 	GetData() interface{}
 	GetErrors() []error
+	AddError(error)
 	Error() string
 }
 
@@ -33,6 +34,10 @@ func (e Error) GetData() interface{} {
 
 func (e Error) GetErrors() []error {
 	return e.Errors
+}
+
+func (e Error) AddError(err error) {
+	e.Errors = append(e.Errors, err)
 }
 
 func (e Error) Error() string {

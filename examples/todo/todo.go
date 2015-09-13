@@ -131,14 +131,14 @@ func start() error {
 	app.RegisterMethod(&kit.Method{
 		Name:         "todo-count",
 		RequiresUser: false,
-		Run: func(app *kit.App, request *kit.Request) (interface{}, kit.ApiError) {
+		Run: func(app *kit.App, request kit.ApiRequest, unblock func()) kit.ApiResponse {
 			//todos := app.GetResource("projects")
 			//count, _ := todos.GetQuery().Last()
-			count := 10
+			//count := 10
 
-			return map[string]interface{}{
-				"count": count,
-			}, nil
+			return &kit.Response{
+
+			}
 		},
 	})
 
