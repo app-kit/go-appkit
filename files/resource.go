@@ -39,7 +39,7 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 		}
 	}
 
-	tmpFile := r.GetMeta().GetString("file")
+	tmpFile := r.GetMeta().String("file")
 	if tmpFile == "" {
 		return &kit.Response{
 			Error: kit.Error{

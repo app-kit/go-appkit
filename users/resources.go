@@ -65,7 +65,7 @@ func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, kit.Ap
 func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
 	meta := r.GetMeta()
 
-	userIdentifier := meta.GetString("user")
+	userIdentifier := meta.String("user")
 	if userIdentifier == "" {
 		return kit.NewErrorResponse("user_missing", "Expected 'user' in metadata.")
 	}
@@ -84,7 +84,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
 
 	user := rawUser.(kit.ApiUser)
 
-	adaptor := meta.GetString("adaptor")
+	adaptor := meta.String("adaptor")
 	if adaptor == "" {
 		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
 	}
@@ -120,7 +120,7 @@ type UserResourceHooks struct {
 func (hooks UserResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
 	meta := r.GetMeta()
 
-	adaptor := meta.GetString("adaptor")
+	adaptor := meta.String("adaptor")
 	if adaptor == "" {
 		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
 	}

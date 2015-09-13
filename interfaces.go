@@ -1,6 +1,8 @@
 package appkit
 
 import (
+	"net/http"
+
 	"github.com/julienschmidt/httprouter"
 
 	db "github.com/theduke/go-dukedb"
@@ -12,10 +14,16 @@ import (
 
 type ApiRequest interface {
 	GetUser() ApiUser
+	SetUser(ApiUser)
+
 	GetSession() ApiSession
+	SetSession(ApiSession)
+
 	GetContext() Context
 	GetMeta() Context
 	GetData() interface{}
+
+	GetHttpRequest() *http.Request
 }
 
 type ApiResponse interface {

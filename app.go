@@ -22,7 +22,6 @@ type App struct {
 	Debug bool
 
 	ENV         string
-	AutoMigrate bool
 
 	Config *config.Config
 
@@ -34,6 +33,8 @@ type App struct {
 	fileHandler ApiFileHandler
 
 	methods map[string]*Method
+
+	middlewares map[string]HttpHandler
 
 	sessionManager *SessionManager
 
@@ -48,6 +49,11 @@ func NewApp(cfgPath string) *App {
 	app.resources = make(map[string]ApiResource)
 	app.backends = make(map[string]db.Backend)
 	app.methods = make(map[string]*Method)
+	
+	app.middlewares = make(map[string]HttpHandler)
+	app.RegisterMiddleware("authentication", AuthenticationMiddleware)
+
+
 
 	// Configure logger.
 	app.Logger = &logrus.Logger{
@@ -139,7 +145,7 @@ func (a *App) PrepareForRun() {
 	a.PrepareBackends()
 
 	// Auto migrate if enabled or not explicitly disabled and env is debug.
-	if auto, err := a.Config.Bool("autoMigrate"); (err == nil && auto) || (err != nil && a.ENV == "dev") {
+	if auto, err := a.Config.Bool("autoRunMigrations"); (err == nil && auto) || (err != nil && a.ENV == "dev") {
 		if err := a.MigrateAllBackends(false); err != nil {
 			a.Logger.Errorf("Migration FAILED: %v\n", err)
 		}
@@ -149,18 +155,30 @@ func (a *App) PrepareForRun() {
 func (a *App) Run() {
 	a.PrepareForRun()
 
-	// Register all method routes.
-	for key := range a.methods {
-		method := a.methods[key]
+	// Register route for method calls.
 
-		// Use both POST and GET to allow for easier debugging.
-		a.router.GET("/api/method/"+method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			JsonWrapHandler(w, r, a, method)
-		})
-		a.router.POST("/api/method/"+method.Name, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-			JsonWrapHandler(w, r, a, method)
-		})
+	methodHandler := func(a *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
+		responder := func(r ApiResponse) {
+			RespondWithJson(w, r)
+		}
+
+		method := r.GetContext().String("name")
+			
+		finishedChannel, err := a.RunMethod(method, r, responder, true)
+		a.Logger.Warningf("finished channel %v", finishedChannel)
+		if err != nil {
+			return &Response{
+				Error: err,
+			}, false
+		}
+		<- finishedChannel
+		
+		return nil, true
 	}
+
+	a.router.POST("/api/method/:name", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		httpRequestMiddleware(w, r, params, a, methodHandler)
+	})
 
 	// Register api2json resources.
 	for key := range a.resources {
@@ -218,9 +236,9 @@ func (a *App) RegisterMethod(method *Method) {
 	a.methods[method.Name] = method
 }
 
-func (a *App) RunMethod(name string, r ApiRequest) ApiError {
+func (a *App) RunMethod(name string, r ApiRequest, responder func(ApiResponse), withFinishedChannel bool) (chan bool, ApiError) {
 	if r.GetSession() == nil {
-		return Error{
+		return nil, Error{
 			Code: "no_session",
 			Message: "Can't run a method without a session",
 		}
@@ -228,13 +246,21 @@ func (a *App) RunMethod(name string, r ApiRequest) ApiError {
 
 	method := a.methods[name]
 	if method == nil {
-		return Error{
+		return nil, Error{
 			Code: "unknown_method",
 			Message: fmt.Sprintf("The method %v does not exist", name),
 		}
 	}
 
-	return nil
+	instance := NewMethodInstance(method, r, responder)
+
+	if withFinishedChannel {
+		c := make(chan bool)
+		instance.finishedChannel = c
+		return c, a.sessionManager.QueueMethod(r.GetSession(), instance)
+	} else {
+		return nil, a.sessionManager.QueueMethod(r.GetSession(), instance)
+	}
 }
 
 /**
@@ -336,6 +362,26 @@ func (a *App) RegisterFileHandler(f ApiFileHandler) {
 
 func (a *App) FileHandler() ApiFileHandler {
 	return a.fileHandler
+}
+
+/**
+ * Middlewares.
+ */
+
+func (a *App) RegisterMiddleware(name string, handler HttpHandler) {
+	a.middlewares[name] = handler
+}
+
+func (a *App) UnregisterMiddleware(name string) {
+	delete(a.middlewares, name)
+}
+
+func (a *App) GetMiddlewares() []HttpHandler {
+	var wares []HttpHandler
+	for key := range a.middlewares {
+		wares = append(wares, a.middlewares[key])
+	}
+	return wares
 }
 
 /**

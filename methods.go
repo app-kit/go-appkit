@@ -26,8 +26,20 @@ type methodInstance struct {
 	startedAt time.Time
 	finishedAt time.Time
 
+	finishedChannel chan bool
+
 	blocked bool
 	stale bool
+}
+
+func NewMethodInstance(m *Method, r ApiRequest, responder func(ApiResponse)) *methodInstance {
+	return &methodInstance{
+		method: m,
+		request: r,
+		responder: responder,
+		blocked: true,
+		stale: false,
+	}
 }
 
 func (m methodInstance) IsRunning() bool {
@@ -229,6 +241,9 @@ func (m *methodQueue) Finish(method *methodInstance, response ApiResponse) {
 
 	// Send the response.
 	method.responder(response)
+	if method.finishedChannel != nil {
+		method.finishedChannel <- true
+	}
 
 	// Remove method from queue.
 	m.Lock()
@@ -236,6 +251,9 @@ func (m *methodQueue) Finish(method *methodInstance, response ApiResponse) {
 	m.Unlock()
 	
 	method.finishedAt = time.Now()
+
+	// Try to run queued methods.
+	m.Process()
 }
 
 type SessionManager struct {
@@ -257,6 +275,8 @@ type SessionManager struct {
 func NewSessionManager(app *App) *SessionManager {
 	return &SessionManager{
 		app: app,
+		queues: make(map[ApiSession]*methodQueue),
+
 		maxQueued: app.Config.UInt("methods.maxQueued", 30),
 		maxRunning: app.Config.UInt("methods.maxRunning", 5),
 		maxPerMinute: app.Config.UInt("methods.maxPerMinute", 100),
@@ -267,7 +287,7 @@ func NewSessionManager(app *App) *SessionManager {
 	}
 }
 
-func (m *SessionManager) AddMethod(session ApiSession, method *methodInstance) ApiError {
+func (m *SessionManager) QueueMethod(session ApiSession, method *methodInstance) ApiError {
 	queue := m.queues[session]
 	if queue == nil {
 		m.Lock()
@@ -276,7 +296,13 @@ func (m *SessionManager) AddMethod(session ApiSession, method *methodInstance) A
 		queue = m.queues[session]
 	}
 
-	return queue.Add(method)
+	err := queue.Add(method)
+	if err != nil {
+		return err
+	}
+
+	queue.Process()
+	return nil
 }
 
 func (m *SessionManager) Prune() {
