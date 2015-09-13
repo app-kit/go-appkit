@@ -34,7 +34,8 @@ type App struct {
 
 	methods map[string]*Method
 
-	middlewares map[string]HttpHandler
+	beforeMiddlewares map[string]HttpHandler
+	afterMiddlewares map[string]HttpHandler
 
 	sessionManager *SessionManager
 
@@ -50,10 +51,9 @@ func NewApp(cfgPath string) *App {
 	app.backends = make(map[string]db.Backend)
 	app.methods = make(map[string]*Method)
 	
-	app.middlewares = make(map[string]HttpHandler)
-	app.RegisterMiddleware("authentication", AuthenticationMiddleware)
-
-
+	app.beforeMiddlewares = make(map[string]HttpHandler)
+	app.afterMiddlewares = make(map[string]HttpHandler)
+	app.RegisterBeforeMiddleware("authentication", AuthenticationMiddleware)
 
 	// Configure logger.
 	app.Logger = &logrus.Logger{
@@ -188,7 +188,7 @@ func (a *App) Run() {
 	}
 
 	a.router.POST("/api/method/:name", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		httpRequestMiddleware(w, r, params, a, methodHandler)
+		httpHandler(w, r, params, a, methodHandler)
 	})
 
 	// Register api2json resources.
@@ -327,7 +327,7 @@ func (a *App) RegisterCustomResource(res ApiResource) {
 				// handler will always be called.
 				func(route *HttpRoute) {
 					a.Router().Handle(route.Method, route.Route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) { 
-						httpRequestMiddleware(w, r, params, a, route.Handler)
+						httpHandler(w, r, params, a, route.Handler)
 					})
 				}(route)
 			}
@@ -402,18 +402,34 @@ func (a *App) FileHandler() ApiFileHandler {
  * Middlewares.
  */
 
-func (a *App) RegisterMiddleware(name string, handler HttpHandler) {
-	a.middlewares[name] = handler
+func (a *App) RegisterBeforeMiddleware(name string, handler HttpHandler) {
+	a.beforeMiddlewares[name] = handler
 }
 
-func (a *App) UnregisterMiddleware(name string) {
-	delete(a.middlewares, name)
+func (a *App) UnregisterBeforeMiddleware(name string) {
+	delete(a.beforeMiddlewares, name)
 }
 
-func (a *App) GetMiddlewares() []HttpHandler {
+func (a *App) GetBeforeMiddlewares() []HttpHandler {
 	var wares []HttpHandler
-	for key := range a.middlewares {
-		wares = append(wares, a.middlewares[key])
+	for key := range a.beforeMiddlewares {
+		wares = append(wares, a.beforeMiddlewares[key])
+	}
+	return wares
+}
+
+func (a *App) RegisterAfterMiddleware(name string, handler HttpHandler) {
+	a.afterMiddlewares[name] = handler
+}
+
+func (a *App) UnregisterAfterMiddleware(name string) {
+	delete(a.afterMiddlewares, name)
+}
+
+func (a *App) GetAfterMiddlewares() []HttpHandler {
+	var wares []HttpHandler
+	for key := range a.afterMiddlewares {
+		wares = append(wares, a.afterMiddlewares[key])
 	}
 	return wares
 }

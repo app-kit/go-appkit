@@ -223,7 +223,7 @@ func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
 	w.Write(output)
 }
 
-func httpRequestMiddleware(w http.ResponseWriter, r *http.Request, params httprouter.Params, app *App, handler HttpHandler) {
+func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, app *App, handler HttpHandler) {
 	request := NewRequest()
 	request.HttpRequest = r
 
@@ -234,8 +234,9 @@ func httpRequestMiddleware(w http.ResponseWriter, r *http.Request, params httpro
 	var response ApiResponse
 
 	// Process all middlewares.
-	for _, middleware := range app.GetMiddlewares() {
-		response, skip := middleware(app, request, w)
+	for _, middleware := range app.GetBeforeMiddlewares() {
+		var skip bool
+		response, skip = middleware(app, request, w)
 		if skip {
 			return
 		} else if response != nil {
@@ -268,6 +269,16 @@ func httpRequestMiddleware(w http.ResponseWriter, r *http.Request, params httpro
 		w.WriteHeader(200)
 		w.Write([]byte(""))
 		return
+	}
+
+	for _, middleware := range app.GetAfterMiddlewares() {
+		var skip bool
+		response, skip = middleware(app, request, w)
+		if skip {
+			return
+		} else if response != nil {
+			break
+		}
 	}
 
 	RespondWithJson(w, response)	
