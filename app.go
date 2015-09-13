@@ -83,7 +83,7 @@ func (a *App) Router() *httprouter.Router {
 
 func (a *App) ReadConfig(path string) {
 	if path == "" {
-		path = "conf.yaml"
+		path = "config.yaml"
 	}
 
 	var cfg *config.Config
@@ -155,8 +155,19 @@ func (a *App) PrepareForRun() {
 func (a *App) Run() {
 	a.PrepareForRun()
 
-	// Register route for method calls.
+	// Serve files routes.
+	serveFiles := a.Config.UMap("serveFiles")
+	fmt.Printf("files: %v\n", a.Config)
+	for route := range serveFiles {
+		path, ok := serveFiles[route].(string)
+		if !ok {
+			a.Logger.Error("Config error: serveFiles configuration invalid: Must be map/dictionary with paths")
+			continue
+		}
+		a.ServeFiles(route, path)
+	}
 
+	// Register route for method calls.
 	methodHandler := func(a *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
 		responder := func(r ApiResponse) {
 			RespondWithJson(w, r)
@@ -201,6 +212,21 @@ func (a *App) Run() {
 	if err != nil {
 		a.Logger.Panicf("Could not start server: %v\n", err)
 	}
+}
+
+/**
+ * Serve files.
+ */
+
+func (a App) ServeFiles(route string, path string) {
+	a.Logger.Debugf("Serving files from directory '%v' at route '%v'", path, route)
+
+	server := http.FileServer(http.Dir(path))
+	a.Router().GET(route + "/*path", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		// Fix the url.
+		r.URL.Path = params.ByName("path")
+		server.ServeHTTP(w, r)
+	})
 }
 
 /**
