@@ -70,7 +70,6 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 }
 
 func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.ApiError) {
-	a.Logger.Info("handling upload")
 	reader, err := r.MultipartReader()
 	if err != nil {
 		return nil, kit.Error{Code: "multipart_error", Message: err.Error()}
@@ -205,8 +204,6 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
 		Method: "POST",
 		Handler: func(a *kit.App, r kit.ApiRequest, w http.ResponseWriter) (kit.ApiResponse, bool) {
 			file, err := a.FileHandler().FindOne(r.GetContext().String("id"))
-			a.Logger.Info("serving file %+v", file)
-
 			if err != nil {
 				w.WriteHeader(500)
 				w.Write([]byte("Error: " + err.Error()))

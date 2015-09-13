@@ -139,17 +139,33 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
 	fullName := pathParts[len(pathParts)-1]
 	nameParts := strings.Split(fullName, ".")
-	extension := ""
 
+	// Determine extension.
+	extension := ""
 	if len(nameParts) > 1 {
 		extension = nameParts[len(nameParts)-1]
 	}
 
 	file.SetFullName(fullName)
 	file.SetSize(stat.Size())
-	file.SetMime(mime.TypeByExtension("." + extension))
 
-	// Todo: isImage, width, height
+	// Determine mime type.
+	mimeType := GetMimeType(filePath)
+	fmt.Printf("determined mime type: %v\n", mimeType)
+	if mimeType == "" {
+		mimeType = mime.TypeByExtension("." + extension)
+	}
+	file.SetMime(mimeType)
+
+	// Determine image info.
+	imageInfo, err := GetImageInfo(filePath)
+	fmt.Printf("info: %+v, err: %v\n", imageInfo, err)
+	if imageInfo != nil {
+		file.SetIsImage(true)
+		file.SetWidth(int(imageInfo.Width))
+		file.SetHeight(int(imageInfo.Height))
+	}
+
 
 	// Store the file in the backend.
 	backendId, writer, err2 := file.Writer(true)
