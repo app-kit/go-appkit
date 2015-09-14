@@ -1,10 +1,10 @@
 package files
 
-import(
+import (
 	"os"
 	"os/exec"
-	"strings"
 	"strconv"
+	"strings"
 
 	kit "github.com/theduke/go-appkit"
 )
@@ -32,17 +32,17 @@ func GetMimeType(path string) string {
 }
 
 type ImageInfo struct {
-	Width int64
+	Width  int64
 	Height int64
 	Format string
 }
 
 func GetImageInfo(path string) (*ImageInfo, kit.ApiError) {
-	output, err := exec.Command("identify", "-verbose",  path).Output()
+	output, err := exec.Command("identify", "-verbose", path).Output()
 	if err != nil {
 		return nil, kit.Error{
-			Code: "identify_failed",
-			Message: err.Error(),
+			Code:     "identify_failed",
+			Message:  err.Error(),
 			Internal: true,
 		}
 	}

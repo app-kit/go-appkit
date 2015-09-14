@@ -6,7 +6,6 @@ import (
 	"net/http"
 	"os"
 
-
 	"github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/manyminds/api2go"
@@ -21,7 +20,7 @@ type App struct {
 
 	Debug bool
 
-	ENV         string
+	ENV string
 
 	Config *config.Config
 
@@ -35,7 +34,7 @@ type App struct {
 	methods map[string]*Method
 
 	beforeMiddlewares map[string]HttpHandler
-	afterMiddlewares map[string]HttpHandler
+	afterMiddlewares  map[string]HttpHandler
 
 	sessionManager *SessionManager
 
@@ -50,17 +49,17 @@ func NewApp(cfgPath string) *App {
 	app.resources = make(map[string]ApiResource)
 	app.backends = make(map[string]db.Backend)
 	app.methods = make(map[string]*Method)
-	
+
 	app.beforeMiddlewares = make(map[string]HttpHandler)
 	app.afterMiddlewares = make(map[string]HttpHandler)
 	app.RegisterBeforeMiddleware("authentication", AuthenticationMiddleware)
 
 	// Configure logger.
 	app.Logger = &logrus.Logger{
-	  Out: os.Stderr,
-	  Formatter: new(logrus.TextFormatter),
-	  Hooks: make(logrus.LevelHooks),
-	  Level: logrus.DebugLevel,
+		Out:       os.Stderr,
+		Formatter: new(logrus.TextFormatter),
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.DebugLevel,
 	}
 
 	app.api2go = api2go.NewAPI("api")
@@ -174,7 +173,7 @@ func (a *App) Run() {
 		}
 
 		method := r.GetContext().String("name")
-			
+
 		finishedChannel, err := a.RunMethod(method, r, responder, true)
 		a.Logger.Warningf("finished channel %v", finishedChannel)
 		if err != nil {
@@ -182,8 +181,8 @@ func (a *App) Run() {
 				Error: err,
 			}, false
 		}
-		<- finishedChannel
-		
+		<-finishedChannel
+
 		return nil, true
 	}
 
@@ -222,7 +221,7 @@ func (a App) ServeFiles(route string, path string) {
 	a.Logger.Debugf("Serving files from directory '%v' at route '%v'", path, route)
 
 	server := http.FileServer(http.Dir(path))
-	a.Router().GET(route + "/*path", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+	a.Router().GET(route+"/*path", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		// Fix the url.
 		r.URL.Path = params.ByName("path")
 		server.ServeHTTP(w, r)
@@ -265,7 +264,7 @@ func (a *App) RegisterMethod(method *Method) {
 func (a *App) RunMethod(name string, r ApiRequest, responder func(ApiResponse), withFinishedChannel bool) (chan bool, ApiError) {
 	if r.GetSession() == nil {
 		return nil, Error{
-			Code: "no_session",
+			Code:    "no_session",
 			Message: "Can't run a method without a session",
 		}
 	}
@@ -273,7 +272,7 @@ func (a *App) RunMethod(name string, r ApiRequest, responder func(ApiResponse), 
 	method := a.methods[name]
 	if method == nil {
 		return nil, Error{
-			Code: "unknown_method",
+			Code:    "unknown_method",
 			Message: fmt.Sprintf("The method %v does not exist", name),
 		}
 	}
@@ -323,10 +322,10 @@ func (a *App) RegisterCustomResource(res ApiResource) {
 	if res.Hooks() != nil {
 		if resRoutes, ok := res.Hooks().(ApiHttpRoutes); ok {
 			for _, route := range resRoutes.HttpRoutes(res) {
-				// Need to wrap this in a lambda, because otherwise, the last routes 
+				// Need to wrap this in a lambda, because otherwise, the last routes
 				// handler will always be called.
 				func(route *HttpRoute) {
-					a.Router().Handle(route.Method, route.Route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) { 
+					a.Router().Handle(route.Method, route.Route, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 						httpHandler(w, r, params, a, route.Handler)
 					})
 				}(route)

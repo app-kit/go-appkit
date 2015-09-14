@@ -53,12 +53,12 @@ func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, ApiErr
 
 	// Call the method callback.
 	/*
-	responseData, err2 := method.Run(app, request)
-	if err != nil {
-		return nil, err2
-	}
+		responseData, err2 := method.Run(app, request)
+		if err != nil {
+			return nil, err2
+		}
 
-	return responseData, nil
+		return responseData, nil
 	*/
 	return nil, nil
 }

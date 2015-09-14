@@ -1,10 +1,10 @@
 package appkit
 
 import (
-	"net/http"
-	"io/ioutil"
-	"fmt"
 	"encoding/json"
+	"fmt"
+	"io/ioutil"
+	"net/http"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -177,14 +177,14 @@ func NewErrorResponse(code, message string) *Response {
 type HttpHandler func(*App, ApiRequest, http.ResponseWriter) (ApiResponse, bool)
 
 type HttpRoute struct {
-	Route string
-	Method string
+	Route   string
+	Method  string
 	Handler HttpHandler
 }
 
 func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
 	code := 200
-	respData := map[string]interface{} {
+	respData := map[string]interface{}{
 		"data": response.GetData(),
 	}
 
@@ -207,7 +207,7 @@ func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
 	output, err2 := json.Marshal(respData)
 	if err2 != nil {
 		code = 500
-		respData = map[string]interface{} {
+		respData = map[string]interface{}{
 			"errors": []error{
 				&Error{
 					Code:    "json_encode_error",
@@ -281,7 +281,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		}
 	}
 
-	RespondWithJson(w, response)	
+	RespondWithJson(w, response)
 }
 
 func AuthenticationMiddleware(a *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {

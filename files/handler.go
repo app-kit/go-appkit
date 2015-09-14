@@ -166,7 +166,6 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 		file.SetHeight(int(imageInfo.Height))
 	}
 
-
 	// Store the file in the backend.
 	backendId, writer, err2 := file.Writer(true)
 	if err2 != nil {

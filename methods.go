@@ -1,10 +1,10 @@
 package appkit
 
 import (
-	"fmt"
 	"encoding/json"
-	"time"
+	"fmt"
 	"sync"
+	"time"
 
 	db "github.com/theduke/go-dukedb"
 )
@@ -12,7 +12,7 @@ import (
 type Method struct {
 	Name         string
 	RequiresUser bool
-	Run func(a *App, r ApiRequest, unblock func()) ApiResponse
+	Run          func(a *App, r ApiRequest, unblock func()) ApiResponse
 }
 
 type methodInstance struct {
@@ -21,24 +21,24 @@ type methodInstance struct {
 	request ApiRequest
 
 	responder func(ApiResponse)
-	
-	createdAt time.Time	
-	startedAt time.Time
+
+	createdAt  time.Time
+	startedAt  time.Time
 	finishedAt time.Time
 
 	finishedChannel chan bool
 
 	blocked bool
-	stale bool
+	stale   bool
 }
 
 func NewMethodInstance(m *Method, r ApiRequest, responder func(ApiResponse)) *methodInstance {
 	return &methodInstance{
-		method: m,
-		request: r,
+		method:    m,
+		request:   r,
 		responder: responder,
-		blocked: true,
-		stale: false,
+		blocked:   true,
+		stale:     false,
 	}
 }
 
@@ -53,23 +53,23 @@ type methodQueue struct {
 
 	queue map[*methodInstance]bool
 
-	maxQueued int
-	maxRunning int
+	maxQueued    int
+	maxRunning   int
 	maxPerMinute int
-	timeout int
+	timeout      int
 
 	lastAction time.Time
 }
 
 func newMethodQueue(m *SessionManager) *methodQueue {
 	return &methodQueue{
-		app: m.app,
-		queue: make(map[*methodInstance]bool),
-		maxQueued: m.maxQueued,
-		maxRunning: m.maxRunning,
+		app:          m.app,
+		queue:        make(map[*methodInstance]bool),
+		maxQueued:    m.maxQueued,
+		maxRunning:   m.maxRunning,
 		maxPerMinute: m.maxPerMinute,
-		timeout: m.timeout,
-		lastAction: time.Now(),
+		timeout:      m.timeout,
+		lastAction:   time.Now(),
 	}
 }
 
@@ -112,14 +112,14 @@ func (m *methodQueue) Add(method *methodInstance) ApiError {
 
 	if len(m.queue) >= m.maxQueued {
 		return Error{
-			Code: "max_methods_queued",
+			Code:    "max_methods_queued",
 			Message: "The maximum amount of methods is already running",
 		}
 	}
 
 	if m.CountAddedSince(60) >= m.maxPerMinute {
 		return Error{
-			Code: "max_methods_per_minute",
+			Code:    "max_methods_per_minute",
 			Message: "You have reached the maximum methods/minute limit.",
 		}
 	}
@@ -133,7 +133,7 @@ func (m *methodQueue) Add(method *methodInstance) ApiError {
 
 	return nil
 }
- 
+
 // Remove methods that have exceeded the timeout.
 func (m *methodQueue) PruneStaleMethods() {
 	now := time.Now()
@@ -160,7 +160,7 @@ func (m *methodQueue) CanProcess() bool {
 			if method.blocked {
 				return false
 			}
-			running++	
+			running++
 		}
 	}
 
@@ -170,7 +170,6 @@ func (m *methodQueue) CanProcess() bool {
 
 	return true
 }
-
 
 func (m *methodQueue) Next() *methodInstance {
 	for method := range m.queue {
@@ -230,8 +229,8 @@ func (m *methodQueue) Process() {
 
 func (m *methodQueue) Finish(method *methodInstance, response ApiResponse) {
 	// Send the response.
-	
-	// Recover a panic in the responder.	
+
+	// Recover a panic in the responder.
 	defer func() {
 		err := recover()
 		if err != nil {
@@ -241,7 +240,7 @@ func (m *methodQueue) Finish(method *methodInstance, response ApiResponse) {
 			m.Lock()
 			delete(m.queue, method)
 			m.Unlock()
-			
+
 			method.finishedAt = time.Now()
 		}
 	}()
@@ -256,7 +255,7 @@ func (m *methodQueue) Finish(method *methodInstance, response ApiResponse) {
 	m.Lock()
 	delete(m.queue, method)
 	m.Unlock()
-	
+
 	method.finishedAt = time.Now()
 
 	// Try to run queued methods.
@@ -270,27 +269,27 @@ type SessionManager struct {
 
 	queues map[ApiSession]*methodQueue
 
-	maxQueued int
-	maxRunning int
+	maxQueued    int
+	maxRunning   int
 	maxPerMinute int
-	timeout int
+	timeout      int
 
 	sessionTimeout int
-	pruneInterval int
+	pruneInterval  int
 }
 
 func NewSessionManager(app *App) *SessionManager {
 	return &SessionManager{
-		app: app,
+		app:    app,
 		queues: make(map[ApiSession]*methodQueue),
 
-		maxQueued: app.Config.UInt("methods.maxQueued", 30),
-		maxRunning: app.Config.UInt("methods.maxRunning", 5),
+		maxQueued:    app.Config.UInt("methods.maxQueued", 30),
+		maxRunning:   app.Config.UInt("methods.maxRunning", 5),
 		maxPerMinute: app.Config.UInt("methods.maxPerMinute", 100),
-		timeout: app.Config.UInt("methods.timeout", 30),
+		timeout:      app.Config.UInt("methods.timeout", 30),
 
-		sessionTimeout: app.Config.UInt("sessions.sessionTimeout", 60 * 4),
-		pruneInterval: app.Config.UInt("sessions.pruneInterval", 60 * 5),
+		sessionTimeout: app.Config.UInt("sessions.sessionTimeout", 60*4),
+		pruneInterval:  app.Config.UInt("sessions.pruneInterval", 60*5),
 	}
 }
 
@@ -330,21 +329,21 @@ func (m *SessionManager) Run() {
 
 type ResourceMethodData struct {
 	Resource ApiResource
-	Objects []db.Model
-	IDs []string
-	Query *db.Query
+	Objects  []db.Model
+	IDs      []string
+	Query    *db.Query
 }
 
 func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData, ApiError) {
 	if data, ok := rawData.(ResourceMethodData); ok {
 		return &data, nil
 	}
-	methodData :=  &ResourceMethodData{}
+	methodData := &ResourceMethodData{}
 
 	data, ok := rawData.(map[string]interface{})
 	if !ok {
 		return nil, Error{
-			Code: "invalid_data_map_expected",
+			Code:    "invalid_data_map_expected",
 			Message: "Data must contain a map/dict",
 		}
 	}
@@ -353,7 +352,7 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 	resourceName, _ := data["resource"].(string)
 	if resourceName == "" {
 		return nil, Error{
-			Code: "resource_missing",
+			Code:    "resource_missing",
 			Message: "Data must contain a 'resource' key",
 		}
 	}
@@ -361,7 +360,7 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 	resource := app.GetResource(resourceName)
 	if resource == nil {
 		return nil, Error{
-			Code: "unknown_resource",
+			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource %v is not registered", resourceName),
 		}
 	}
@@ -373,7 +372,7 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 			id, ok := rawId.(string)
 			if !ok {
 				return nil, Error{
-					Code: "invalid_id",
+					Code:    "invalid_id",
 					Message: fmt.Sprintf("The %vth id '%v' must be a string", index, rawId),
 				}
 			}
@@ -386,7 +385,7 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 
 	if objectData, ok := data["objects"]; ok {
 		// Objects key exists, try to parse it.
-		
+
 		if objects, ok := objectData.([]db.Model); ok {
 			// Objects are already a model slice.
 			methodData.Objects = objects
@@ -395,7 +394,7 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 			rawObjects, ok := data["objects"].([]interface{})
 			if !ok {
 				return nil, Error{
-					Code: "invalid_object_data",
+					Code:    "invalid_object_data",
 					Message: "Expected array in key 'objects'",
 				}
 			}
@@ -404,18 +403,18 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 				js, err := json.Marshal(rawObj)
 				if err != nil {
 					return nil, Error{
-						Code: "json_error",
+						Code:    "json_error",
 						Message: err.Error(),
-						Errors: []error{err},
+						Errors:  []error{err},
 					}
 				}
 
 				model := resource.NewModel()
 				if err := json.Unmarshal(js, model); err != nil {
 					return nil, Error{
-						Code: "json_unmarshal_error",
+						Code:    "json_unmarshal_error",
 						Message: fmt.Sprintf("Could not unmarshal model %v: %v", index, err),
-						Errors: []error{err},
+						Errors:  []error{err},
 					}
 				}
 
@@ -429,9 +428,9 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 		query, err := db.ParseQuery(resourceName, rawQuery)
 		if err != nil {
 			return nil, Error{
-				Code: "invalid_query",
+				Code:    "invalid_query",
 				Message: fmt.Sprintf("Error while parsing query: %v", err),
-				Errors: []error{err},
+				Errors:  []error{err},
 			}
 		}
 		methodData.Query = query

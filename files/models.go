@@ -18,7 +18,7 @@ type BaseFile struct {
 	Backend kit.ApiFileBackend `db:"-"`
 
 	BackendName string
-	BackendID string
+	BackendID   string
 	Bucket      string
 
 	Name      string

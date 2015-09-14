@@ -8,8 +8,8 @@ type ApiError interface {
 	GetCode() string
 	GetMessage() string
 	GetData() interface{}
-	
-	IsInternal() bool	
+
+	IsInternal() bool
 
 	GetErrors() []error
 	AddError(error)
@@ -18,11 +18,11 @@ type ApiError interface {
 }
 
 type Error struct {
-	Code    string      `json:"code,omitempty"`
-	Message string      `json:"title,omitempty"`
-	Data    interface{} `json:"-"`
+	Code     string      `json:"code,omitempty"`
+	Message  string      `json:"title,omitempty"`
+	Data     interface{} `json:"-"`
 	Internal bool
-	Errors  []error
+	Errors   []error
 }
 
 func (e Error) GetCode() string {
