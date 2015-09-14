@@ -7,6 +7,9 @@ import (
 	"strconv"
 	"fmt"
 	"image"
+	"sync"
+	"time"
+	"strings"
 
 	_ "image/png"
 	"image/jpeg"
@@ -19,7 +22,110 @@ import (
 	db "github.com/theduke/go-dukedb"
 )
 
-type FilesResource struct{}
+type rateLimiter struct {
+	sync.Mutex
+
+	running int
+	maxPerIPPerMinute int
+	maxQueueSize int
+
+	maxRunning int
+	ipLog map[string][]*time.Time
+	queueChannels []chan bool
+}
+
+func newRateLimiter(maxRunning, maxPerIPPerMinute int, maxQueueSize int) *rateLimiter {
+	limiter := &rateLimiter{
+		maxRunning: maxRunning,
+		maxPerIPPerMinute: maxPerIPPerMinute,
+		maxQueueSize: maxQueueSize,
+
+		ipLog: make(map[string][]*time.Time),
+		queueChannels: make([]chan bool, 0),
+	}
+
+	return limiter
+}
+
+func (r *rateLimiter) PruneIpLog() {
+	now := time.Now()
+
+	for ip := range r.ipLog {
+		for index, t := range r.ipLog[ip] {
+			if now.Sub(*t).Seconds() > 60 {
+				if index == len(r.ipLog[ip]) - 1 {
+					r.ipLog[ip] = r.ipLog[ip][:]
+				} else {
+					r.ipLog[ip] = r.ipLog[ip][index + 1:]
+				}
+				break
+			}
+		}
+
+		if len(r.ipLog[ip]) == 0 {
+			delete(r.ipLog, ip)
+		}
+	}
+}
+
+func (r *rateLimiter) Start(ip string) (chan bool, kit.ApiError) {
+	if r.running >= r.maxRunning {
+		if len(r.queueChannels) >= r.maxQueueSize {
+			return nil, kit.Error{
+				Code: "rate_limit_queue_threshold_exceeded",
+				Message: "The queue for the rate limiter has reached it's maximum size",
+			}
+		} else {
+			channel := make(chan bool)
+			r.Lock()
+			r.queueChannels = append(r.queueChannels, channel)
+			r.Unlock()
+			return channel, nil
+		}
+	}
+
+	// Check for ip limits.
+	r.PruneIpLog()
+	if log, ok := r.ipLog[ip]; ok {
+		if len(log) > r.maxPerIPPerMinute {
+			return nil, kit.Error{
+				Code: "rate_limit_max_per_ip_per_minute_exceeced",
+				Message: "The maximum limit for requests per ip per minute was exceeded",
+			}
+		}
+	}
+
+	// maxRunning is not reached, so it is allowed to start.
+	r.Lock()
+	if _, ok := r.ipLog[ip]; !ok {
+		r.ipLog[ip] = make([]*time.Time, 0)
+	}
+	r.running += 1
+	now := time.Now()
+	r.ipLog[ip] = append(r.ipLog[ip], &now)
+	r.Unlock()
+
+	return nil, nil
+}
+
+func (r *rateLimiter) Finish() {
+	var channel chan bool
+	r.Lock()
+	r.running -= 1
+	if len(r.queueChannels) > 0 {
+		channel = r.queueChannels[0]
+		r.queueChannels = r.queueChannels[1:]
+	}
+	r.Unlock()
+
+	if channel != nil {
+		channel <- true
+	}
+}
+
+type FilesResource struct{
+	thumbnailRateLimiter *rateLimiter
+}
 
 func getTmpPath(res kit.ApiResource) string {
 	tmpPath := res.App().Config.UString("tmpDirUploads")
@@ -174,7 +280,7 @@ func serveFile(w http.ResponseWriter, file kit.ApiFile, reader io.Reader) {
 	}
 }
 
-func getImageReader(tmpDir string, file kit.ApiFile, width, height int64) (io.Reader, kit.ApiError) {
+func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.ApiFile, width, height int64, ip string) (io.Reader, kit.ApiError) {
 	if width == 0 && height == 0 {
 		return file.Reader()
 	}
@@ -191,6 +297,12 @@ func getImageReader(tmpDir string, file kit.ApiFile, width, height int64) (io.Re
 		}
 	}
 
+	if width < 0 || height < 0 {
+		return nil, kit.Error{
+			Code: "invalid_dimensions",
+		}
+	}
+
 	// If either height or width is 0, determine proper values to presserve aspect ratio.
   if width == 0 {
   	ratio := float64(file.GetWidth()) / float64(file.GetHeight())
@@ -198,6 +310,16 @@ func getImageReader(tmpDir string, file kit.ApiFile, width, height int64) (io.Re
   } else if height == 0 {
   	ratio := float64(file.GetHeight()) / float64(file.GetWidth())
   	height = int64(float64(width) * ratio)
+  }
+
+  maxWidth := app.Config.UInt("files.thumbGenerator.maxWidth", 2000)
+  maxHeight := app.Config.UInt("files.thumbGenerator.maxHeight", 2000)
+
+  if width > int64(maxWidth) || height > int64(maxHeight) {
+  	return nil, kit.Error{
+  		Code: "dimensions_exceed_maximum_limits",
+  		Message: "The specified dimensions exceed the maximum limits",
+  	}
   }
 
 	thumbId := fmt.Sprintf("%v_%v_%v_%v_%v.%v",
@@ -209,6 +331,14 @@ func getImageReader(tmpDir string, file kit.ApiFile, width, height int64) (io.Re
 		"jpeg")
 
 	if ok, _ := file.GetBackend().HasFileById("thumbs", thumbId); !ok {
+		channel, err := r.thumbnailRateLimiter.Start(ip)
+		if err != nil {
+			return nil, err
+		}
+		if channel != nil {
+			<- channel
+		}
+
 		// Thumb does not exist yet, so create it.
 		reader, err := file.Reader()
 		if err != nil {
@@ -237,12 +367,19 @@ func getImageReader(tmpDir string, file kit.ApiFile, width, height int64) (io.Re
     defer writer.Close()
 
     jpeg.Encode(writer, thumb, &jpeg.Options{Quality: 90})
+
+    r.thumbnailRateLimiter.Finish()
 	}
 
 	return file.GetBackend().ReaderById("thumbs", thumbId)
 }
 
 func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
+	maxRunning := res.App().Config.UInt("files.thumbGenerator.maxRunning", 10)	
+	maxPerIPPerMinute	:= res.App().Config.UInt("files.thumbGenerator.maxPerIPPerMinute", 100)	
+	maxQueueSize	:= res.App().Config.UInt("files.thumbGenerator.maxQueueSize", 100)	
+	hooks.thumbnailRateLimiter = newRateLimiter(maxRunning, maxPerIPPerMinute, maxQueueSize)
+
 	routes := make([]*kit.HttpRoute, 0)
 
 	// Upload route.
@@ -378,7 +515,12 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
 				thumbDir = tmpPath + string(os.PathSeparator) + "thumbnails"
 			}
 
-			reader, err := getImageReader(thumbDir, file, width, height)
+			ip := strings.Split(r.GetHttpRequest().RemoteAddr, ":")[0]
+			if ip == "" {
+				ip = r.GetHttpRequest().Header.Get("X-Forwarded-For")
+			}
+
+			reader, err := hooks.getImageReader(a, thumbDir, file, width, height, ip)
 			if err != nil {
 				w.WriteHeader(500)
 				w.Write([]byte("Error: " + err.Error()))
