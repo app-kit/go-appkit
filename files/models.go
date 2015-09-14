@@ -1,8 +1,7 @@
 package files
 
 import (
-	"bufio"
-	"strconv"
+	"io"
 	"strings"
 
 	kit "github.com/theduke/go-appkit"
@@ -19,6 +18,7 @@ type BaseFile struct {
 	Backend kit.ApiFileBackend `db:"-"`
 
 	BackendName string
+	BackendID string
 	Bucket      string
 
 	Name      string
@@ -41,11 +41,6 @@ func (f *BaseFile) Collection() string {
 	return "files"
 }
 
-// Gorm.
-func (f *BaseFile) TableName() string {
-	return "files"
-}
-
 func (f *BaseFile) GetBackend() kit.ApiFileBackend {
 	return f.Backend
 }
@@ -61,6 +56,15 @@ func (f *BaseFile) GetBackendName() string {
 
 func (f *BaseFile) SetBackendName(x string) {
 	f.BackendName = x
+}
+
+func (f *BaseFile) GetBackendID() string {
+	return f.BackendID
+}
+
+func (f *BaseFile) SetBackendID(x string) error {
+	f.BackendID = x
+	return nil
 }
 
 func (f *BaseFile) GetBucket() string {
@@ -168,30 +172,19 @@ func (f *BaseFile) SetHeight(x int) {
 type FileStrID struct {
 	users.BaseUserModelStrID
 	BaseFile
-
-	BackendID string
-}
-
-func (f *FileStrID) GetBackendID() string {
-	return f.BackendID
-}
-
-func (f *FileStrID) SetBackendID(x string) error {
-	f.BackendID = x
-	return nil
 }
 
 // Ensure FileStrID implements ApiFile interface.
 var _ kit.ApiFile = (*FileStrID)(nil)
 
-func (f *FileStrID) Reader() (*bufio.Reader, kit.ApiError) {
+func (f *FileStrID) Reader() (io.ReadCloser, kit.ApiError) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileStrID) Writer(create bool) (string, *bufio.Writer, kit.ApiError) {
+func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, kit.ApiError) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}
@@ -205,35 +198,19 @@ func (f *FileStrID) Writer(create bool) (string, *bufio.Writer, kit.ApiError) {
 type FileIntID struct {
 	users.BaseUserModelIntID
 	BaseFile
-
-	BackendID uint64
 }
 
 // Ensure FileIntID implements ApiFile interface.
 var _ kit.ApiFile = (*FileIntID)(nil)
 
-func (f *FileIntID) GetBackendID() string {
-	return strconv.FormatUint(f.BackendID, 10)
-}
-
-func (f *FileIntID) SetBackendID(x string) error {
-	id, err := strconv.ParseUint(x, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	f.BackendID = id
-	return nil
-}
-
-func (f *FileIntID) Reader() (*bufio.Reader, kit.ApiError) {
+func (f *FileIntID) Reader() (io.ReadCloser, kit.ApiError) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileIntID) Writer(create bool) (string, *bufio.Writer, kit.ApiError) {
+func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, kit.ApiError) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}

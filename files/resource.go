@@ -5,8 +5,15 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"fmt"
+	"image"
+
+	_ "image/png"
+	"image/jpeg"
+	_ "image/gif"
 
 	"github.com/twinj/uuid"
+	"github.com/disintegration/gift"
 
 	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
@@ -120,6 +127,7 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.Ap
 				Message: err.Error(),
 			}
 		}
+		defer file.Close()
 
 		_, err = io.Copy(file, part)
 		if err != nil {
@@ -133,6 +141,105 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.Ap
 	}
 
 	return files, nil
+}
+
+func serveFile(w http.ResponseWriter, file kit.ApiFile, reader io.Reader) {
+	header := w.Header()
+
+	if file.GetMime() != "" {
+		header.Set("Content-Type", file.GetMime())
+	}
+	/*
+	if file.GetSize() != 0 {
+		header.Set("Content-Length", strconv.FormatInt(file.GetSize(), 10))
+	}
+	*/
+
+	buffer := make([]byte, 1024)
+	flusher, canFlush := w.(http.Flusher)
+
+	w.WriteHeader(200)
+
+	for {
+		n, err := reader.Read(buffer)
+		if err != nil {
+			break
+		}
+		if _, err := w.Write(buffer[:n]); err != nil {
+			break
+		}
+		if canFlush {
+			flusher.Flush()
+		}
+	}
+}
+
+func getImageReader(tmpDir string, file kit.ApiFile, width, height int64) (io.Reader, kit.ApiError) {
+	if width == 0 && height == 0 {
+		return file.Reader()
+	}
+
+	// Dimensions specified.
+	// Check if the thumbnail was already created.
+	// If so, serve it. Otherwise, create it first.
+
+	if (width == 0 || height == 0) && (file.GetWidth() == 0 || file.GetHeight() == 0) {
+		return nil, kit.Error{
+			Code: "image_dimensions_not_determined",
+			Message: fmt.Sprintf("The file with id %v does not have width/height", file.GetID()),
+			Internal: true,
+		}
+	}
+
+	// If either height or width is 0, determine proper values to presserve aspect ratio.
+  if width == 0 {
+  	ratio := float64(file.GetWidth()) / float64(file.GetHeight())
+  	width = int64(float64(height) * ratio)
+  } else if height == 0 {
+  	ratio := float64(file.GetHeight()) / float64(file.GetWidth())
+  	height = int64(float64(width) * ratio)
+  }
+
+	thumbId := fmt.Sprintf("%v_%v_%v_%v_%v.%v",
+		file.GetID(),
+		file.GetBucket(),
+		file.GetName(),
+		strconv.FormatInt(width, 10),
+		strconv.FormatInt(height, 10),
+		"jpeg")
+
+	if ok, _ := file.GetBackend().HasFileById("thumbs", thumbId); !ok {
+		// Thumb does not exist yet, so create it.
+		reader, err := file.Reader()
+		if err != nil {
+			return nil, err
+		}
+		defer reader.Close()
+
+    img, _, err2 := image.Decode(reader)
+    if err2 != nil {
+    	return nil, kit.Error{
+				Code: "image_decode_error",
+				Message: err2.Error(),
+			}
+    }
+
+    gift := gift.New(
+	    gift.ResizeToFill(int(width), int(height), gift.LanczosResampling, gift.CenterAnchor),
+		)
+		thumb := image.NewRGBA(gift.Bounds(img.Bounds()))
+		gift.Draw(thumb, img)
+
+    _, writer, err := file.GetBackend().WriterById("thumbs", thumbId, true)
+    if err != nil {
+    	return nil, err
+    }
+    defer writer.Close()
+
+    jpeg.Encode(writer, thumb, &jpeg.Options{Quality: 90})
+	}
+
+	return file.GetBackend().ReaderById("thumbs", thumbId)
 }
 
 func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
@@ -201,7 +308,7 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
 
 	serveFileRoute := &kit.HttpRoute{
 		Route: "/files/:id/*rest",
-		Method: "POST",
+		Method: "GET",
 		Handler: func(a *kit.App, r kit.ApiRequest, w http.ResponseWriter) (kit.ApiResponse, bool) {
 			file, err := a.FileHandler().FindOne(r.GetContext().String("id"))
 			if err != nil {
@@ -222,38 +329,67 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
 				w.Write([]byte("Error: " + err.Error()))
 				return nil, true
 			}
+			defer reader.Close()
 
-			header := w.Header()
-
-			if file.GetMime() != "" {
-				header.Set("Content-Type", file.GetMime())
-			}
-			if file.GetSize() != 0 {
-				header.Set("Test", strconv.FormatInt(file.GetSize(), 10))
-			}
-
-			buffer := make([]byte, 1024)
-			flusher, canFlush := w.(http.Flusher)
-
-			w.WriteHeader(200)
-
-			for {
-				n, err := reader.Read(buffer)
-				if err != nil {
-					break
-				}
-				if _, err := w.Write(buffer[:n]); err != nil {
-					break
-				}
-				if canFlush {
-					flusher.Flush()
-				}
-			}
-
+			serveFile(w, file, reader)
 			return nil, true
 		},
 	}
 	routes = append(routes, serveFileRoute)
+
+	serveImageRoute := &kit.HttpRoute{
+		Route: "/images/:id/*rest",
+		Method: "GET",
+		Handler: func(a *kit.App, r kit.ApiRequest, w http.ResponseWriter) (kit.ApiResponse, bool) {
+			file, err := a.FileHandler().FindOne(r.GetContext().String("id"))
+			if err != nil {
+				w.WriteHeader(500)
+				w.Write([]byte("Error: " + err.Error()))
+				return nil, true
+			}
+
+			if file == nil {
+				w.WriteHeader(404)
+				w.Write([]byte("Image not found"))
+				return nil, true
+			}
+
+			if !file.GetIsImage() {
+				w.WriteHeader(404)
+				w.Write([]byte("Image not found"))
+				return nil, true
+			}
+
+			query := r.GetHttpRequest().URL.Query()
+			rawWidth := query.Get("width")
+			rawHeight := query.Get("height")
+
+			var width, height int64
+
+			if rawWidth != "" {
+				width, _ = strconv.ParseInt(rawWidth, 10, 64)
+			}
+			if rawHeight != "" {
+				height, _ = strconv.ParseInt(rawHeight, 10, 64)
+			}
+
+			thumbDir := a.Config.UString("thumbnailDir")
+			if thumbDir == "" {
+				thumbDir = tmpPath + string(os.PathSeparator) + "thumbnails"
+			}
+
+			reader, err := getImageReader(thumbDir, file, width, height)
+			if err != nil {
+				w.WriteHeader(500)
+				w.Write([]byte("Error: " + err.Error()))
+				return nil, true
+			}
+			serveFile(w, file, reader)
+
+			return nil, true
+		},
+	}
+	routes = append(routes, serveImageRoute)
 
 	return routes
 }

@@ -1,8 +1,8 @@
 package fs
 
 import (
-	"bufio"
 	"fmt"
+	"io"
 	"os"
 	"strconv"
 	"strings"
@@ -10,7 +10,7 @@ import (
 	kit "github.com/theduke/go-appkit"
 )
 
-func fileExists(path string) (bool, error) {
+func FileExists(path string) (bool, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if err == os.ErrNotExist {
@@ -25,7 +25,7 @@ func fileExists(path string) (bool, error) {
 }
 
 func findUniqueFilePath(path string) (string, error) {
-	if ok, err := fileExists(path); !ok {
+	if ok, err := FileExists(path); !ok {
 		return path, nil
 	} else if err != nil {
 		return "", err
@@ -49,7 +49,7 @@ func findUniqueFilePath(path string) (string, error) {
 	for {
 		path = dir + string(os.PathSeparator) + name + "_" + strconv.Itoa(index) + "." + extension
 
-		if ok, err := fileExists(path); !ok {
+		if ok, err := FileExists(path); !ok {
 			// Found non-existant file name!
 			break
 		} else if err != nil {
@@ -282,11 +282,11 @@ func (fs Fs) DeleteFileById(bucket, id string) kit.ApiError {
 	return nil
 }
 
-func (fs Fs) Reader(f kit.ApiFile) (*bufio.Reader, kit.ApiError) {
+func (fs Fs) Reader(f kit.ApiFile) (io.ReadCloser, kit.ApiError) {
 	return fs.ReaderById(f.GetBucket(), f.GetBackendID())
 }
 
-func (fs Fs) ReaderById(bucket, id string) (*bufio.Reader, kit.ApiError) {
+func (fs Fs) ReaderById(bucket, id string) (io.ReadCloser, kit.ApiError) {
 	if id == "" {
 		return nil, kit.Error{Code: "empty_file_id"}
 	}
@@ -300,14 +300,14 @@ func (fs Fs) ReaderById(bucket, id string) (*bufio.Reader, kit.ApiError) {
 		}
 	}
 
-	return bufio.NewReader(f), nil
+	return f, nil
 }
 
-func (fs Fs) Writer(f kit.ApiFile, create bool) (string, *bufio.Writer, kit.ApiError) {
+func (fs Fs) Writer(f kit.ApiFile, create bool) (string, io.WriteCloser, kit.ApiError) {
 	return fs.WriterById(f.GetBucket(), f.GetFullName(), create)
 }
 
-func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, kit.ApiError) {
+func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser, kit.ApiError) {
 	if id == "" {
 		return "", nil, kit.Error{Code: "empty_file_id"}
 	}
@@ -353,5 +353,5 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, *bufio.Writer, 
 	pathParts := strings.Split(path, string(os.PathSeparator))
 	name := pathParts[len(pathParts)-1]
 
-	return name, bufio.NewWriter(f), nil
+	return name, f, nil
 }

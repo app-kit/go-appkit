@@ -128,6 +128,9 @@ func (m *methodQueue) Add(method *methodInstance) ApiError {
 	m.queue[method] = true
 	m.Unlock()
 
+	// Try to process.
+	m.Process()
+
 	return nil
 }
  
@@ -141,7 +144,11 @@ func (m *methodQueue) PruneStaleMethods() {
 			method.stale = true
 			m.Unlock()
 		}
+
 	}
+
+	// Try to process in case anything was marked as stale.
+	m.Process()
 }
 
 func (m *methodQueue) CanProcess() bool {
@@ -301,7 +308,6 @@ func (m *SessionManager) QueueMethod(session ApiSession, method *methodInstance)
 		return err
 	}
 
-	queue.Process()
 	return nil
 }
 

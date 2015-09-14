@@ -1,12 +1,27 @@
 package files
 
 import(
+	"os"
 	"os/exec"
 	"strings"
 	"strconv"
 
 	kit "github.com/theduke/go-appkit"
 )
+
+func FileExists(path string) (bool, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if err == os.ErrNotExist {
+			return false, nil
+		} else {
+			return false, err
+		}
+	}
+	f.Close()
+
+	return true, nil
+}
 
 func GetMimeType(path string) string {
 	output, err := exec.Command("file", "-b", "--mime-type", path).Output()
@@ -50,8 +65,10 @@ func GetImageInfo(path string) (*ImageInfo, kit.ApiError) {
 			if len(format) > 0 {
 				info.Format = format[0]
 			}
-		case "Resolution":
-			parts := strings.Split(strings.TrimSpace(parts[1]), "x")
+		case "Geometry":
+			parts := strings.Split(strings.TrimSpace(parts[1]), "+")
+			parts = strings.Split(strings.TrimSpace(parts[0]), "x")
+
 			if len(parts) == 2 {
 				width, err := strconv.ParseInt(parts[0], 10, 64)
 				height, err2 := strconv.ParseInt(parts[1], 10, 64)

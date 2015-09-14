@@ -175,6 +175,7 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 			Message: err2.Error(),
 		}
 	}
+	defer writer.Close()
 
 	// Open file for reading.
 	f, err := os.Open(filePath)

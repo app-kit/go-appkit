@@ -1,7 +1,7 @@
 package appkit
 
 import (
-	"bufio"
+	"io"
 
 	db "github.com/theduke/go-dukedb"
 )
@@ -68,11 +68,11 @@ type ApiFile interface {
 	// Get a reader for the file.
 	// Might return an error if the file does not exist in the backend,
 	// or it is not connected to a backend.
-	Reader() (*bufio.Reader, ApiError)
+	Reader() (io.ReadCloser, ApiError)
 
 	// Get a writer for the file.
 	// Might return an error if the file is not connected to a backend.
-	Writer(create bool) (string, *bufio.Writer, ApiError)
+	Writer(create bool) (string, io.WriteCloser, ApiError)
 }
 
 type ApiFileBackend interface {
@@ -112,14 +112,14 @@ type ApiFileBackend interface {
 	DeleteFileById(bucket, id string) ApiError
 
 	// Retrieve a reader for a file.
-	Reader(ApiFile) (*bufio.Reader, ApiError)
+	Reader(ApiFile) (io.ReadCloser, ApiError)
 	// Retrieve a reader for a file in a bucket.
-	ReaderById(bucket, id string) (*bufio.Reader, ApiError)
+	ReaderById(bucket, id string) (io.ReadCloser, ApiError)
 
 	// Retrieve a writer for a file in a bucket.
-	Writer(f ApiFile, create bool) (string, *bufio.Writer, ApiError)
+	Writer(f ApiFile, create bool) (string, io.WriteCloser, ApiError)
 	// Retrieve a writer for a file in a bucket.
-	WriterById(bucket, id string, create bool) (string, *bufio.Writer, ApiError)
+	WriterById(bucket, id string, create bool) (string, io.WriteCloser, ApiError)
 }
 
 type ApiFileHandler interface {
