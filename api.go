@@ -5,6 +5,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strings"
+	"html/template"
+	"io"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -118,8 +121,8 @@ func (r *Request) SetSession(x ApiSession) {
 	r.Session = x
 }
 
-func (r *Request) GetContext() Context {
-	return r.Context
+func (r *Request) GetContext() *Context {
+	return &r.Context
 }
 
 func (r *Request) SetContext(x Context) {
@@ -176,10 +179,148 @@ func NewErrorResponse(code, message string) *Response {
 
 type HttpHandler func(*App, ApiRequest, http.ResponseWriter) (ApiResponse, bool)
 
+type HttpHandlerStruct struct {
+	App *App
+	Handler HttpHandler
+}
+
+func (h *HttpHandlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	params := new(httprouter.Params)
+	httpHandler(w, r, *params, h.App, h.Handler)
+}
+
 type HttpRoute struct {
 	Route   string
 	Method  string
 	Handler HttpHandler
+}
+
+func serverRenderer(app *App, w http.ResponseWriter, r ApiRequest) ApiError {
+	return nil
+}
+
+func defaultErrorTpl() *template.Template {
+	tpl := `
+	<html>
+		<head>
+			<title>Server Error</title>
+		</head>
+
+		<body>
+			<h1>Server Error</h1>
+
+			<p>{{error}}</p>
+		</body>
+	</html>
+	`
+
+	t, _ := template.New("error").Parse(tpl)	
+	return t
+}
+
+func defaultNotFoundTpl() *template.Template {
+	tpl := `
+	<html>
+		<head>
+			<title>Page Not Found</title>
+		</head>
+
+		<body>
+			<h1>Page Not Found</h1>
+
+			<p>The page you are looking for does not exist.</p>
+		</body>
+	</html>
+	`
+
+	t, _ := template.New("error").Parse(tpl)	
+	return t
+}
+
+func serverErrorHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
+	tplPath := app.Config.UString("frontend.errorTemplate")
+
+	tpl := defaultErrorTpl()
+
+	if tplPath != "" {
+		var err error
+		tpl, err = template.ParseFiles(tplPath)
+		if err != nil {
+			app.Logger.Fatalf("Could not parse error template at '%v': %v", tplPath, err)
+		}
+	}
+
+	err, _ := r.GetContext().Get("error")
+	data := map[string]interface{} {
+		"error": err,
+	}
+
+	w.WriteHeader(500)
+	if err := tpl.Execute(w, data); err != nil {
+		app.Logger.Fatalf("Could not render error template: %v\n", err)
+		w.Write([]byte("Server Error"))
+	}
+
+	return nil, true
+}
+
+func notFoundHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
+	apiPrefix := "/" + app.Config.UString("api.prefix", "api")
+
+	// Try to render the page on the server, if enabled.
+	if !strings.HasPrefix(r.GetHttpRequest().URL.Path, apiPrefix) {
+		if app.Config.UBool("serverRenderer.enabled", false) {
+			err := serverRenderer(app, w, r)
+			if err == nil {
+				// Rendering worked fine and the serverRenderer sent the response.
+				// Nothing more to do.
+				return  nil, true
+			} else {
+				// An error occurred, send an error response.
+				context := r.GetContext()
+				context.Set("error", err)
+				app.ServerErrorHandler()(app, r, w)
+				return nil, true
+			}
+		}
+	}
+
+	// Not rendered on server, render the normal not found template.
+	apiNotFoundTplPath := app.Config.UString("api.notFoundTemplate")
+	tplPath := app.Config.UString("frontend.notFoundTemplate")
+
+	if strings.HasPrefix(r.GetHttpRequest().URL.Path, apiPrefix) && apiNotFoundTplPath != "" {
+		tplPath = apiNotFoundTplPath
+	}
+
+	tpl := defaultNotFoundTpl()
+
+	if tplPath != "" {
+		var err error
+		tpl, err = template.ParseFiles(tplPath)
+		if err != nil {
+			app.Logger.Fatalf("Could not parse error template at '%v': %v", tplPath, err)
+		}
+	}
+
+	w.WriteHeader(404)
+	if err := tpl.Execute(w, map[string]interface{}{}); err != nil {
+		app.Logger.Fatalf("Could not render not found template: %v", err)
+		w.Write([]byte("Server Error"))
+	}
+
+	return nil, true
+}
+
+func RespondWithContent(app *App, w http.ResponseWriter, code int, content []byte) {
+	w.WriteHeader(code)
+	w.Write(content)
+}
+
+func RespondWithReader(app *App, w http.ResponseWriter, code int, reader io.ReadCloser) {
+	w.WriteHeader(code)
+	io.Copy(w, reader)
+	reader.Close()
 }
 
 func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
@@ -281,7 +422,17 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		}
 	}
 
-	RespondWithJson(w, response)
+	// If an error has occurred and the request is a non-api request,
+	// use the app.ServerErrorHandler to respond.
+	// Otherwise, do a json response.
+	apiPrefix := "/" + app.Config.UString("api.prefix", "api")
+	fmt.Printf("path: %v\n", r.URL.Path)
+	if response.GetError() != nil && !strings.HasPrefix(r.URL.Path, apiPrefix) {
+		request.Context.Set("error", response.GetError())
+		app.ServerErrorHandler()(app, request, w)
+	} else {
+		RespondWithJson(w, response)
+	}
 }
 
 func AuthenticationMiddleware(a *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {

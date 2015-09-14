@@ -36,6 +36,9 @@ type App struct {
 	beforeMiddlewares map[string]HttpHandler
 	afterMiddlewares  map[string]HttpHandler
 
+	serverErrorHandler HttpHandler
+	notFoundHandler HttpHandler
+
 	sessionManager *SessionManager
 
 	api2go *api2go.API
@@ -153,6 +156,20 @@ func (a *App) PrepareForRun() {
 
 func (a *App) Run() {
 	a.PrepareForRun()
+
+	if a.notFoundHandler == nil {
+		a.notFoundHandler = notFoundHandler
+	}
+	if a.serverErrorHandler == nil {
+		a.serverErrorHandler = serverErrorHandler
+	}
+
+
+	// Install not found handler.
+	a.router.NotFound = &HttpHandlerStruct{
+		App: a,
+		Handler: a.notFoundHandler,
+	}
 
 	// Serve files routes.
 	serveFiles := a.Config.UMap("serveFiles")
@@ -431,6 +448,26 @@ func (a *App) GetAfterMiddlewares() []HttpHandler {
 		wares = append(wares, a.afterMiddlewares[key])
 	}
 	return wares
+}
+
+/**
+ * Http handlers.
+ */
+
+func(a *App) ServerErrorHandler() HttpHandler {
+	return a.serverErrorHandler
+}
+
+func(a *App) SetServerErrorHandler(x HttpHandler) {
+	a.serverErrorHandler = x
+}
+
+func(a *App) NotFoundHandler() HttpHandler {
+	return a.notFoundHandler
+}
+
+func(a *App) SetNotFoundHandler(x HttpHandler) {
+	a.notFoundHandler = x
 }
 
 /**

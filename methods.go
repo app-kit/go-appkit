@@ -146,9 +146,6 @@ func (m *methodQueue) PruneStaleMethods() {
 		}
 
 	}
-
-	// Try to process in case anything was marked as stale.
-	m.Process()
 }
 
 func (m *methodQueue) CanProcess() bool {

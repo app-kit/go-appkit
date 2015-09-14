@@ -17,7 +17,7 @@ type ApiRequest interface {
 	GetSession() ApiSession
 	SetSession(ApiSession)
 
-	GetContext() Context
+	GetContext() *Context
 	GetMeta() Context
 	GetData() interface{}
 
