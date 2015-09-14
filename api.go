@@ -3,11 +3,12 @@ package appkit
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/http"
 	"strings"
 	"html/template"
-	"io"
+	"os"
 
 	"github.com/julienschmidt/httprouter"
 )
@@ -237,6 +238,44 @@ func defaultNotFoundTpl() *template.Template {
 	return t
 }
 
+func getIndexTpl(app *App) ([]byte, ApiError) {
+	if path := app.Config.UString("frontend.indexTpl"); path != "" {
+		f, err := os.Open(path)
+		if err != nil {
+			return nil, Error{
+				Code: "cant_open_index_tpl",
+				Message: fmt.Sprintf("The index template at %v could not be opened: %v", path, err),
+			}
+		}
+
+		tpl, err := ioutil.ReadAll(f)
+		if err != nil {
+			return nil, Error{
+				Code: "index_tpl_read_error",
+				Message: fmt.Sprintf("Could not read index template at %v: %v", path, err),
+			}
+		}
+
+		return tpl, nil
+	}
+
+	tpl := `
+	<html>
+		<body>
+			<h1>Go Appkit</h1>
+
+			<p>Welcome to your new appkit server.</p>
+
+			<p>
+			  Find instructions on how to set up your app at <a href="http://github.com/theduke/go-appkit">Github</a>
+			</p>
+		</body>
+	</html>
+	`
+
+	return []byte(tpl), nil
+}
+
 func serverErrorHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
 	tplPath := app.Config.UString("frontend.errorTemplate")
 
@@ -266,9 +305,10 @@ func serverErrorHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiRespo
 
 func notFoundHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
 	apiPrefix := "/" + app.Config.UString("api.prefix", "api")
+	isApiRequest := strings.HasPrefix(r.GetHttpRequest().URL.Path, apiPrefix)
 
 	// Try to render the page on the server, if enabled.
-	if !strings.HasPrefix(r.GetHttpRequest().URL.Path, apiPrefix) {
+	if !isApiRequest {
 		if app.Config.UBool("serverRenderer.enabled", false) {
 			err := serverRenderer(app, w, r)
 			if err == nil {
@@ -285,30 +325,29 @@ func notFoundHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse
 		}
 	}
 
-	// Not rendered on server, render the normal not found template.
-	apiNotFoundTplPath := app.Config.UString("api.notFoundTemplate")
-	tplPath := app.Config.UString("frontend.notFoundTemplate")
-
-	if strings.HasPrefix(r.GetHttpRequest().URL.Path, apiPrefix) && apiNotFoundTplPath != "" {
-		tplPath = apiNotFoundTplPath
-	}
-
-	tpl := defaultNotFoundTpl()
-
-	if tplPath != "" {
-		var err error
-		tpl, err = template.ParseFiles(tplPath)
+	// For non-api requests, render the default template.
+	if !isApiRequest {
+		tpl, err := getIndexTpl(app)
 		if err != nil {
-			app.Logger.Fatalf("Could not parse error template at '%v': %v", tplPath, err)
+			context := r.GetContext()
+			context.Set("error", err)
+			app.ServerErrorHandler()(app, r, w)
+			return nil, true
 		}
+
+		w.WriteHeader(200)
+		w.Write(tpl)
+		return nil, true
 	}
 
-	w.WriteHeader(404)
-	if err := tpl.Execute(w, map[string]interface{}{}); err != nil {
-		app.Logger.Fatalf("Could not render not found template: %v", err)
-		w.Write([]byte("Server Error"))
+	// Forapi requests, render the api not found error.
+	response := &Response{
+		Error: Error{
+			Code: "not_found",
+			Message: "This api route does not exist",
+		},
 	}
-
+	RespondWithJson(w, response)
 	return nil, true
 }
 

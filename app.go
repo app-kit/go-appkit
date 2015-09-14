@@ -164,6 +164,16 @@ func (a *App) Run() {
 		a.serverErrorHandler = serverErrorHandler
 	}
 
+	// Install handler for index.
+	indexTpl, err := getIndexTpl(a)
+	if err != nil {
+		panic(err.Error())
+	}
+
+	a.router.GET("/", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		w.WriteHeader(200)
+		w.Write(indexTpl)
+	})
 
 	// Install not found handler.
 	a.router.NotFound = &HttpHandlerStruct{
@@ -224,8 +234,8 @@ func (a *App) Run() {
 	a.Logger.Infof("Serving on %v", url)
 
 	handler := a.api2go.Handler()
-	err := http.ListenAndServe(url, handler)
-	if err != nil {
+	err2 := http.ListenAndServe(url, handler)
+	if err2 != nil {
 		a.Logger.Panicf("Could not start server: %v\n", err)
 	}
 }
