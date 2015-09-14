@@ -480,6 +480,12 @@ func(a *App) SetNotFoundHandler(x HttpHandler) {
 	a.notFoundHandler = x
 }
 
+func (a *App) RegisterHttpHandler(method, path string, handler HttpHandler) {
+	a.router.Handle(method, path, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		httpHandler(w, r, params, a, handler)
+	})
+}
+
 /**
  * Migrations and Backend functionality.
  */
