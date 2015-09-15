@@ -6,6 +6,10 @@ import(
 )
 
 func StrIn(haystack []string, needle string) bool {
+	if haystack == nil {
+		return false
+	}
+	
 	for _, str := range haystack {
 		if str == needle {
 			return true
