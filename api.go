@@ -21,6 +21,7 @@ import (
 	"github.com/julienschmidt/httprouter"
 
 	. "github.com/theduke/go-appkit/error"
+	"github.com/theduke/go-appkit/utils"
 )
 
 type Context struct {
@@ -223,7 +224,7 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
 
 	// First, ensure that the tmp directory exists.
 	tmpDir := path.Join(app.TmpDir(), "phantom")
-	if ok, _ := FileExists(tmpDir); !ok {
+	if ok, _ := utils.FileExists(tmpDir); !ok {
 		if err := os.MkdirAll(tmpDir, 0777); err != nil {
 			return 0, nil, AppError{
 				Code: "create_tmp_dir_failed",
@@ -274,7 +275,7 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
 		"microseconds": timeTaken,
 	}).Debugf("Rendered url %v with phantomjs", url)
 
-	content, err2 := ReadFile(filePath)
+	content, err2 := utils.ReadFile(filePath)
 	if err2 != nil {
 		return 0, nil, err2
 	}

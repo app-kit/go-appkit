@@ -19,6 +19,7 @@ import (
 	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/utils"
 	. "github.com/theduke/go-appkit/error"
 	db "github.com/theduke/go-dukedb"
 )
@@ -220,7 +221,7 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, Error)
 			}
 		}
 
-		filename = kit.Canonicalize(filename)
+		filename = utils.Canonicalize(filename)
 		if filename == "" {
 			filename = id
 		}
