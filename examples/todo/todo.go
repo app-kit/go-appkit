@@ -8,12 +8,14 @@ import (
 
 	_ "github.com/lib/pq"
 
+	db "github.com/theduke/go-dukedb"
+	"github.com/theduke/go-dukedb/backends/sql"
+
 	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/users"
-	db "github.com/theduke/go-dukedb"
-	"github.com/theduke/go-dukedb/backends/sql"
+	"github.com/theduke/go-appkit/caches/fs"
 )
 
 type Project struct {
@@ -107,16 +109,22 @@ func InitMigrations(app *kit.App) {
 }
 
 func start() error {
+	app := kit.NewApp("")
+
+	// Build backend.
 	backend, err := sql.New("postgres", "postgres://test:test@localhost/test?sslmode=disable")
 	if err != nil {
 		return err
 	}
 	backend.SetDebug(true)
-
-	//userResource := userHandler.GetUserResource()
-
-	app := kit.NewApp("")
 	app.RegisterBackend("gorm", backend)
+
+	// Build cache.
+	fsCache, err := fs.New("tmp/cache")
+	if err != nil {
+		return err
+	}
+	app.RegisterCache("fs", fsCache)
 
 	userHandler := users.NewUserHandler(nil)
 	app.RegisterUserHandler(userHandler)

@@ -23,6 +23,7 @@ import (
 
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/utils"
+	"github.com/theduke/go-appkit/caches"
 )
 
 type Context struct {
@@ -260,6 +261,39 @@ func serverRenderer(app *App, r ApiRequest) ApiResponse {
 	q.Set("no-server-render", "1")
 	url.RawQuery = q.Encode()
 
+	strUrl := url.String()
+
+	cacheKey := "serverrenderer_" + strUrl
+	cacheName := app.Config.UString("serverRenderer.cache")
+	var cache caches.Cache
+
+	// If a cache is specified, try to retrieve it.
+	if cacheName != "" {
+		cache = app.Cache(cacheName)
+		if cache == nil {
+			app.Logger.Errorf("serverRenderer.cache is set to %v, but the cache is not registered with app", cacheName)
+		}
+	}
+
+	// If a cache was found, try to retrieve cached response.
+	if cache != nil {
+		item, err := cache.Get(cacheKey)
+		if err != nil {
+			app.Logger.Errorf("serverRenderer: cache retrieval error: %v", err)
+		} else if item != nil {
+			// Cache item found, return response with cache item.
+			status, _ := strconv.ParseInt(item.GetTags()[0], 10, 64)
+			data, _ := item.ToString()
+
+			return &Response{
+				HttpStatus: int(status),
+				RawData: []byte(data),
+			}
+		}
+	}
+
+	// Either no cache or url not yet cached, so render it.
+
 	// First, ensure that the tmp directory exists.
 	tmpDir := path.Join(app.TmpDir(), "phantom")
 	if ok, _ := utils.FileExists(tmpDir); !ok {
@@ -292,7 +326,7 @@ func serverRenderer(app *App, r ApiRequest) ApiResponse {
 		"--local-to-remote-url-access=true", 
 		scriptPath, 
 		"10", 
-		url.String(), 
+		strUrl, 
 		filePath,
 	}	
 	result, err := exec.Command(phantomPath, args...).CombinedOutput()
@@ -328,6 +362,21 @@ func serverRenderer(app *App, r ApiRequest) ApiResponse {
 	if res != nil {
 		s, _ := strconv.ParseInt(res[1], 10, 64)
 		status = int(s)
+	}
+
+	// Save to cache.
+	if cache != nil {
+		lifetime := app.Config.UInt("serverRenderer.cacheLiftetime", 3600)
+
+		err := cache.Set(&caches.StrItem{
+			Key: cacheKey,
+			Value: string(content),
+			Tags: []string{strconv.FormatInt(int64(status), 10)},
+			ExpiresAt: time.Now().Add(time.Duration(lifetime) * time.Second),
+		})
+		if err != nil {
+			app.Logger.Errorf("serverRenderer: Cache persist error: %v",  err)
+		}
 	}
 
 	return &Response{

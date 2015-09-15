@@ -3,5 +3,7 @@ serveFiles:
   "/public": public
 serverRenderer:
   enabled: true
+  cache: fs
+  cacheLifetime: 3600
 frontend:
   indexTpl: public/index.html
