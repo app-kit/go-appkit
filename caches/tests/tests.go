@@ -16,6 +16,10 @@ func TestCache(cache caches.Cache) {
 		Expect(cache.Keys()).To(Equal([]string{}))
 	})
 
+	It("Should return nil for unset keys", func() {
+		Expect(cache.Get("lala")).To(BeNil())
+	})
+
 	It("Should SetString()", func() {
 		Expect(cache.SetString("test1", "testval", nil, nil)).ToNot(HaveOccurred())
 		Expect(cache.GetString("test1")).To(Equal("testval"))

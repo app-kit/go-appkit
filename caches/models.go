@@ -30,7 +30,11 @@ func(i *StrItem) GetValue() interface{} {
 }
 
 func(i *StrItem) SetValue(x interface{}) {
-	i.Value = x.(string)
+	if x == nil {
+		i.Value = ""
+	} else {
+		i.Value = x.(string)
+	}
 }
 
 func(i *StrItem) ToString() (string, Error) {
@@ -48,6 +52,13 @@ func(i *StrItem) GetExpiresAt() time.Time {
 
 func(i *StrItem) SetExpiresAt(x time.Time) {
 	i.ExpiresAt = x
+}
+
+func (i *StrItem) IsExpired() bool {
+	if i.ExpiresAt.IsZero() {
+		return  false
+	}
+	return i.ExpiresAt.Sub(time.Now()).Seconds() < 0
 }
 
 func(i *StrItem) GetTags() []string {
@@ -68,7 +79,11 @@ func(i *MapItem) GetValue() interface{} {
 }
 
 func(i *MapItem) SetValue(x interface{}) {
-	i.Value = x.(map[string]interface{})
+	if x == nil {
+		i.Value = nil
+	} else {
+		i.Value = x.(map[string]interface{})
+	}
 }
 
 func(i *MapItem) ToString() (string, Error) {

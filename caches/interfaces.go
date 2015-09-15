@@ -18,6 +18,7 @@ type CacheItem interface {
 
 	GetExpiresAt() time.Time
 	SetExpiresAt(time.Time)
+	IsExpired() bool
 
 	GetTags() []string
 	SetTags([]string)

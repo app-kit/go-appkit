@@ -187,9 +187,6 @@ func(r *Redis) Set(item CacheItem) Error {
 	if err := conn.Flush(); err != nil {
 		return redisErr(err)
 	}
-	if _, err := conn.Receive(); err !=  nil {
-		return redisErr(err)
-	}
 
 	return nil
 }
@@ -262,6 +259,11 @@ func(r *Redis) Get(key string, items ...CacheItem) (CacheItem, Error) {
 		return nil, redisErr(err)
 	}
 
+	// Return nil if item is expired.
+	if item.IsExpired() {
+		return nil, nil
+	}
+
 	return item, nil
 }
 
@@ -286,7 +288,7 @@ func(r *Redis) Delete(keys ...string) Error {
 	ifKeys := make([]interface{}, 0)
 	for _, key := range keys {
 		if key == "" {
-			continue
+			return AppError{Code: "empty_key"}
 		}
 
 		key = r.key(key)

@@ -21,7 +21,7 @@ var tmpDir string
 var finishedChannel chan bool
 
 var _ = BeforeSuite(func() {
-	tmpDir = path.Join(os.TempDir(), "appkit-cache-redis")
+	tmpDir = path.Join(os.TempDir(), "appkit_cache_redis_test")
 	err := os.MkdirAll(tmpDir, 0777)
 	Expect(err).ToNot(HaveOccurred())
 
