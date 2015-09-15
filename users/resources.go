@@ -7,6 +7,8 @@ import (
 
 	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 func randomToken() string {
@@ -37,10 +39,10 @@ type SessionResourceHooks struct {
 	ApiDeleteAllowed bool
 }
 
-func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, kit.ApiError) {
+func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, Error) {
 	token := randomToken()
 	if token == "" {
-		return nil, kit.Error{Code: "token_creation_failed"}
+		return nil, AppError{Code: "token_creation_failed"}
 	}
 
 	rawSession, err := res.GetBackend().NewModel(res.GetModel().Collection())

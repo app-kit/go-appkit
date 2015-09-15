@@ -19,6 +19,8 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/twinj/uuid"
 	"github.com/julienschmidt/httprouter"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 type Context struct {
@@ -77,12 +79,12 @@ func NewRequest() *Request {
 	return &r
 }
 
-func (r *Request) BuildFromJsonBody() ApiError {
+func (r *Request) BuildFromJsonBody() Error {
 	// Read request body.
 	defer r.HttpRequest.Body.Close()
 	body, err := ioutil.ReadAll(r.HttpRequest.Body)
 	if err != nil {
-		return Error{
+		return AppError{
 			Code:    "read_post_error",
 			Message: fmt.Sprintf("Request body could not be read: %v", err),
 		}
@@ -94,7 +96,7 @@ func (r *Request) BuildFromJsonBody() ApiError {
 	if string(body) != "" {
 		err = json.Unmarshal(body, &allData)
 		if err != nil {
-			return Error{
+			return AppError{
 				Code:    "invalid_json_body",
 				Message: fmt.Sprintf("Json body could not be unmarshaled: %v", err),
 			}
@@ -159,12 +161,12 @@ func (r *Request) GetHttpRequest() *http.Request {
 }
 
 type Response struct {
-	Error ApiError
+	Error Error
 	Meta  map[string]interface{}
 	Data  interface{}
 }
 
-func (r Response) GetError() ApiError {
+func (r Response) GetError() Error {
 	return r.Error
 }
 
@@ -182,7 +184,7 @@ func (r Response) GetData() interface{} {
 
 func NewErrorResponse(code, message string) *Response {
 	return &Response{
-		Error: Error{Code: code, Message: message},
+		Error: AppError{Code: code, Message: message},
 	}
 }
 
@@ -204,7 +206,7 @@ type HttpRoute struct {
 	Handler HttpHandler
 }
 
-func serverRenderer(app *App, r ApiRequest) (int, []byte, ApiError) {
+func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
 	// Build the url to query.
 	url := r.GetHttpRequest().URL
 
@@ -223,7 +225,7 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, ApiError) {
 	tmpDir := path.Join(app.TmpDir(), "phantom")
 	if ok, _ := FileExists(tmpDir); !ok {
 		if err := os.MkdirAll(tmpDir, 0777); err != nil {
-			return 0, nil, Error{
+			return 0, nil, AppError{
 				Code: "create_tmp_dir_failed",
 				Message: fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
 				Internal: true,
@@ -256,7 +258,7 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, ApiError) {
 	if err != nil {
 		app.Logger.Errorf("Phantomjs execution error: %v", string(result))
 
-		return 0, nil, Error{
+		return 0, nil, AppError{
 			Code: "phantom_execution_failed",
 			Message: err.Error(),
 			Data: result,
@@ -326,11 +328,11 @@ func defaultNotFoundTpl() *template.Template {
 	return t
 }
 
-func getIndexTpl(app *App) ([]byte, ApiError) {
+func getIndexTpl(app *App) ([]byte, Error) {
 	if path := app.Config.UString("frontend.indexTpl"); path != "" {
 		f, err := os.Open(path)
 		if err != nil {
-			return nil, Error{
+			return nil, AppError{
 				Code: "cant_open_index_tpl",
 				Message: fmt.Sprintf("The index template at %v could not be opened: %v", path, err),
 			}
@@ -338,7 +340,7 @@ func getIndexTpl(app *App) ([]byte, ApiError) {
 
 		tpl, err := ioutil.ReadAll(f)
 		if err != nil {
-			return nil, Error{
+			return nil, AppError{
 				Code: "index_tpl_read_error",
 				Message: fmt.Sprintf("Could not read index template at %v: %v", path, err),
 			}
@@ -434,7 +436,7 @@ func notFoundHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse
 
 	// Forapi requests, render the api not found error.
 	response := &Response{
-		Error: Error{
+		Error: AppError{
 			Code: "not_found",
 			Message: "This api route does not exist",
 		},
@@ -466,7 +468,7 @@ func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
 		additionalErrs := response.GetError().GetErrors()
 		if additionalErrs != nil {
 			for _, err := range additionalErrs {
-				if apiErr, ok := err.(ApiError); ok && !apiErr.IsInternal() {
+				if apiErr, ok := err.(Error); ok && !apiErr.IsInternal() {
 					errs = append(errs, apiErr)
 				}
 			}
@@ -481,7 +483,7 @@ func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
 		code = 500
 		respData = map[string]interface{}{
 			"errors": []error{
-				&Error{
+				&AppError{
 					Code:    "json_encode_error",
 					Message: err2.Error(),
 				},

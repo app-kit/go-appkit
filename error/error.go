@@ -1,23 +1,10 @@
-package appkit
+package error
 
 import (
 	"fmt"
 )
 
-type ApiError interface {
-	GetCode() string
-	GetMessage() string
-	GetData() interface{}
-
-	IsInternal() bool
-
-	GetErrors() []error
-	AddError(error)
-
-	Error() string
-}
-
-type Error struct {
+type AppError struct {
 	Code     string      `json:"code,omitempty"`
 	Message  string      `json:"title,omitempty"`
 	Data     interface{} `json:"-"`
@@ -25,31 +12,34 @@ type Error struct {
 	Errors   []error
 }
 
-func (e Error) GetCode() string {
+// Ensure error implements the error interface.
+var _ Error = (*AppError)(nil)
+
+func (e AppError) GetCode() string {
 	return e.Code
 }
 
-func (e Error) GetMessage() string {
+func (e AppError) GetMessage() string {
 	return e.Message
 }
 
-func (e Error) GetData() interface{} {
+func (e AppError) GetData() interface{} {
 	return e.Data
 }
 
-func (e Error) IsInternal() bool {
+func (e AppError) IsInternal() bool {
 	return e.Internal
 }
 
-func (e Error) GetErrors() []error {
+func (e AppError) GetErrors() []error {
 	return e.Errors
 }
 
-func (e Error) AddError(err error) {
+func (e AppError) AddError(err error) {
 	e.Errors = append(e.Errors, err)
 }
 
-func (e Error) Error() string {
+func (e AppError) Error() string {
 	s := e.Code
 	if e.Message != "" {
 		s += ": " + e.Message

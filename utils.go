@@ -6,6 +6,8 @@ import (
 	"os"
 	"fmt"
 	"io/ioutil"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 func Canonicalize(str string) string {
@@ -48,10 +50,10 @@ func FileExists(path string) (bool, error) {
 	return true, nil
 }
 
-func ReadFile(path string) ([]byte, ApiError) {
+func ReadFile(path string) ([]byte, Error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, Error{
+		return nil, AppError{
 			Code: "file_open_error",
 			Message: fmt.Sprintf("Could not open file at %v: %v", path, err),
 			Errors: []error{err},
@@ -61,7 +63,7 @@ func ReadFile(path string) ([]byte, ApiError) {
 
 	content, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, Error{
+		return nil, AppError{
 			Code: "file_read_error",
 			Message: fmt.Sprintf("Could not read file at %v: %v", path, err),
 			Errors: []error{err},

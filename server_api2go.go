@@ -13,14 +13,16 @@ import (
 	"github.com/manyminds/api2go"
 
 	db "github.com/theduke/go-dukedb"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
-func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, ApiError) {
+func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, Error) {
 	// Read request body.
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, Error{
+		return nil, AppError{
 			Code:    "read_post_error",
 			Message: fmt.Sprintf("Request body could not be read: %v", err),
 		}
@@ -34,7 +36,7 @@ func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, ApiErr
 	} else {
 		err = json.Unmarshal(body, &rawData)
 		if err != nil {
-			return nil, Error{
+			return nil, AppError{
 				Code:    "invalid_json_body",
 				Message: fmt.Sprintf("POST body json could not be unmarshaled: %v", err),
 			}
@@ -48,7 +50,7 @@ func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, ApiErr
 
 	// Check permissions.
 	if method.RequiresUser && request.User == nil {
-		return nil, Error{Code: "permission_denied"}
+		return nil, AppError{Code: "permission_denied"}
 	}
 
 	// Call the method callback.
@@ -93,7 +95,7 @@ func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app *App, method *M
 		log.Printf("JSON encode error: %v\n", err)
 		code = 500
 		resp["errors"] = []error{
-			&Error{
+			&AppError{
 				Code:    "json_encode_error",
 				Message: err.Error(),
 			},
@@ -165,14 +167,14 @@ type Api2GoResource struct {
 	App         *App
 }
 
-func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, ApiError) {
+func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, Error) {
 
 	// Handle a json query in metadata.
 	if r.Meta != nil {
 		if rawQuery, ok := r.Meta["query"]; ok {
 			queryData, ok := rawQuery.(map[string]interface{})
 			if !ok {
-				return nil, db.Error{
+				return nil, AppError{
 					Code:    "invalid_query",
 					Message: "Expected query to be dictionary",
 				}

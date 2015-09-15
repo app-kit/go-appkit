@@ -3,6 +3,8 @@ package appkit
 import (
 	db "github.com/theduke/go-dukedb"
 	"time"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 type ApiAuthAdaptor interface {
@@ -30,9 +32,9 @@ type ApiAuthItem interface {
  */
 
 type ApiUserHandler interface {
-	CreateUser(user ApiUser, adaptor string, data interface{}) ApiError
-	AuthenticateUser(user ApiUser, adaptor string, data interface{}) ApiError
-	VerifySession(token string) (ApiUser, ApiSession, ApiError)
+	CreateUser(user ApiUser, adaptor string, data interface{}) Error
+	AuthenticateUser(user ApiUser, adaptor string, data interface{}) Error
+	VerifySession(token string) (ApiUser, ApiSession, Error)
 
 	GetAuthAdaptor(name string) ApiAuthAdaptor
 	AddAuthAdaptor(a ApiAuthAdaptor)

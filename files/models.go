@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/users"
 )
 
@@ -177,14 +178,14 @@ type FileStrID struct {
 // Ensure FileStrID implements ApiFile interface.
 var _ kit.ApiFile = (*FileStrID)(nil)
 
-func (f *FileStrID) Reader() (io.ReadCloser, kit.ApiError) {
+func (f *FileStrID) Reader() (io.ReadCloser, Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, kit.ApiError) {
+func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}
@@ -203,14 +204,14 @@ type FileIntID struct {
 // Ensure FileIntID implements ApiFile interface.
 var _ kit.ApiFile = (*FileIntID)(nil)
 
-func (f *FileIntID) Reader() (io.ReadCloser, kit.ApiError) {
+func (f *FileIntID) Reader() (io.ReadCloser, Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, kit.ApiError) {
+func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}

@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 func FileExists(path string) (bool, error) {
@@ -70,7 +71,7 @@ type Fs struct {
 // Ensure Fs implements the ApiFileBackend interface.
 var _ kit.ApiFileBackend = (*Fs)(nil)
 
-func New(path string) (*Fs, kit.ApiError) {
+func New(path string) (*Fs, Error) {
 	fs := &Fs{
 		name: "fs",
 		path: path,
@@ -78,7 +79,7 @@ func New(path string) (*Fs, kit.ApiError) {
 
 	// Verify root path.
 	if err := os.MkdirAll(path, 0777); err != nil {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:    "root_dir_initializiation_failed",
 			Message: fmt.Sprintf("Could not read or create the root path %v: ", path, err.Error()),
 		}
@@ -103,10 +104,10 @@ func (fs Fs) filePath(bucket, file string) string {
 	return fs.bucketPath(bucket) + string(os.PathSeparator) + file
 }
 
-func (fs Fs) Buckets() ([]string, kit.ApiError) {
+func (fs Fs) Buckets() ([]string, Error) {
 	dir, err := os.Open(fs.path)
 	if err != nil {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:    "read_error",
 			Message: err.Error(),
 		}
@@ -115,7 +116,7 @@ func (fs Fs) Buckets() ([]string, kit.ApiError) {
 
 	dirItems, err := dir.Readdir(-1)
 	if err != nil {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:    "read_error",
 			Message: err.Error(),
 		}
@@ -132,7 +133,7 @@ func (fs Fs) Buckets() ([]string, kit.ApiError) {
 	return buckets, nil
 }
 
-func (fs Fs) HasBucket(bucket string) (bool, kit.ApiError) {
+func (fs Fs) HasBucket(bucket string) (bool, Error) {
 	f, err := os.Open(fs.bucketPath(bucket))
 	if err != nil {
 		// Todo: check for "does not exist" error and return other
@@ -143,7 +144,7 @@ func (fs Fs) HasBucket(bucket string) (bool, kit.ApiError) {
 
 	info, err := f.Stat()
 	if err != nil {
-		return false, kit.Error{
+		return false, AppError{
 			Code:    "read_error",
 			Message: err.Error(),
 		}
@@ -156,9 +157,9 @@ func (fs Fs) HasBucket(bucket string) (bool, kit.ApiError) {
 	}
 }
 
-func (fs Fs) CreateBucket(bucket string, _ kit.ApiBucketConfig) kit.ApiError {
+func (fs Fs) CreateBucket(bucket string, _ kit.ApiBucketConfig) Error {
 	if err := os.Mkdir(fs.bucketPath(bucket), 0777); err != nil {
-		return kit.Error{
+		return AppError{
 			Code:    "create_bucket_failed",
 			Message: err.Error(),
 		}
@@ -167,9 +168,9 @@ func (fs Fs) CreateBucket(bucket string, _ kit.ApiBucketConfig) kit.ApiError {
 	return nil
 }
 
-func (fs Fs) DeleteBucket(bucket string) kit.ApiError {
+func (fs Fs) DeleteBucket(bucket string) Error {
 	if err := os.RemoveAll(fs.bucketPath(bucket)); err != nil {
-		return kit.Error{
+		return AppError{
 			Code:    "bucket_delete_failed",
 			Message: fmt.Sprintf("Could not delete bucket %v: %v", bucket, err),
 		}
@@ -183,12 +184,12 @@ func (fs Fs) BucketConfig(string) kit.ApiBucketConfig {
 	return nil
 }
 
-func (fs Fs) ConfigureBucket(string, kit.ApiBucketConfig) kit.ApiError {
+func (fs Fs) ConfigureBucket(string, kit.ApiBucketConfig) Error {
 	// FS does not support any bucket configuration.
 	return nil
 }
 
-func (fs Fs) ClearBucket(bucket string) kit.ApiError {
+func (fs Fs) ClearBucket(bucket string) Error {
 	files, err := fs.FileIDs(bucket)
 	if err != nil {
 		return err
@@ -196,7 +197,7 @@ func (fs Fs) ClearBucket(bucket string) kit.ApiError {
 
 	for _, file := range files {
 		if err := os.Remove(fs.filePath(bucket, file)); err != nil {
-			return kit.Error{
+			return AppError{
 				Code: "delete_failed",
 				Message: fmt.Sprintf(
 					"Could not delete file %v from bucket %v: %v", file, bucket, err),
@@ -207,7 +208,7 @@ func (fs Fs) ClearBucket(bucket string) kit.ApiError {
 	return nil
 }
 
-func (fs Fs) ClearAll() kit.ApiError {
+func (fs Fs) ClearAll() Error {
 	buckets, err := fs.Buckets()
 	if err != nil {
 		return err
@@ -222,11 +223,11 @@ func (fs Fs) ClearAll() kit.ApiError {
 	return nil
 }
 
-func (fs Fs) FileIDs(bucket string) ([]string, kit.ApiError) {
+func (fs Fs) FileIDs(bucket string) ([]string, Error) {
 	bucketPath := fs.bucketPath(bucket)
 	dir, err := os.Open(bucketPath)
 	if err != nil {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:    "read_error",
 			Message: err.Error(),
 		}
@@ -235,7 +236,7 @@ func (fs Fs) FileIDs(bucket string) ([]string, kit.ApiError) {
 
 	items, err := dir.Readdir(-1)
 	if err != nil {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:    "read_error",
 			Message: err.Error(),
 		}
@@ -251,11 +252,11 @@ func (fs Fs) FileIDs(bucket string) ([]string, kit.ApiError) {
 	return ids, nil
 }
 
-func (fs Fs) HasFile(f kit.ApiFile) (bool, kit.ApiError) {
+func (fs Fs) HasFile(f kit.ApiFile) (bool, Error) {
 	return fs.HasFileById(f.GetBucket(), f.GetFullName())
 }
 
-func (fs Fs) HasFileById(bucket, id string) (bool, kit.ApiError) {
+func (fs Fs) HasFileById(bucket, id string) (bool, Error) {
 	path := fs.filePath(bucket, id)
 	if f, err := os.Open(path); err != nil {
 		// Todo: check for other errors.
@@ -266,14 +267,14 @@ func (fs Fs) HasFileById(bucket, id string) (bool, kit.ApiError) {
 	}
 }
 
-func (fs Fs) DeleteFile(f kit.ApiFile) kit.ApiError {
+func (fs Fs) DeleteFile(f kit.ApiFile) Error {
 	return fs.DeleteFileById(f.GetBucket(), f.GetFullName())
 }
 
-func (fs Fs) DeleteFileById(bucket, id string) kit.ApiError {
+func (fs Fs) DeleteFileById(bucket, id string) Error {
 	path := fs.filePath(bucket, id)
 	if err := os.Remove(path); err != nil {
-		return kit.Error{
+		return AppError{
 			Code:    "file_delete_failed",
 			Message: fmt.Sprintf("Could not delete file %v from bucket %v: %v", bucket, id, err),
 		}
@@ -282,19 +283,19 @@ func (fs Fs) DeleteFileById(bucket, id string) kit.ApiError {
 	return nil
 }
 
-func (fs Fs) Reader(f kit.ApiFile) (io.ReadCloser, kit.ApiError) {
+func (fs Fs) Reader(f kit.ApiFile) (io.ReadCloser, Error) {
 	return fs.ReaderById(f.GetBucket(), f.GetBackendID())
 }
 
-func (fs Fs) ReaderById(bucket, id string) (io.ReadCloser, kit.ApiError) {
+func (fs Fs) ReaderById(bucket, id string) (io.ReadCloser, Error) {
 	if id == "" {
-		return nil, kit.Error{Code: "empty_file_id"}
+		return nil, AppError{Code: "empty_file_id"}
 	}
 
 	path := fs.filePath(bucket, id)
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:    "read_error",
 			Message: fmt.Sprintf("Could not open file %v: %v", path, err),
 		}
@@ -303,13 +304,13 @@ func (fs Fs) ReaderById(bucket, id string) (io.ReadCloser, kit.ApiError) {
 	return f, nil
 }
 
-func (fs Fs) Writer(f kit.ApiFile, create bool) (string, io.WriteCloser, kit.ApiError) {
+func (fs Fs) Writer(f kit.ApiFile, create bool) (string, io.WriteCloser, Error) {
 	return fs.WriterById(f.GetBucket(), f.GetFullName(), create)
 }
 
-func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser, kit.ApiError) {
+func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser, Error) {
 	if id == "" {
-		return "", nil, kit.Error{Code: "empty_file_id"}
+		return "", nil, AppError{Code: "empty_file_id"}
 	}
 
 	if flag, err := fs.HasBucket(bucket); err != nil {
@@ -320,7 +321,7 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser,
 				return "", nil, err
 			}
 		} else {
-			return "", nil, kit.Error{
+			return "", nil, AppError{
 				Code:    "unknown_bucket",
 				Message: fmt.Sprintf("Trying to get writer for file %v in non-existant bucket %v", id, bucket),
 			}
@@ -335,7 +336,7 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser,
 		var err error
 		path, err = findUniqueFilePath(path)
 		if err != nil {
-			return "", nil, kit.Error{
+			return "", nil, AppError{
 				Code:    "read_error",
 				Message: err.Error(),
 			}
@@ -344,7 +345,7 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser,
 
 	f, err := os.Create(path)
 	if err != nil {
-		return "", nil, kit.Error{
+		return "", nil, AppError{
 			Code:    "create_failed",
 			Message: fmt.Sprintf("Could not create file %v: %v", path, err),
 		}

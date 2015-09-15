@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/files/backends/fs"
 	db "github.com/theduke/go-dukedb"
 )
@@ -89,9 +90,9 @@ func (h *FileHandler) SetModel(x interface{}) {
 	h.model = x
 }
 
-func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath string, deleteDir bool) kit.ApiError {
+func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath string, deleteDir bool) Error {
 	if h.DefaultBackend == nil {
-		return kit.Error{
+		return AppError{
 			Code:    "no_default_backend",
 			Message: "Cant build a file without a default backend.",
 		}
@@ -103,14 +104,14 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 
 	backend := h.Backend(file.GetBackendName())
 	if backend == nil {
-		return kit.Error{
+		return AppError{
 			Code:    "unknown_backend",
 			Message: fmt.Sprintf("The backend %v does not exist", file.GetBackendName()),
 		}
 	}
 
 	if file.GetBucket() == "" {
-		return kit.Error{
+		return AppError{
 			Code:    "missing_bucket",
 			Message: "Bucket must be set on the file",
 		}
@@ -119,13 +120,13 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	stat, err := os.Stat(filePath)
 	if err != nil {
 		if err == os.ErrNotExist {
-			return kit.Error{
+			return AppError{
 				Code:    "file_not_found",
 				Message: fmt.Sprintf("File %v does not exist", filePath),
 			}
 		}
 
-		return kit.Error{
+		return AppError{
 			Code:    "stat_error",
 			Message: fmt.Sprintf("Could not get file stats for file at %v: %v", filePath, err),
 			Errors:  []error{err},
@@ -133,7 +134,7 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	}
 
 	if stat.IsDir() {
-		return kit.Error{Code: "path_is_directory"}
+		return AppError{Code: "path_is_directory"}
 	}
 
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
@@ -169,7 +170,7 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	// Store the file in the backend.
 	backendId, writer, err2 := file.Writer(true)
 	if err2 != nil {
-		return kit.Error{
+		return AppError{
 			Code:    "backend_error",
 			Message: err2.Error(),
 		}
@@ -179,7 +180,7 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	// Open file for reading.
 	f, err := os.Open(filePath)
 	if err != nil {
-		return kit.Error{
+		return AppError{
 			Code:    "read_error",
 			Message: fmt.Sprintf("Could not read file at %v", filePath),
 		}
@@ -188,7 +189,7 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	_, err = io.Copy(writer, f)
 	if err != nil {
 		f.Close()
-		return kit.Error{
+		return AppError{
 			Code:    "copy_to_backend_failed",
 			Message: err.Error(),
 		}
@@ -203,7 +204,7 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	if err2 != nil {
 		// Delete file from backend again.
 		backend.DeleteFile(file)
-		return kit.Error{
+		return AppError{
 			Code:    "db_error",
 			Message: fmt.Sprintf("Could not save file to database: %v\n", err2),
 			Errors:  []error{err2},
@@ -227,7 +228,7 @@ func (h *FileHandler) New() kit.ApiFile {
 	return f
 }
 
-func (h *FileHandler) FindOne(id string) (kit.ApiFile, kit.ApiError) {
+func (h *FileHandler) FindOne(id string) (kit.ApiFile, Error) {
 	file, err := h.resource.FindOne(id)
 	if err != nil {
 		return nil, err
@@ -247,7 +248,7 @@ func (h *FileHandler) FindOne(id string) (kit.ApiFile, kit.ApiError) {
 	}
 }
 
-func (h *FileHandler) Find(q *db.Query) ([]kit.ApiFile, kit.ApiError) {
+func (h *FileHandler) Find(q *db.Query) ([]kit.ApiFile, Error) {
 	rawFiles, err := h.resource.Find(q)
 	if err != nil {
 		return nil, err
@@ -270,14 +271,14 @@ func (h *FileHandler) Find(q *db.Query) ([]kit.ApiFile, kit.ApiError) {
 	return files, nil
 }
 
-func (h *FileHandler) Create(f kit.ApiFile, u kit.ApiUser) kit.ApiError {
+func (h *FileHandler) Create(f kit.ApiFile, u kit.ApiUser) Error {
 	return h.resource.Create(f, u)
 }
 
-func (h *FileHandler) Update(f kit.ApiFile, u kit.ApiUser) kit.ApiError {
+func (h *FileHandler) Update(f kit.ApiFile, u kit.ApiUser) Error {
 	return h.resource.Update(f, u)
 }
 
-func (h *FileHandler) Delete(f kit.ApiFile, u kit.ApiUser) kit.ApiError {
+func (h *FileHandler) Delete(f kit.ApiFile, u kit.ApiUser) Error {
 	return h.resource.Delete(f, u)
 }

@@ -4,6 +4,8 @@ import (
 	"net/http"
 
 	db "github.com/theduke/go-dukedb"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 /**
@@ -25,7 +27,7 @@ type ApiRequest interface {
 }
 
 type ApiResponse interface {
-	GetError() ApiError
+	GetError() Error
 	GetMeta() map[string]interface{}
 	SetMeta(map[string]interface{})
 	GetData() interface{}
@@ -57,21 +59,21 @@ type ApiResource interface {
 
 	Q() *db.Query
 
-	Find(*db.Query) ([]db.Model, ApiError)
-	FindOne(id string) (db.Model, ApiError)
+	Find(*db.Query) ([]db.Model, Error)
+	FindOne(id string) (db.Model, Error)
 
 	ApiFindOne(string, ApiRequest) ApiResponse
 	ApiFind(*db.Query, ApiRequest) ApiResponse
 	// Same as find, but response meta will contain a total count.
 	ApiFindPaginated(*db.Query, ApiRequest) ApiResponse
 
-	Create(obj db.Model, user ApiUser) ApiError
+	Create(obj db.Model, user ApiUser) Error
 	ApiCreate(obj db.Model, r ApiRequest) ApiResponse
 
-	Update(obj db.Model, user ApiUser) ApiError
+	Update(obj db.Model, user ApiUser) Error
 	ApiUpdate(obj db.Model, r ApiRequest) ApiResponse
 
-	Delete(obj db.Model, user ApiUser) ApiError
+	Delete(obj db.Model, user ApiUser) Error
 	ApiDelete(id string, r ApiRequest) ApiResponse
 }
 
@@ -101,11 +103,11 @@ type ApiFindHook interface {
 }
 
 type ApiAlterQueryHook interface {
-	ApiAlterQuery(res ApiResource, query *db.Query, r ApiRequest) ApiError
+	ApiAlterQuery(res ApiResource, query *db.Query, r ApiRequest) Error
 }
 
 type ApiAfterFindHook interface {
-	ApiAfterFind(res ApiResource, obj []db.Model, user ApiUser) ApiError
+	ApiAfterFind(res ApiResource, obj []db.Model, user ApiUser) Error
 }
 
 /**
@@ -117,11 +119,11 @@ type ApiCreateHook interface {
 }
 
 type CreateHook interface {
-	Create(res ApiResource, obj db.Model, user ApiUser) ApiError
+	Create(res ApiResource, obj db.Model, user ApiUser) Error
 }
 
 type BeforeCreateHook interface {
-	BeforeCreate(res ApiResource, obj db.Model, user ApiUser) ApiError
+	BeforeCreate(res ApiResource, obj db.Model, user ApiUser) Error
 }
 
 type AllowCreateHook interface {
@@ -129,7 +131,7 @@ type AllowCreateHook interface {
 }
 
 type AfterCreateHook interface {
-	AfterCreate(res ApiResource, obj db.Model, user ApiUser) ApiError
+	AfterCreate(res ApiResource, obj db.Model, user ApiUser) Error
 }
 
 /**
@@ -141,11 +143,11 @@ type ApiUpdateHook interface {
 }
 
 type UpdateHook interface {
-	Update(res ApiResource, obj db.Model, r ApiRequest) ApiError
+	Update(res ApiResource, obj db.Model, r ApiRequest) Error
 }
 
 type BeforeUpdateHook interface {
-	BeforeUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
+	BeforeUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) Error
 }
 
 type AllowUpdateHook interface {
@@ -153,7 +155,7 @@ type AllowUpdateHook interface {
 }
 
 type AfterUpdateHook interface {
-	AfterUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) ApiError
+	AfterUpdate(res ApiResource, obj, oldobj db.Model, user ApiUser) Error
 }
 
 /**
@@ -165,11 +167,11 @@ type ApiDeleteHook interface {
 }
 
 type DeleteHook interface {
-	Delete(res ApiResource, obj db.Model, user ApiUser) ApiError
+	Delete(res ApiResource, obj db.Model, user ApiUser) Error
 }
 
 type BeforeDeleteHook interface {
-	BeforeDelete(res ApiResource, obj db.Model, user ApiUser) ApiError
+	BeforeDelete(res ApiResource, obj db.Model, user ApiUser) Error
 }
 
 type AllowDeleteHook interface {
@@ -177,5 +179,5 @@ type AllowDeleteHook interface {
 }
 
 type AfterDeleteHook interface {
-	AfterDelete(res ApiResource, obj db.Model, user ApiUser) ApiError
+	AfterDelete(res ApiResource, obj db.Model, user ApiUser) Error
 }

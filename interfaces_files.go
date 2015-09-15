@@ -4,6 +4,8 @@ import (
 	"io"
 
 	db "github.com/theduke/go-dukedb"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 type ApiBucketConfig interface {
@@ -68,11 +70,11 @@ type ApiFile interface {
 	// Get a reader for the file.
 	// Might return an error if the file does not exist in the backend,
 	// or it is not connected to a backend.
-	Reader() (io.ReadCloser, ApiError)
+	Reader() (io.ReadCloser, Error)
 
 	// Get a writer for the file.
 	// Might return an error if the file is not connected to a backend.
-	Writer(create bool) (string, io.WriteCloser, ApiError)
+	Writer(create bool) (string, io.WriteCloser, Error)
 }
 
 type ApiFileBackend interface {
@@ -80,46 +82,46 @@ type ApiFileBackend interface {
 	SetName(string)
 
 	// Lists the buckets that currently exist.
-	Buckets() ([]string, ApiError)
+	Buckets() ([]string, Error)
 
 	// Check if a Bucket exists.
-	HasBucket(string) (bool, ApiError)
+	HasBucket(string) (bool, Error)
 
 	// Create a bucket.
-	CreateBucket(string, ApiBucketConfig) ApiError
+	CreateBucket(string, ApiBucketConfig) Error
 
 	// Return the configuration for a a bucket.
 	BucketConfig(string) ApiBucketConfig
 
 	// Change the configuration for a bucket.
-	ConfigureBucket(string, ApiBucketConfig) ApiError
+	ConfigureBucket(string, ApiBucketConfig) Error
 
 	// Delete all files in a bucket.
-	ClearBucket(bucket string) ApiError
+	ClearBucket(bucket string) Error
 
-	DeleteBucket(bucket string) ApiError
+	DeleteBucket(bucket string) Error
 
 	// Clear all buckets.
-	ClearAll() ApiError
+	ClearAll() Error
 
 	// Return the ids of all files in a bucket.
-	FileIDs(bucket string) ([]string, ApiError)
+	FileIDs(bucket string) ([]string, Error)
 
-	HasFile(ApiFile) (bool, ApiError)
-	HasFileById(bucket, id string) (bool, ApiError)
+	HasFile(ApiFile) (bool, Error)
+	HasFileById(bucket, id string) (bool, Error)
 
-	DeleteFile(ApiFile) ApiError
-	DeleteFileById(bucket, id string) ApiError
+	DeleteFile(ApiFile) Error
+	DeleteFileById(bucket, id string) Error
 
 	// Retrieve a reader for a file.
-	Reader(ApiFile) (io.ReadCloser, ApiError)
+	Reader(ApiFile) (io.ReadCloser, Error)
 	// Retrieve a reader for a file in a bucket.
-	ReaderById(bucket, id string) (io.ReadCloser, ApiError)
+	ReaderById(bucket, id string) (io.ReadCloser, Error)
 
 	// Retrieve a writer for a file in a bucket.
-	Writer(f ApiFile, create bool) (string, io.WriteCloser, ApiError)
+	Writer(f ApiFile, create bool) (string, io.WriteCloser, Error)
 	// Retrieve a writer for a file in a bucket.
-	WriterById(bucket, id string, create bool) (string, io.WriteCloser, ApiError)
+	WriterById(bucket, id string, create bool) (string, io.WriteCloser, Error)
 }
 
 type ApiFileHandler interface {
@@ -144,7 +146,7 @@ type ApiFileHandler interface {
 	// it will be left in the file system.
 	// If deleteDir is true, the directory holding the file will be deleted
 	// also.
-	BuildFile(file ApiFile, user ApiUser, filePath string, deleteDir bool) ApiError
+	BuildFile(file ApiFile, user ApiUser, filePath string, deleteDir bool) Error
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.
@@ -152,10 +154,10 @@ type ApiFileHandler interface {
 	// Create a new file model.
 	New() ApiFile
 
-	FindOne(id string) (ApiFile, ApiError)
-	Find(*db.Query) ([]ApiFile, ApiError)
+	FindOne(id string) (ApiFile, Error)
+	Find(*db.Query) ([]ApiFile, Error)
 
-	Create(ApiFile, ApiUser) ApiError
-	Update(ApiFile, ApiUser) ApiError
-	Delete(ApiFile, ApiUser) ApiError
+	Create(ApiFile, ApiUser) Error
+	Update(ApiFile, ApiUser) Error
+	Delete(ApiFile, ApiUser) Error
 }

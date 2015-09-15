@@ -2,6 +2,8 @@ package appkit
 
 import (
 	db "github.com/theduke/go-dukedb"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 type Resource struct {
@@ -84,7 +86,7 @@ func (res *Resource) SetHooks(h ApiHooks) {
 /**
  * Perform a query.
  */
-func (res Resource) Query(q *db.Query) ([]db.Model, ApiError) {
+func (res Resource) Query(q *db.Query) ([]db.Model, Error) {
 	return res.Backend.Query(q)
 }
 
@@ -99,7 +101,7 @@ func (res Resource) Q() *db.Query {
  * FindOne
  */
 
-func (res *Resource) FindOne(rawId string) (db.Model, ApiError) {
+func (res *Resource) FindOne(rawId string) (db.Model, Error) {
 	return res.Backend.FindOne(res.Model.Collection(), rawId)
 }
 
@@ -107,7 +109,7 @@ func (res *Resource) FindOne(rawId string) (db.Model, ApiError) {
  * Find.
  */
 
-func (res Resource) Find(query *db.Query) ([]db.Model, ApiError) {
+func (res Resource) Find(query *db.Query) ([]db.Model, Error) {
 	return res.Backend.Query(query)
 }
 
@@ -174,10 +176,10 @@ func (res *Resource) ApiFindPaginated(query *db.Query, r ApiRequest) ApiResponse
  * Create.
  */
 
-func (res *Resource) Create(obj db.Model, user ApiUser) ApiError {
+func (res *Resource) Create(obj db.Model, user ApiUser) Error {
 	if allowCreate, ok := res.hooks.(AllowCreateHook); ok {
 		if !allowCreate.AllowCreate(res, obj, user) {
-			return Error{Code: "permission_denied"}
+			return AppError{Code: "permission_denied"}
 		}
 	}
 
@@ -220,17 +222,17 @@ func (res *Resource) ApiCreate(obj db.Model, r ApiRequest) ApiResponse {
  * Update.
  */
 
-func (res *Resource) Update(obj db.Model, user ApiUser) ApiError {
+func (res *Resource) Update(obj db.Model, user ApiUser) Error {
 	oldObj, err := res.FindOne(obj.GetID())
 	if err != nil {
 		return err
 	} else if oldObj == nil {
-		return Error{Code: "not_found"}
+		return AppError{Code: "not_found"}
 	}
 
 	if allowUpdate, ok := res.hooks.(AllowUpdateHook); ok {
 		if !allowUpdate.AllowUpdate(res, obj, oldObj, user) {
-			return Error{Code: "permission_denied"}
+			return AppError{Code: "permission_denied"}
 		}
 	}
 
@@ -273,10 +275,10 @@ func (res *Resource) ApiUpdate(obj db.Model, r ApiRequest) ApiResponse {
  * Delete.
  */
 
-func (res *Resource) Delete(obj db.Model, user ApiUser) ApiError {
+func (res *Resource) Delete(obj db.Model, user ApiUser) Error {
 	if allowDelete, ok := res.hooks.(AllowDeleteHook); ok {
 		if !allowDelete.AllowDelete(res, obj, user) {
-			return Error{Code: "permission_denied"}
+			return AppError{Code: "permission_denied"}
 		}
 	}
 

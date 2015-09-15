@@ -19,6 +19,7 @@ import (
 	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 	db "github.com/theduke/go-dukedb"
 )
 
@@ -68,10 +69,10 @@ func (r *rateLimiter) PruneIpLog() {
 	}
 }
 
-func (r *rateLimiter) Start(ip string) (chan bool, kit.ApiError) {
+func (r *rateLimiter) Start(ip string) (chan bool, Error) {
 	if r.running >= r.maxRunning {
 		if len(r.queueChannels) >= r.maxQueueSize {
-			return nil, kit.Error{
+			return nil, AppError{
 				Code:    "rate_limit_queue_threshold_exceeded",
 				Message: "The queue for the rate limiter has reached it's maximum size",
 			}
@@ -88,7 +89,7 @@ func (r *rateLimiter) Start(ip string) (chan bool, kit.ApiError) {
 	r.PruneIpLog()
 	if log, ok := r.ipLog[ip]; ok {
 		if len(log) > r.maxPerIPPerMinute {
-			return nil, kit.Error{
+			return nil, AppError{
 				Code:    "rate_limit_max_per_ip_per_minute_exceeced",
 				Message: "The maximum limit for requests per ip per minute was exceeded",
 			}
@@ -143,7 +144,7 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	tmpPath := getTmpPath(res)
 	if tmpPath == "" {
 		return &kit.Response{
-			Error: kit.Error{
+			Error: AppError{
 				Code:    "no_tmp_path",
 				Message: "Tmp path is not configured",
 			},
@@ -153,7 +154,7 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	tmpFile := r.GetMeta().String("file")
 	if tmpFile == "" {
 		return &kit.Response{
-			Error: kit.Error{
+			Error: AppError{
 				Code:    "missing_file_in_meta",
 				Message: "Expected 'file' in metadata with id of tmp file",
 			},
@@ -182,10 +183,10 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	}
 }
 
-func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.ApiError) {
+func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, Error) {
 	reader, err := r.MultipartReader()
 	if err != nil {
-		return nil, kit.Error{Code: "multipart_error", Message: err.Error()}
+		return nil, AppError{Code: "multipart_error", Message: err.Error()}
 	}
 
 	files := make([]string, 0)
@@ -196,7 +197,7 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.Ap
 			if err == io.EOF {
 				break
 			} else {
-				return nil, kit.Error{
+				return nil, AppError{
 					Code:    "read_error",
 					Message: err.Error(),
 				}
@@ -213,7 +214,7 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.Ap
 		path := tmpPath + string(os.PathSeparator) + id
 
 		if err := os.MkdirAll(path, 0777); err != nil {
-			return nil, kit.Error{
+			return nil, AppError{
 				Code:    "create_dir_failed",
 				Message: err.Error(),
 			}
@@ -228,7 +229,7 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.Ap
 
 		file, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE, 0666)
 		if err != nil {
-			return nil, kit.Error{
+			return nil, AppError{
 				Code:    "file_create_failed",
 				Message: err.Error(),
 			}
@@ -237,7 +238,7 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, kit.Ap
 
 		_, err = io.Copy(file, part)
 		if err != nil {
-			return nil, kit.Error{
+			return nil, AppError{
 				Code:    "file_create_failed",
 				Message: err.Error(),
 			}
@@ -280,7 +281,7 @@ func serveFile(w http.ResponseWriter, file kit.ApiFile, reader io.Reader) {
 	}
 }
 
-func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.ApiFile, width, height int64, ip string) (io.Reader, kit.ApiError) {
+func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.ApiFile, width, height int64, ip string) (io.Reader, Error) {
 	if width == 0 && height == 0 {
 		return file.Reader()
 	}
@@ -290,7 +291,7 @@ func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.Api
 	// If so, serve it. Otherwise, create it first.
 
 	if (width == 0 || height == 0) && (file.GetWidth() == 0 || file.GetHeight() == 0) {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:     "image_dimensions_not_determined",
 			Message:  fmt.Sprintf("The file with id %v does not have width/height", file.GetID()),
 			Internal: true,
@@ -298,7 +299,7 @@ func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.Api
 	}
 
 	if width < 0 || height < 0 {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code: "invalid_dimensions",
 		}
 	}
@@ -316,7 +317,7 @@ func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.Api
 	maxHeight := app.Config.UInt("files.thumbGenerator.maxHeight", 2000)
 
 	if width > int64(maxWidth) || height > int64(maxHeight) {
-		return nil, kit.Error{
+		return nil, AppError{
 			Code:    "dimensions_exceed_maximum_limits",
 			Message: "The specified dimensions exceed the maximum limits",
 		}
@@ -348,7 +349,7 @@ func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.Api
 
 		img, _, err2 := image.Decode(reader)
 		if err2 != nil {
-			return nil, kit.Error{
+			return nil, AppError{
 				Code:    "image_decode_error",
 				Message: err2.Error(),
 			}
@@ -425,7 +426,7 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
 			}
 
 			var files []string
-			var err kit.ApiError
+			var err Error
 
 			if err == nil {
 				files, err = handleUpload(a, tmpPath, r.GetHttpRequest())

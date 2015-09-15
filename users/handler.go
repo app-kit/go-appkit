@@ -5,6 +5,8 @@ import (
 
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/users/auth"
+
+	. "github.com/theduke/go-appkit/error"
 )
 
 type UserHandler struct {
@@ -110,15 +112,15 @@ func (u *UserHandler) SetPermissionResource(x kit.ApiResource) {
 	u.Permissions = x
 }
 
-func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData interface{}) kit.ApiError {
+func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData interface{}) Error {
 	adaptor := h.GetAuthAdaptor(adaptorName)
 	if adaptor == nil {
-		return kit.Error{Code: "unknown_auth_adaptor"}
+		return AppError{Code: "unknown_auth_adaptor"}
 	}
 
 	data, err := adaptor.BuildData(authData)
 	if err != nil {
-		return kit.Error{Code: "adaptor_error", Message: err.Error()}
+		return AppError{Code: "adaptor_error", Message: err.Error()}
 	}
 
 	if user.GetUsername() == "" {
@@ -131,7 +133,7 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	if err2 != nil {
 		return err2
 	} else if oldUser != nil {
-		return kit.Error{
+		return AppError{
 			Code:    "user_exists",
 			Message: "A user with the username or email already exists",
 		}
@@ -165,20 +167,20 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 
 	if err := h.AuthItems.Create(auth, nil); err != nil {
 		h.Users.Delete(user, nil)
-		return kit.Error{Code: "auth_save_failed", Message: err.Error()}
+		return AppError{Code: "auth_save_failed", Message: err.Error()}
 	}
 
 	return nil
 }
 
-func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string, data interface{}) kit.ApiError {
+func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string, data interface{}) Error {
 	if !user.IsActive() {
-		return kit.Error{Code: "user_inactive"}
+		return AppError{Code: "user_inactive"}
 	}
 
 	authAdaptor := h.GetAuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
-		return kit.Error{
+		return AppError{
 			Code:    "unknown_auth_adaptor",
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
@@ -194,7 +196,7 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 
 	cleanData, err2 := auth.GetData()
 	if err2 != nil {
-		return kit.Error{
+		return AppError{
 			Code:    "invalid_auth_data",
 			Message: err.Error(),
 		}
@@ -202,22 +204,22 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 
 	ok, err2 := authAdaptor.Authenticate(cleanData, data)
 	if err2 != nil {
-		return kit.Error{Code: "auth_error", Message: err.Error()}
+		return AppError{Code: "auth_error", Message: err.Error()}
 	}
 	if !ok {
-		return kit.Error{Code: "invalid_credentials"}
+		return AppError{Code: "invalid_credentials"}
 	}
 
 	return nil
 }
 
-func (h *UserHandler) VerifySession(token string) (kit.ApiUser, kit.ApiSession, kit.ApiError) {
+func (h *UserHandler) VerifySession(token string) (kit.ApiUser, kit.ApiSession, Error) {
 	rawSession, err := h.Sessions.FindOne(token)
 	if err != nil {
 		return nil, nil, err
 	}
 	if rawSession == nil {
-		return nil, nil, kit.Error{Code: "session_not_found"}
+		return nil, nil, AppError{Code: "session_not_found"}
 	}
 	session := rawSession.(kit.ApiSession)
 
@@ -229,11 +231,11 @@ func (h *UserHandler) VerifySession(token string) (kit.ApiUser, kit.ApiSession, 
 	user := rawUser.(kit.ApiUser)
 
 	if !user.IsActive() {
-		return nil, nil, kit.Error{Code: "user_inactive"}
+		return nil, nil, AppError{Code: "user_inactive"}
 	}
 
 	if session.GetValidUntil().Sub(time.Now()) < 1 {
-		return nil, nil, kit.Error{Code: "session_expired"}
+		return nil, nil, AppError{Code: "session_expired"}
 	}
 
 	// Prolong session

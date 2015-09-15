@@ -9,6 +9,7 @@ import (
 	_ "github.com/lib/pq"
 
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/users"
 	db "github.com/theduke/go-dukedb"
@@ -45,7 +46,7 @@ func (p Project) Collection() string {
 type ProjectHooks struct {
 }
 
-func (p ProjectHooks) BeforeCreate(res kit.ApiResource, obj db.Model, user kit.ApiUser) kit.ApiError {
+func (p ProjectHooks) BeforeCreate(res kit.ApiResource, obj db.Model, user kit.ApiUser) Error {
 	log.Printf("obj: %+v\n", obj)
 	return nil
 }
