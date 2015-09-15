@@ -13,7 +13,9 @@ import (
 	"github.com/spf13/cobra"
 
 	db "github.com/theduke/go-dukedb"
+
 	. "github.com/theduke/go-appkit/error"
+	"github.com/theduke/go-appkit/caches"
 )
 
 type App struct {
@@ -27,6 +29,8 @@ type App struct {
 
 	DefaultBackend db.Backend
 	backends       map[string]db.Backend
+
+	caches map[string]caches.Cache
 
 	resources   map[string]ApiResource
 	userHandler ApiUserHandler
@@ -52,7 +56,9 @@ func NewApp(cfgPath string) *App {
 	app := App{}
 	app.resources = make(map[string]ApiResource)
 	app.backends = make(map[string]db.Backend)
+	app.caches = make(map[string]caches.Cache)
 	app.methods = make(map[string]*Method)
+
 
 	app.beforeMiddlewares = make(map[string]HttpHandler)
 	app.afterMiddlewares = make(map[string]HttpHandler)
@@ -279,6 +285,18 @@ func (a *App) GetBackend(name string) db.Backend {
 	}
 
 	return b
+}
+
+/**
+ * Caches.
+ */
+
+func (a *App) RegisterCache(name string, c caches.Cache) {
+	a.caches[name] = c
+}
+
+func (a *App) Cache(name string) caches.Cache {
+	return a.caches[name]
 }
 
 /**
