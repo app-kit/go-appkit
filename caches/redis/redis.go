@@ -255,10 +255,10 @@ func(r *Redis) Get(key string, items ...CacheItem) (CacheItem, Error) {
 
 	// Now get the ttl.
 	ttl, err := redis.Int(conn.Do("TTL", key))
-	if err == nil {
+	if err == nil && ttl > 0 {
 		expires := time.Now().Add(time.Duration(ttl) * time.Second)
 		item.SetExpiresAt(expires)
-	} else if err != redis.ErrNil {
+	} else if err != nil && err != redis.ErrNil {
 		return nil, redisErr(err)
 	}
 
