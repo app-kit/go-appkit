@@ -1,7 +1,7 @@
 package appkit
 
 import (
-	"net/http"
+	"io"
 
 	db "github.com/theduke/go-dukedb"
 
@@ -22,15 +22,25 @@ type ApiRequest interface {
 	GetContext() *Context
 	GetMeta() Context
 	GetData() interface{}
-
-	GetHttpRequest() *http.Request
 }
 
 type ApiResponse interface {
 	GetError() Error
+
+	GetHttpStatus()  int
+	SetHttpStatus(int)
+
 	GetMeta() map[string]interface{}
 	SetMeta(map[string]interface{})
+
 	GetData() interface{}
+	SetData(interface{})
+
+	GetRawData() []byte
+	SetRawData([]byte)
+
+	GetRawDataReader() io.ReadCloser
+	SetRawDataReader(io.ReadCloser)
 }
 
 /**

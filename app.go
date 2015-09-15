@@ -38,11 +38,11 @@ type App struct {
 
 	methods map[string]*Method
 
-	beforeMiddlewares map[string]HttpHandler
-	afterMiddlewares  map[string]HttpHandler
+	beforeMiddlewares []RequestHandler
+	afterMiddlewares  []AfterRequestMiddleware
 
-	serverErrorHandler HttpHandler
-	notFoundHandler HttpHandler
+	serverErrorHandler AfterRequestMiddleware
+	notFoundHandler RequestHandler
 
 	sessionManager *SessionManager
 
@@ -60,9 +60,15 @@ func NewApp(cfgPath string) *App {
 	app.methods = make(map[string]*Method)
 
 
-	app.beforeMiddlewares = make(map[string]HttpHandler)
-	app.afterMiddlewares = make(map[string]HttpHandler)
-	app.RegisterBeforeMiddleware("authentication", AuthenticationMiddleware)
+	app.beforeMiddlewares = make([]RequestHandler, 0)
+	app.afterMiddlewares = make([]AfterRequestMiddleware, 0)
+
+	app.RegisterBeforeMiddleware(RequestTraceMiddleware)
+	app.RegisterBeforeMiddleware(AuthenticationMiddleware)
+
+	app.RegisterAfterMiddleware(ServerErrorMiddleware)
+	app.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
+	app.RegisterAfterMiddleware(RequestLoggerMiddleware)
 
 	// Configure logger.
 	app.Logger = &logrus.Logger{
@@ -171,8 +177,11 @@ func (a *App) Run() {
 	if a.notFoundHandler == nil {
 		a.notFoundHandler = notFoundHandler
 	}
-	if a.serverErrorHandler == nil {
-		a.serverErrorHandler = serverErrorHandler
+
+	// Install not found handler.
+	a.router.NotFound = &HttpHandlerStruct{
+		App: a,
+		Handler: a.notFoundHandler,
 	}
 
 	// Install handler for index.
@@ -182,19 +191,15 @@ func (a *App) Run() {
 	}
 
 	a.router.GET("/", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		w.WriteHeader(200)
-		w.Write(indexTpl)
+		httpHandler(w, r, params, a, func(*App, ApiRequest) (ApiResponse, bool) {
+			return &Response{
+				RawData: indexTpl,
+			}, false
+		})
 	})
-
-	// Install not found handler.
-	a.router.NotFound = &HttpHandlerStruct{
-		App: a,
-		Handler: a.notFoundHandler,
-	}
 
 	// Serve files routes.
 	serveFiles := a.Config.UMap("serveFiles")
-	fmt.Printf("files: %v\n", a.Config)
 	for route := range serveFiles {
 		path, ok := serveFiles[route].(string)
 		if !ok {
@@ -205,15 +210,16 @@ func (a *App) Run() {
 	}
 
 	// Register route for method calls.
-	methodHandler := func(a *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
+	methodHandler := func(a *App, r ApiRequest) (ApiResponse, bool) {
+		var response ApiResponse
+
 		responder := func(r ApiResponse) {
-			RespondWithJson(w, r)
+			response = r
 		}
 
 		method := r.GetContext().String("name")
 
 		finishedChannel, err := a.RunMethod(method, r, responder, true)
-		a.Logger.Warningf("finished channel %v", finishedChannel)
 		if err != nil {
 			return &Response{
 				Error: err,
@@ -221,7 +227,7 @@ func (a *App) Run() {
 		}
 		<-finishedChannel
 
-		return nil, true
+		return response, false
 	}
 
 	a.router.POST("/api/method/:name", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -451,59 +457,43 @@ func (a *App) FileHandler() ApiFileHandler {
  * Middlewares.
  */
 
-func (a *App) RegisterBeforeMiddleware(name string, handler HttpHandler) {
-	a.beforeMiddlewares[name] = handler
+func (a *App) RegisterBeforeMiddleware(handler RequestHandler) {
+	a.beforeMiddlewares = append(a.beforeMiddlewares, handler)
 }
 
-func (a *App) UnregisterBeforeMiddleware(name string) {
-	delete(a.beforeMiddlewares, name)
+func (a *App) ClearBeforeMiddleware() {
+	a.beforeMiddlewares = a.beforeMiddlewares[:]
 }
 
-func (a *App) GetBeforeMiddlewares() []HttpHandler {
-	var wares []HttpHandler
-	for key := range a.beforeMiddlewares {
-		wares = append(wares, a.beforeMiddlewares[key])
-	}
-	return wares
+func (a *App) GetBeforeMiddlewares() []RequestHandler {
+	return a.beforeMiddlewares
 }
 
-func (a *App) RegisterAfterMiddleware(name string, handler HttpHandler) {
-	a.afterMiddlewares[name] = handler
+func (a *App) RegisterAfterMiddleware(middleware AfterRequestMiddleware) {
+	a.afterMiddlewares = append(a.afterMiddlewares, middleware)
 }
 
-func (a *App) UnregisterAfterMiddleware(name string) {
-	delete(a.afterMiddlewares, name)
+func (a *App) ClearAfterMiddlewares() {
+	a.afterMiddlewares = a.afterMiddlewares[:]
 }
 
-func (a *App) GetAfterMiddlewares() []HttpHandler {
-	var wares []HttpHandler
-	for key := range a.afterMiddlewares {
-		wares = append(wares, a.afterMiddlewares[key])
-	}
-	return wares
+func (a *App) GetAfterMiddlewares() []AfterRequestMiddleware {
+	return a.afterMiddlewares
 }
 
 /**
  * Http handlers.
  */
 
-func(a *App) ServerErrorHandler() HttpHandler {
-	return a.serverErrorHandler
-}
-
-func(a *App) SetServerErrorHandler(x HttpHandler) {
-	a.serverErrorHandler = x
-}
-
-func(a *App) NotFoundHandler() HttpHandler {
+func(a *App) NotFoundHandler() RequestHandler {
 	return a.notFoundHandler
 }
 
-func(a *App) SetNotFoundHandler(x HttpHandler) {
+func(a *App) SetNotFoundHandler(x RequestHandler) {
 	a.notFoundHandler = x
 }
 
-func (a *App) RegisterHttpHandler(method, path string, handler HttpHandler) {
+func (a *App) RegisterHttpHandler(method, path string, handler RequestHandler) {
 	a.router.Handle(method, path, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		httpHandler(w, r, params, a, handler)
 	})

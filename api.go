@@ -15,6 +15,7 @@ import (
 	"regexp"
 	"strconv"
 	"time"
+	"bytes"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/twinj/uuid"
@@ -38,6 +39,15 @@ func NewContext() Context {
 func (c Context) Get(key string) (interface{}, bool) {
 	x, ok := c.Data[key]
 	return x, ok
+}
+
+func (c Context) MustGet(key string) interface{} {
+	x, ok := c.Data[key]
+	if !ok {
+		panic("Context does not have key " + key)
+	}
+
+	return x
 }
 
 func (c *Context) Set(key string, data interface{}) {
@@ -68,8 +78,6 @@ type Request struct {
 	Context Context
 	Meta    Context
 	Data    interface{}
-
-	HttpRequest *http.Request
 }
 
 func NewRequest() *Request {
@@ -80,10 +88,10 @@ func NewRequest() *Request {
 	return &r
 }
 
-func (r *Request) BuildFromJsonBody() Error {
+func (r *Request) BuildFromJsonBody(request *http.Request) Error {
 	// Read request body.
-	defer r.HttpRequest.Body.Close()
-	body, err := ioutil.ReadAll(r.HttpRequest.Body)
+	defer request.Body.Close()
+	body, err := ioutil.ReadAll(request.Body)
 	if err != nil {
 		return AppError{
 			Code:    "read_post_error",
@@ -157,18 +165,27 @@ func (r *Request) SetData(x interface{}) {
 	r.Data = x
 }
 
-func (r *Request) GetHttpRequest() *http.Request {
-	return r.HttpRequest
-}
-
 type Response struct {
 	Error Error
+	HttpStatus int
+
 	Meta  map[string]interface{}
+
 	Data  interface{}
+	RawData []byte
+	RawDataReader io.ReadCloser
 }
 
 func (r Response) GetError() Error {
 	return r.Error
+}
+
+func (r Response) GetHttpStatus() int {
+	return r.HttpStatus
+}
+
+func (r Response) SetHttpStatus(status int) {
+	r.HttpStatus = status
 }
 
 func (r Response) GetMeta() map[string]interface{} {
@@ -183,17 +200,38 @@ func (r Response) GetData() interface{} {
 	return r.Data
 }
 
+func (r Response) SetData(data interface{}) {
+	r.Data = data
+}
+
+func (r Response)  GetRawData() []byte {
+	return r.RawData
+}
+
+func (r Response) SetRawData(data []byte) {
+	r.RawData = data
+}
+
+func (r Response) GetRawDataReader() io.ReadCloser {
+	return r.RawDataReader
+}
+
+func (r Response) SetRawDataReader(reader io.ReadCloser) {
+	r.RawDataReader = reader
+}
+
 func NewErrorResponse(code, message string) *Response {
 	return &Response{
 		Error: AppError{Code: code, Message: message},
 	}
 }
 
-type HttpHandler func(*App, ApiRequest, http.ResponseWriter) (ApiResponse, bool)
+type RequestHandler func(*App, ApiRequest) (ApiResponse, bool)
+type AfterRequestMiddleware func(*App, ApiRequest, ApiResponse) bool
 
 type HttpHandlerStruct struct {
 	App *App
-	Handler HttpHandler
+	Handler RequestHandler
 }
 
 func (h *HttpHandlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -204,13 +242,13 @@ func (h *HttpHandlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 type HttpRoute struct {
 	Route   string
 	Method  string
-	Handler HttpHandler
+	Handler RequestHandler
 }
 
-func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
-	// Build the url to query.
-	url := r.GetHttpRequest().URL
+func serverRenderer(app *App, r ApiRequest) ApiResponse {
+	url := r.GetContext().MustGet("httpRequest").(*http.Request).URL
 
+	// Build the url to query.
 	if url.Scheme == "" {
 		url.Scheme = "http"
 	}
@@ -226,14 +264,16 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
 	tmpDir := path.Join(app.TmpDir(), "phantom")
 	if ok, _ := utils.FileExists(tmpDir); !ok {
 		if err := os.MkdirAll(tmpDir, 0777); err != nil {
-			return 0, nil, AppError{
-				Code: "create_tmp_dir_failed",
-				Message: fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
-				Internal: true,
+			return &Response{
+				Error: AppError{
+					Code: "create_tmp_dir_failed",
+					Message: fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
+					Internal: true,
+				},
 			}
 		}
 	}
-	
+
 	// Build a unique file name.
 	filePath := path.Join(tmpDir, uuid.NewV4().String() + ".html")
 
@@ -259,12 +299,14 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
 	if err != nil {
 		app.Logger.Errorf("Phantomjs execution error: %v", string(result))
 
-		return 0, nil, AppError{
-			Code: "phantom_execution_failed",
-			Message: err.Error(),
-			Data: result,
-			Errors: []error{err},
-			Internal: true,
+		return &Response{
+			Error: AppError{
+				Code: "phantom_execution_failed",
+				Message: err.Error(),
+				Data: result,
+				Errors: []error{err},
+				Internal: true,
+			},
 		}
 	}
 
@@ -272,12 +314,12 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
 	timeTaken := int(time.Now().Sub(start) / time.Millisecond)
 	app.Logger.WithFields(log.Fields{
 		"action": "phantomjs_render",
-		"microseconds": timeTaken,
+		"milliseconds": timeTaken,
 	}).Debugf("Rendered url %v with phantomjs", url)
 
 	content, err2 := utils.ReadFile(filePath)
 	if err2 != nil {
-		return 0, nil, err2
+		return &Response{Error: err2}
 	}
 
 	// Find http status code.
@@ -288,7 +330,10 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, Error) {
 		status = int(s)
 	}
 
-	return status, content, nil
+	return &Response{
+		HttpStatus: status,
+		RawData: content,
+	}
 }
 
 func defaultErrorTpl() *template.Template {
@@ -367,56 +412,18 @@ func getIndexTpl(app *App) ([]byte, Error) {
 	return []byte(tpl), nil
 }
 
-func serverErrorHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
-	tpl := defaultErrorTpl()
-
-	tplPath := app.Config.UString("frontend.errorTemplate")
-	if tplPath != "" {
-		t, err := template.ParseFiles(tplPath)
-		if err != nil {
-			app.Logger.Fatalf("Could not parse error template at '%v': %v", tplPath, err)
-		} else {
-			tpl = t
-		}
-	}
-
-	err, _ := r.GetContext().Get("error")
-	data := map[string]interface{} {
-		"error": err,
-	}
-
-	w.WriteHeader(500)
-	if err := tpl.Execute(w, data); err != nil {
-		app.Logger.Fatalf("Could not render error template: %v\n", err)
-		w.Write([]byte("Server Error"))
-	}
-
-	return nil, true
-}
-
-func notFoundHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
+func notFoundHandler(app *App, r ApiRequest) (ApiResponse, bool) {
+	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
 	apiPrefix := "/" + app.Config.UString("api.prefix", "api")
-	isApiRequest := strings.HasPrefix(r.GetHttpRequest().URL.Path, apiPrefix)
+	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
 
 	// Try to render the page on the server, if enabled.
 	if !isApiRequest {
 		renderEnabled := app.Config.UBool("serverRenderer.enabled", false)
-		noRender := strings.Contains(r.GetHttpRequest().URL.String(), "no-server-render")
+		noRender := strings.Contains(httpRequest.URL.String(), "no-server-render")
 
 		if renderEnabled && !noRender {
-			status, content, err := serverRenderer(app, r)
-			if err == nil {
-				// Rendering worked. Send the response.
-				w.WriteHeader(status)
-				w.Write(content)
-				return  nil, true
-			} else {
-				// An error occurred, send an error response.
-				context := r.GetContext()
-				context.Set("error", err)
-				app.ServerErrorHandler()(app, r, w)
-				return nil, true
-			}
+			return serverRenderer(app, r), false
 		}
 	}
 
@@ -424,26 +431,22 @@ func notFoundHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse
 	if !isApiRequest {
 		tpl, err := getIndexTpl(app)
 		if err != nil {
-			context := r.GetContext()
-			context.Set("error", err)
-			app.ServerErrorHandler()(app, r, w)
-			return nil, true
+			return &Response{
+				Error: err,
+			}, false
 		}
-
-		w.WriteHeader(200)
-		w.Write(tpl)
-		return nil, true
+		return &Response{
+			RawData: tpl,
+		}, false
 	}
 
-	// Forapi requests, render the api not found error.
-	response := &Response{
+	// For api requests, render the api not found error.
+	return &Response{
 		Error: AppError{
 			Code: "not_found",
 			Message: "This api route does not exist",
 		},
-	}
-	RespondWithJson(w, response)
-	return nil, true
+	}, false
 }
 
 func RespondWithContent(app *App, w http.ResponseWriter, code int, content []byte) {
@@ -498,9 +501,11 @@ func RespondWithJson(w http.ResponseWriter, response ApiResponse) {
 	w.Write(output)
 }
 
-func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, app *App, handler HttpHandler) {
+func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, app *App, handler RequestHandler) {
 	request := NewRequest()
-	request.HttpRequest = r
+
+	request.Context.Set("httpRequest", r)
+	request.Context.Set("responseWriter", w)
 
 	for _, param := range params {
 		request.Context.Set(param.Key, param.Value)
@@ -511,7 +516,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// Process all middlewares.
 	for _, middleware := range app.GetBeforeMiddlewares() {
 		var skip bool
-		response, skip = middleware(app, request, w)
+		response, skip = middleware(app, request)
 		if skip {
 			return
 		} else if response != nil {
@@ -522,7 +527,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// Only run the handler if no middleware provided a response.
 	if response == nil {
 		skip := false
-		response, skip = handler(app, request, w)
+		response, skip = handler(app, request)
 		if skip {
 			return
 		}
@@ -541,36 +546,75 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		allowedHeaders := app.Config.UString("accessControl.allowedHeaders", "Authentication, Content-Type")
 		header.Set("Access-Control-Allow-Headers", allowedHeaders)
 
-		w.WriteHeader(200)
-		w.Write([]byte(""))
-		return
-	}
-
-	for _, middleware := range app.GetAfterMiddlewares() {
-		var skip bool
-		response, skip = middleware(app, request, w)
-		if skip {
-			return
-		} else if response != nil {
-			break
+		response = &Response{
+			RawData: []byte{},
 		}
 	}
 
-	// If an error has occurred and the request is a non-api request,
-	// use the app.ServerErrorHandler to respond.
-	// Otherwise, do a json response.
-	apiPrefix := "/" + app.Config.UString("api.prefix", "api")
-	if response.GetError() != nil && !strings.HasPrefix(r.URL.Path, apiPrefix) {
-		request.Context.Set("error", response.GetError())
-		app.ServerErrorHandler()(app, request, w)
-	} else {
-		RespondWithJson(w, response)
+	// Note: error responses are converted with the serverErrrorMiddleware middleware.
+
+	for _, middleware := range app.GetAfterMiddlewares() {
+		skip := middleware(app, request, response)
+		if skip {
+			return
+		}
 	}
+
+	if response.GetHttpStatus() == 0 {
+		response.SetHttpStatus(200)
+	}
+
+	// If a data reader is set, write the data of the reader.
+	reader := response.GetRawDataReader()
+	if reader != nil {
+		status := response.GetHttpStatus()
+		if status == 0 {
+			status = 200
+		}
+		w.WriteHeader(status)
+		io.Copy(w, reader)
+		reader.Close()
+		return
+	}
+
+	// If raw data is set, write the raw data.
+	rawData := response.GetRawData()
+	if rawData != nil {
+		status := response.GetHttpStatus()
+		if status == 0 {
+			status = 200
+		}
+		w.WriteHeader(status)
+		w.Write(rawData)
+		return
+	}
+
+	// Send json response.
+	RespondWithJson(w, response)
 }
 
-func AuthenticationMiddleware(a *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
+/**
+ * Request trace middlewares.
+ */
+
+func RequestTraceMiddleware(a *App, r ApiRequest) (ApiResponse, bool) {
+	r.GetContext().Set("startTime", time.Now())
+	return nil, false
+}
+
+func RequestTraceAfterMiddleware(app *App, r ApiRequest, response ApiResponse) bool {
+	r.GetContext().Set("endTime", time.Now())
+	return false
+}
+
+/**
+ * Before middlewares.
+ */
+
+func AuthenticationMiddleware(a *App, r ApiRequest) (ApiResponse, bool) {
 	// Handle authentication.
-	if token := r.GetHttpRequest().Header.Get("Authentication"); token != "" {
+	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+	if token := httpRequest.Header.Get("Authentication"); token != "" {
 		if a.GetUserHandler() != nil {
 			user, session, err := a.GetUserHandler().VerifySession(token)
 			if err == nil {
@@ -585,4 +629,87 @@ func AuthenticationMiddleware(a *App, r ApiRequest, w http.ResponseWriter) (ApiR
 	}
 
 	return nil, false
+}
+
+/**
+ * After middlewares.
+ */
+
+func ServerErrorMiddleware(app *App, r ApiRequest, response ApiResponse) bool {
+	if response.GetError() == nil {
+		return false
+	}
+
+	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+	apiPrefix := "/" + app.Config.UString("api.prefix", "api")
+	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
+
+	response.SetHttpStatus(500)	
+
+	data := map[string]interface{}{"errors": []error{response.GetError()}}
+
+	if isApiRequest {
+		response.SetData(data)
+		return false
+	}
+
+	tpl := defaultErrorTpl()
+
+	tplPath := app.Config.UString("frontend.errorTemplate")
+	if tplPath != "" {
+		t, err := template.ParseFiles(tplPath)
+		if err != nil {
+			app.Logger.Fatalf("Could not parse error template at '%v': %v", tplPath, err)
+		} else {
+			tpl = t
+		}
+	}
+
+	var buffer *bytes.Buffer
+	if err := tpl.Execute(buffer, data); err != nil {
+		app.Logger.Fatalf("Could not render error template: %v\n", err)
+		response.SetRawData([]byte("Server error"))
+	} else {
+		response.SetRawData(buffer.Bytes())
+	}
+
+	return false
+}
+
+func RequestLoggerMiddleware(app *App, r ApiRequest, response ApiResponse) bool {
+	rawStarted, ok1 := r.GetContext().Get("startTime")
+	rawFinished, ok2 := r.GetContext().Get("endTime")
+
+	var timeTaken int64 = int64(-1)
+	if ok1 && ok2 {
+		started := rawStarted.(time.Time)
+		finished := rawFinished.(time.Time)
+		timeTaken = int64(finished.Sub(started) / time.Millisecond)
+	}
+
+	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+	method := httpRequest.Method
+	url := httpRequest.URL
+
+	// Log the request.
+	if response.GetError() != nil {
+		app.Logger.WithFields(log.Fields{
+			"action": "request",
+			"method": method,
+			"url": url.String(),
+			"status": response.GetHttpStatus(),
+			"err": response.GetError(),
+			"milliseconds": timeTaken,
+		}).Errorf("%v: %v - %v - %v", response.GetHttpStatus(), method, url, response.GetError())
+	} else {
+		app.Logger.WithFields(log.Fields{
+			"action": "request",
+			"method": method,
+			"url": url.String(),
+			"status": response.GetHttpStatus(),
+			"milliseconds": timeTaken,
+		}).Debugf("%v: %v - %v", response.GetHttpStatus(), method, url)
+	}
+
+	return false
 }
