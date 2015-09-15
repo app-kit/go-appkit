@@ -1,5 +1,7 @@
 tmpDir: tmp
 serveFiles:
   "/public": public
-
-
+serverRenderer:
+  enabled: true
+frontend:
+  indexTpl: public/index.html

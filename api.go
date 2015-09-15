@@ -9,7 +9,15 @@ import (
 	"strings"
 	"html/template"
 	"os"
+	"runtime"
+	"path"
+	"os/exec"
+	"regexp"
+	"strconv"
+	"time"
 
+	log "github.com/Sirupsen/logrus"
+	"github.com/twinj/uuid"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -196,8 +204,77 @@ type HttpRoute struct {
 	Handler HttpHandler
 }
 
-func serverRenderer(app *App, w http.ResponseWriter, r ApiRequest) ApiError {
-	return nil
+func serverRenderer(app *App, r ApiRequest) (int, []byte, ApiError) {
+	// Build the url to query.
+	url := r.GetHttpRequest().URL
+
+	if url.Scheme == "" {
+		url.Scheme = "http"
+	}
+	if url.Host == "" {
+		url.Host = app.Config.UString("host", "localhost") + ":" + app.Config.UString("port", "8000")
+	}
+
+	q := url.Query()
+	q.Set("no-server-render", "1")
+	url.RawQuery = q.Encode()
+
+	// First, ensure that the tmp directory exists.
+	tmpDir := path.Join(app.TmpDir(), "phantom")
+	if ok, _ := FileExists(tmpDir); !ok {
+		if err := os.MkdirAll(tmpDir, 0777); err != nil {
+			return 0, nil, Error{
+				Code: "create_tmp_dir_failed",
+				Message: fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
+				Internal: true,
+			}
+		}
+	}
+	
+	// Build a unique file name.
+	filePath := path.Join(tmpDir, uuid.NewV4().String() + ".html")
+
+	// Execute phantom js.
+
+	// Find path of phantom script.
+	_, filename, _, _ := runtime.Caller(1)
+	scriptPath := path.Join(path.Dir(filename), "phantom", "render.js")
+
+	start := time.Now()
+
+	phantomPath := app.Config.UString("serverRenderer.phantomJsPath", "phantomjs")
+	result, err := exec.Command(phantomPath, scriptPath, url.String(), filePath).Output()
+	if err != nil {
+		return 0, nil, Error{
+			Code: "phantom_execution_failed",
+			Message: err.Error(),
+			Data: result,
+			Errors: []error{err},
+			Internal: true,
+		}
+	}
+
+	// Get time taken as milliseconds.
+	timeTaken := int(time.Now().Sub(start) / time.Millisecond)
+	app.Logger.WithFields(log.Fields{
+		"action": "phantomjs_render",
+		"microseconds": timeTaken,
+	}).Debugf("Rendered url %v with phantomjs", url)
+
+	content, err2 := ReadFile(filePath)
+	if err2 != nil {
+		return 0, nil, err2
+	}
+
+	// Find http status code.
+	status := 200
+	res := regexp.MustCompile("http_status_code\\=(\\d+)").FindStringSubmatch(string(content))
+	if res != nil {
+		s, _ := strconv.ParseInt(res[1], 10, 64)
+		status = int(s)
+	}
+
+	return status, content, nil
 }
 
 func defaultErrorTpl() *template.Template {
@@ -309,11 +386,15 @@ func notFoundHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse
 
 	// Try to render the page on the server, if enabled.
 	if !isApiRequest {
-		if app.Config.UBool("serverRenderer.enabled", false) {
-			err := serverRenderer(app, w, r)
+		renderEnabled := app.Config.UBool("serverRenderer.enabled", false)
+		noRender := strings.Contains(r.GetHttpRequest().URL.String(), "no-server-render")
+
+		if renderEnabled && !noRender {
+			status, content, err := serverRenderer(app, r)
 			if err == nil {
-				// Rendering worked fine and the serverRenderer sent the response.
-				// Nothing more to do.
+				// Rendering worked. Send the response.
+				w.WriteHeader(status)
+				w.Write(content)
 				return  nil, true
 			} else {
 				// An error occurred, send an error response.
@@ -465,7 +546,6 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// use the app.ServerErrorHandler to respond.
 	// Otherwise, do a json response.
 	apiPrefix := "/" + app.Config.UString("api.prefix", "api")
-	fmt.Printf("path: %v\n", r.URL.Path)
 	if response.GetError() != nil && !strings.HasPrefix(r.URL.Path, apiPrefix) {
 		request.Context.Set("error", response.GetError())
 		app.ServerErrorHandler()(app, request, w)

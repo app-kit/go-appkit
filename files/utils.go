@@ -1,27 +1,12 @@
 package files
 
 import (
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
 
 	kit "github.com/theduke/go-appkit"
 )
-
-func FileExists(path string) (bool, error) {
-	f, err := os.Open(path)
-	if err != nil {
-		if err == os.ErrNotExist {
-			return false, nil
-		} else {
-			return false, err
-		}
-	}
-	f.Close()
-
-	return true, nil
-}
 
 func GetMimeType(path string) string {
 	output, err := exec.Command("file", "-b", "--mime-type", path).Output()

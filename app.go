@@ -79,6 +79,10 @@ func NewApp(cfgPath string) *App {
 	return &app
 }
 
+func (a *App) TmpDir() string {
+	return a.Config.UString("tmpDir", "tmp")
+}
+
 func (a *App) Router() *httprouter.Router {
 	return a.router
 }
