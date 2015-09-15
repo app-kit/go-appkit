@@ -243,8 +243,19 @@ func serverRenderer(app *App, r ApiRequest) (int, []byte, ApiError) {
 	start := time.Now()
 
 	phantomPath := app.Config.UString("serverRenderer.phantomJsPath", "phantomjs")
-	result, err := exec.Command(phantomPath, scriptPath, url.String(), filePath).Output()
+	
+	args := []string{
+		"--web-security=false",
+		"--local-to-remote-url-access=true", 
+		scriptPath, 
+		"10", 
+		url.String(), 
+		filePath,
+	}	
+	result, err := exec.Command(phantomPath, args...).CombinedOutput()
 	if err != nil {
+		app.Logger.Errorf("Phantomjs execution error: %v", string(result))
+
 		return 0, nil, Error{
 			Code: "phantom_execution_failed",
 			Message: err.Error(),
@@ -287,12 +298,12 @@ func defaultErrorTpl() *template.Template {
 		<body>
 			<h1>Server Error</h1>
 
-			<p>{{error}}</p>
+			<p>{{.error}}</p>
 		</body>
 	</html>
 	`
 
-	t, _ := template.New("error").Parse(tpl)	
+	t := template.Must(template.New("error").Parse(tpl))
 	return t
 }
 
@@ -354,15 +365,15 @@ func getIndexTpl(app *App) ([]byte, ApiError) {
 }
 
 func serverErrorHandler(app *App, r ApiRequest, w http.ResponseWriter) (ApiResponse, bool) {
-	tplPath := app.Config.UString("frontend.errorTemplate")
-
 	tpl := defaultErrorTpl()
 
+	tplPath := app.Config.UString("frontend.errorTemplate")
 	if tplPath != "" {
-		var err error
-		tpl, err = template.ParseFiles(tplPath)
+		t, err := template.ParseFiles(tplPath)
 		if err != nil {
 			app.Logger.Fatalf("Could not parse error template at '%v': %v", tplPath, err)
+		} else {
+			tpl = t
 		}
 	}
 
