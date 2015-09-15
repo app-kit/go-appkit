@@ -71,6 +71,10 @@ func(fs *Fs) Set(item CacheItem) Error {
 		return AppError{Code: "empty_key"}
 	}
 
+	if item.IsExpired() {
+		return AppError{Code: "item_expired"}
+	}
+
 	value, err := item.ToString()
 	if err != nil {
 		return AppError{

@@ -64,7 +64,27 @@ func TestCache(cache caches.Cache) {
 		Expect(cache.Clear()).ToNot(HaveOccurred())
 		Expect(cache.Keys()).To(Equal([]string{}))
 	})
-	
+
+	It("Should fail when setting expired item", func() {
+		item := &caches.StrItem{
+			Key: "expired",
+			Value: "lala",
+			ExpiresAt: time.Now().Add(time.Second * -1),
+		}
+		Expect(cache.Set(item).GetCode()).To(Equal("item_expired"))
+	})
+
+	It("Should return nil for expired items", func() {
+		item := &caches.StrItem{
+			Key: "expiresSoon",
+			Value: "lala",
+			ExpiresAt: time.Now().Add(time.Second * 2),
+		}
+		Expect(cache.Set(item)).ToNot(HaveOccurred())
+
+		time.Sleep(time.Second * 4)
+		Expect(cache.Get("expiresSoon")).To(BeNil())
+	})
 
 	It("Should .Delete()", func() {
 		Expect(cache.SetString("deletekey", "val", nil, nil)).ToNot(HaveOccurred())

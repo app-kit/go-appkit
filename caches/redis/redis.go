@@ -150,9 +150,17 @@ func(r *Redis) Set(item CacheItem) Error {
 	}
 	key = r.key(key)
 
+	if item.IsExpired() {
+		return AppError{Code: "item_expired"}
+	}
+
 	expireSeconds := 0
 	if expires := item.GetExpiresAt(); !expires.IsZero()  {
-		expireSeconds = int(expires.Sub(time.Now()).Seconds())
+		seconds := expires.Sub(time.Now()).Seconds()
+		if seconds > 0 && seconds < 1 {
+			return AppError{Code: "item_expired"}
+		}
+		expireSeconds = int(seconds)
 	}
 
 	conn := r.pool.Get()
