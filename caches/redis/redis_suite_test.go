@@ -35,7 +35,7 @@ var _ = BeforeSuite(func() {
 		"--dir",
 		tmpDir,
 	}
-	serverCmd := exec.Command("redis-server", args...) 
+	serverCmd = exec.Command("redis-server", args...) 
 
   err = serverCmd.Start()
   Expect(err).NotTo(HaveOccurred())
@@ -45,5 +45,6 @@ var _ = BeforeSuite(func() {
 })
 
 var _ = AfterSuite(func() {
+	serverCmd.Process.Kill()
 	os.RemoveAll(tmpDir)  
 })
