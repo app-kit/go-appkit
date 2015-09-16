@@ -102,10 +102,10 @@ func(fs *Fs) Set(item CacheItem) Error {
 	}
 	item.SetValue(tmpVal)
 
-	if err := utils.WriteFile(fs.keyPath(key), []byte(value)); err != nil {
+	if err := utils.WriteFile(fs.keyPath(key), []byte(value), false); err != nil {
 		return err
 	}
-	if err := utils.WriteFile(fs.keyMetaPath(key), js); err != nil {
+	if err := utils.WriteFile(fs.keyMetaPath(key), js, false); err != nil {
 		return err
 	}
 

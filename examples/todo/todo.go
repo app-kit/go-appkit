@@ -16,6 +16,7 @@ import (
 	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/users"
 	"github.com/theduke/go-appkit/caches/fs"
+	"github.com/theduke/go-appkit/email"
 )
 
 type Project struct {
@@ -177,6 +178,14 @@ func start() error {
 			log.Printf("file: %+v\nerr: %v", f, err)
 		}
 	}
+
+	// Send an email.
+	e := email.NewMail()
+	e.SetSubject("testSubject")
+	e.AddTo("reg@theduke.at", "Christoph Herzog")
+	e.AddBody("text/plain", []byte("Hallo du lulu"))
+	e.SetFrom("reg@theduke.at", "pfuscher")
+	app.EmailService().Send(e)
 
 	app.RunCli()
 

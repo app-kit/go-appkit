@@ -2,13 +2,30 @@ package utils
 
 import (
 	"os"
+	"path"
 	"fmt"
 	"io/ioutil"
+
+	"github.com/twinj/uuid"
 
 	. "github.com/theduke/go-appkit/error"
 )
 
+func AbsPath(p string) (string, Error) {
+	if !path.IsAbs(p) { 
+		wd, err := os.Getwd() 
+		if err != nil { 
+	  	return "", AppError{
+	  		Code: "get_wd_error",
+	  		Message: err.Error(),
+	  		Internal: true,
+	  	}
+		}
+		p = path.Clean(path.Join(wd, p))
+	}
 
+	return p, nil
+}
 
 func FileExists(path string) (bool, Error) {
 	f, err := os.Open(path)
@@ -52,8 +69,25 @@ func ReadFile(path string) ([]byte, Error) {
 	return content, nil
 }
 
-func WriteFile(path string, content []byte) Error {
-	f, err := os.Create(path)
+func WriteFile(p string, content []byte, createDir bool) Error {
+	if createDir {
+		dir, err := AbsPath(path.Dir(p))
+		if err != nil {
+			return err
+		}
+
+		if dir != "" {
+			if err := os.MkdirAll(dir, 0777); err != nil {
+				return AppError{
+					Code: "mkdir_error",
+					Message: err.Error(),
+					Internal: true,
+				}
+			}
+		}
+	}
+
+	f, err := os.Create(p)
 	if err != nil {
 		return AppError{
 			Code: "file_create_error",
@@ -72,6 +106,22 @@ func WriteFile(path string, content []byte) Error {
 	}
 
 	return nil
+}
+
+// Write contents to a tmp file and return the path to the file.
+func WriteTmpFile(content[]byte, name string) (string, Error) {
+	if name == "" {
+		name = uuid.NewV4().String()
+	} else if name[0] == '.' {
+		name = uuid.NewV4().String() + name
+	}
+
+	p := path.Join(os.TempDir(), "tmpfiles", name)
+	if err := WriteFile(p, content, true); err != nil {
+		return "", err
+	}
+
+	return p, nil
 }
 
 func ListFiles(path string) ([]string, Error) {

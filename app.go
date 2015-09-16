@@ -17,6 +17,10 @@ import (
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/caches"
 	"github.com/theduke/go-appkit/crawler"
+
+	"github.com/theduke/go-appkit/email"
+	"github.com/theduke/go-appkit/email/gomail"
+	emaillog "github.com/theduke/go-appkit/email/log"
 )
 
 type App struct {
@@ -26,12 +30,14 @@ type App struct {
 
 	ENV string
 
-	Config *config.Config
+	Config *config.EnvConfig
 
 	DefaultBackend db.Backend
 	backends       map[string]db.Backend
 
 	caches map[string]caches.Cache
+
+	emailService email.EmailService
 
 	resources   map[string]ApiResource
 	userHandler ApiUserHandler
@@ -90,6 +96,9 @@ func NewApp(cfgPath string) *App {
 	app.RegisterMethod(deleteMethod())
 	app.RegisterMethod(queryMethod())
 
+	// EmailService setup.
+	app.buildEmailService()
+
 	return &app
 }
 
@@ -140,10 +149,6 @@ func (a *App) ReadConfig(path string) {
 	}
 	a.ENV = env
 
-	if envConf, _ := cfg.Get(env); envConf != nil {
-		cfg = envConf
-	}
-
 	// Fill in default values into the config and ensure they are valid.
 
 	// Ensure a tmp directory exists and is readable.
@@ -152,7 +157,7 @@ func (a *App) ReadConfig(path string) {
 		panic(fmt.Sprintf("Could not read or create tmp dir at '%v': %v", tmpDir, err))
 	}
 
-	a.Config = cfg
+	a.Config = &config.EnvConfig{Env: env, Config: cfg}
 }
 
 func (a *App) PrepareBackends() {
@@ -331,6 +336,41 @@ func (a *App) RegisterCache(name string, c caches.Cache) {
 
 func (a *App) Cache(name string) caches.Cache {
 	return a.caches[name]
+}
+
+/**
+ * Email service.
+ */
+
+func (a *App) buildEmailService() {
+	host := a.Config.UString("email.host")
+	port := a.Config.UInt("email.port")
+	user := a.Config.UString("email.user")
+	pw := a.Config.UString("email.password")
+
+	fromEmail := a.Config.UString("email.from", "no-reply@appkit")
+	fromName := a.Config.UString("email.fromName", "Appkit")
+
+	from := email.Recipient{
+		Email: fromEmail,
+		Name: fromName,
+	}
+
+	if host != "" && port > 0 && user != "" && pw != "" {
+		a.emailService = gomail.New(host, port, user, pw, fromEmail, fromName)
+		a.Logger.Debug("Using gomail email service")
+	} else {
+		a.emailService = emaillog.New(a.Logger, from)
+		a.Logger.Debug("Using log email service")
+	}
+}
+
+func (a *App) RegisterEmailService(s email.EmailService) {
+	a.emailService = s
+}
+
+func (a *App) EmailService() email.EmailService {
+	return a.emailService
 }
 
 /**
