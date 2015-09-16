@@ -177,19 +177,19 @@ type Response struct {
 	RawDataReader io.ReadCloser
 }
 
-func (r Response) GetError() Error {
+func (r *Response) GetError() Error {
 	return r.Error
 }
 
-func (r Response) GetHttpStatus() int {
+func (r *Response) GetHttpStatus() int {
 	return r.HttpStatus
 }
 
-func (r Response) SetHttpStatus(status int) {
+func (r *Response) SetHttpStatus(status int) {
 	r.HttpStatus = status
 }
 
-func (r Response) GetMeta() map[string]interface{} {
+func (r *Response) GetMeta() map[string]interface{} {
 	return r.Meta
 }
 
@@ -197,27 +197,27 @@ func (r *Response) SetMeta(m map[string]interface{}) {
 	r.Meta = m
 }
 
-func (r Response) GetData() interface{} {
+func (r *Response) GetData() interface{} {
 	return r.Data
 }
 
-func (r Response) SetData(data interface{}) {
+func (r *Response) SetData(data interface{}) {
 	r.Data = data
 }
 
-func (r Response)  GetRawData() []byte {
+func (r *Response)  GetRawData() []byte {
 	return r.RawData
 }
 
-func (r Response) SetRawData(data []byte) {
+func (r *Response) SetRawData(data []byte) {
 	r.RawData = data
 }
 
-func (r Response) GetRawDataReader() io.ReadCloser {
+func (r *Response) GetRawDataReader() io.ReadCloser {
 	return r.RawDataReader
 }
 
-func (r Response) SetRawDataReader(reader io.ReadCloser) {
+func (r *Response) SetRawDataReader(reader io.ReadCloser) {
 	r.RawDataReader = reader
 }
 

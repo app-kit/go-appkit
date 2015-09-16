@@ -16,6 +16,7 @@ import (
 
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/caches"
+	"github.com/theduke/go-appkit/crawler"
 )
 
 type App struct {
@@ -247,6 +248,11 @@ func (a *App) Run() {
 	a.sessionManager = NewSessionManager(a)
 	a.sessionManager.Run()
 
+	// Crawl on startup if enabled.
+	if a.Config.UBool("crawler.onRun", false) {
+		a.Crawl()
+	}
+
 	url := a.Config.UString("host", "localhost") + ":" + a.Config.UString("port", "8000")
 	a.Logger.Infof("Serving on %v", url)
 
@@ -255,6 +261,28 @@ func (a *App) Run() {
 	if err2 != nil {
 		a.Logger.Panicf("Could not start server: %v\n", err)
 	}
+}
+
+/**
+ * Crawling.
+ */
+
+func (a *App) Crawl() {
+	concurrentRequests := a.Config.UInt("crawler.concurrentRequests", 5)
+	host := a.Config.UString("url")
+	if host == "" {
+		a.Logger.Error("Can't crawl because 'url' setting is not specified")
+		return
+	}
+
+	hosts := []string{host}
+	startUrls := []string{"http://" + host + "/"}
+	crawler := crawler.New(concurrentRequests, hosts, startUrls)
+	crawler.Logger = a.Logger
+
+	go func() {
+		crawler.Run()
+	}()
 }
 
 /**

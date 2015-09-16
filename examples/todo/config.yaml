@@ -1,4 +1,9 @@
 tmpDir: tmp
+host: "localhost"
+port: 8000
+
+url: "localhost:8000"
+
 serveFiles:
   "/public": public
 serverRenderer:
@@ -7,3 +12,6 @@ serverRenderer:
   cacheLifetime: 3600
 frontend:
   indexTpl: public/index.html
+crawler:
+  onRun: true
+  concurrentRequests: 1
