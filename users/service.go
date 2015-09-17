@@ -3,92 +3,93 @@ package users
 import (
 	"time"
 
-	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/users/auth"
 
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/resources"
 )
 
-type UserHandler struct {
-	Users     kit.ApiResource
-	Sessions  kit.ApiResource
-	AuthItems kit.ApiResource
+type Service struct {
+	Users     kit.Resource
+	Sessions  kit.Resource
+	AuthItems kit.Resource
 
-	Roles       kit.ApiResource
-	Permissions kit.ApiResource
+	Roles       kit.Resource
+	Permissions kit.Resource
 
-	profileModel kit.ApiUserProfile
+	profileModel kit.UserProfile
 
-	AuthAdaptors map[string]kit.ApiAuthAdaptor
+	AuthAdaptors map[string]kit.AuthAdaptor
 }
 
-func NewUserHandler(profileModel kit.ApiUserProfile) *UserHandler {
-	h := UserHandler{
+// Ensure UserService implements kit.UserService.
+var _ kit.UserService = (*Service)(nil)
+
+func NewService(profileModel kit.UserProfile) *Service {
+	h := Service{
 		profileModel: profileModel,
 	}
 
-	h.AuthAdaptors = make(map[string]kit.ApiAuthAdaptor)
+	h.AuthAdaptors = make(map[string]kit.AuthAdaptor)
 
 	// Register auth adaptors.
 	h.AddAuthAdaptor(auth.AuthAdaptorPassword{})
 
 	// Build resources.
-	users := kit.NewResource(&BaseUserIntID{}, UserResourceHooks{
+	users := resources.NewResource(&BaseUserIntID{}, UserResourceHooks{
 		ProfileModel: profileModel,
 	})
 	h.Users = users
 
-	sessions := kit.NewResource(&BaseSessionIntID{}, SessionResourceHooks{
-		ApiUpdateAllowed: false,
-		ApiDeleteAllowed: false,
-	})
+	sessions := resources.NewResource(&BaseSessionIntID{}, SessionResourceHooks{})
 	h.Sessions = sessions
 
-	auths := kit.NewResource(&BaseAuthItemIntID{}, nil)
+	auths := resources.NewResource(&BaseAuthItemIntID{}, nil)
 	h.AuthItems = auths
 
-	roles := kit.NewResource(&Role{}, RoleResourceHooks{})
+	roles := resources.NewResource(&Role{}, RoleResourceHooks{})
 	h.Roles = roles
 
-	permissions := kit.NewResource(&Permission{}, PermissionResourceHooks{})
+	permissions := resources.NewResource(&Permission{}, PermissionResourceHooks{})
 	h.Permissions = permissions
 
 	return &h
 }
 
-func (h *UserHandler) GetAuthAdaptor(name string) kit.ApiAuthAdaptor {
+func (h *Service) AuthAdaptor(name string) kit.AuthAdaptor {
 	return h.AuthAdaptors[name]
 }
 
-func (h *UserHandler) AddAuthAdaptor(a kit.ApiAuthAdaptor) {
+func (h *Service) AddAuthAdaptor(a kit.AuthAdaptor) {
 	h.AuthAdaptors[a.GetName()] = a
 }
 
-func (h *UserHandler) GetUserResource() kit.ApiResource {
+func (h *Service) UserResource() kit.Resource {
 	return h.Users
 }
 
-func (h *UserHandler) SetUserResource(x kit.ApiResource) {
+func (h *Service) SetUserResource(x kit.Resource) {
 	h.Users = x
 }
 
-func (h *UserHandler) GetSessionResource() kit.ApiResource {
+func (h *Service) SessionResource() kit.Resource {
 	return h.Sessions
 }
 
-func (h *UserHandler) SetSessionResource(x kit.ApiResource) {
+func (h *Service) SetSessionResource(x kit.Resource) {
 	h.Sessions = x
 }
 
-func (h *UserHandler) GetAuthItemResource() kit.ApiResource {
+func (h *Service) AuthItemResource() kit.Resource {
 	return h.AuthItems
 }
 
-func (h *UserHandler) SetAuthItemResource(x kit.ApiResource) {
+func (h *Service) SetAuthItemResource(x kit.Resource) {
 	h.AuthItems = x
 }
 
-func (h *UserHandler) GetProfileModel() kit.ApiUserProfile {
+func (h *Service) ProfileModel() kit.UserProfile {
 	return h.profileModel
 }
 
@@ -96,29 +97,29 @@ func (h *UserHandler) GetProfileModel() kit.ApiUserProfile {
  * RBAC resources.
  */
 
-func (u *UserHandler) GetRoleResource() kit.ApiResource {
+func (u *Service) RoleResource() kit.Resource {
 	return u.Roles
 }
 
-func (u *UserHandler) SetRoleResource(x kit.ApiResource) {
+func (u *Service) SetRoleResource(x kit.Resource) {
 	u.Roles = x
 }
 
-func (u *UserHandler) GetPermissionResource() kit.ApiResource {
+func (u *Service) PermissionResource() kit.Resource {
 	return u.Permissions
 }
 
-func (u *UserHandler) SetPermissionResource(x kit.ApiResource) {
+func (u *Service) SetPermissionResource(x kit.Resource) {
 	u.Permissions = x
 }
 
-func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData interface{}) Error {
-	adaptor := h.GetAuthAdaptor(adaptorName)
+func (h *Service) CreateUser(user kit.User, adaptorName string, authData interface{}) Error {
+	adaptor := h.AuthAdaptor(adaptorName)
 	if adaptor == nil {
 		return AppError{Code: "unknown_auth_adaptor"}
 	}
 
-	data, err := adaptor.BuildData(authData)
+	data, err := adaptor.BuildData(user, authData)
 	if err != nil {
 		return AppError{Code: "adaptor_error", Message: err.Error()}
 	}
@@ -142,8 +143,8 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	user.SetIsActive(true)
 
 	if h.profileModel != nil && user.GetProfile() == nil {
-		newProfile, _ := h.Users.GetBackend().NewModel(h.profileModel.Collection())
-		user.SetProfile(newProfile.(kit.ApiUserProfile))
+		newProfile, _ := h.Users.Backend().NewModel(h.profileModel.Collection())
+		user.SetProfile(newProfile.(kit.UserProfile))
 	}
 
 	if err := h.Users.Create(user, nil); err != nil {
@@ -153,14 +154,14 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	// Create profile if one exists.
 	if profile := user.GetProfile(); profile != nil {
 		profile.SetID(user.GetID())
-		if err := h.Users.GetBackend().Create(profile); err != nil {
-			h.Users.GetBackend().Delete(user)
+		if err := h.Users.Backend().Create(profile); err != nil {
+			h.Users.Backend().Delete(user)
 			return err
 		}
 	}
 
-	rawAuth, _ := h.AuthItems.GetBackend().NewModel(h.AuthItems.GetModel().Collection())
-	auth := rawAuth.(kit.ApiAuthItem)
+	rawAuth, _ := h.AuthItems.Backend().NewModel(h.AuthItems.Model().Collection())
+	auth := rawAuth.(kit.AuthItem)
 	auth.SetUserID(user.GetID())
 	auth.SetType(adaptorName)
 	auth.SetData(data)
@@ -173,12 +174,12 @@ func (h *UserHandler) CreateUser(user kit.ApiUser, adaptorName string, authData 
 	return nil
 }
 
-func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string, data interface{}) Error {
+func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data interface{}) Error {
 	if !user.IsActive() {
 		return AppError{Code: "user_inactive"}
 	}
 
-	authAdaptor := h.GetAuthAdaptor(authAdaptorName)
+	authAdaptor := h.AuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
 		return AppError{
 			Code:    "unknown_auth_adaptor",
@@ -192,7 +193,7 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 		return err
 	}
 
-	auth := rawAuth.(kit.ApiAuthItem)
+	auth := rawAuth.(kit.AuthItem)
 
 	cleanData, err2 := auth.GetData()
 	if err2 != nil {
@@ -202,7 +203,7 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 		}
 	}
 
-	ok, err2 := authAdaptor.Authenticate(cleanData, data)
+	ok, err2 := authAdaptor.Authenticate(user, cleanData, data)
 	if err2 != nil {
 		return AppError{Code: "auth_error", Message: err.Error()}
 	}
@@ -213,7 +214,7 @@ func (h *UserHandler) AuthenticateUser(user kit.ApiUser, authAdaptorName string,
 	return nil
 }
 
-func (h *UserHandler) VerifySession(token string) (kit.ApiUser, kit.ApiSession, Error) {
+func (h *Service) VerifySession(token string) (kit.User, kit.Session, Error) {
 	rawSession, err := h.Sessions.FindOne(token)
 	if err != nil {
 		return nil, nil, err
@@ -221,14 +222,14 @@ func (h *UserHandler) VerifySession(token string) (kit.ApiUser, kit.ApiSession, 
 	if rawSession == nil {
 		return nil, nil, AppError{Code: "session_not_found"}
 	}
-	session := rawSession.(kit.ApiSession)
+	session := rawSession.(kit.Session)
 
 	// Load user.
-	rawUser, err := h.GetUserResource().FindOne(session.GetUserID())
+	rawUser, err := h.UserResource().FindOne(session.GetUserID())
 	if err != nil {
 		return nil, nil, err
 	}
-	user := rawUser.(kit.ApiUser)
+	user := rawUser.(kit.User)
 
 	if !user.IsActive() {
 		return nil, nil, AppError{Code: "user_inactive"}

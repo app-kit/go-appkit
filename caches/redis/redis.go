@@ -7,6 +7,7 @@ import(
 	"github.com/garyburd/redigo/redis"
 
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/caches"
 	"github.com/theduke/go-appkit/utils"
 )
@@ -43,7 +44,7 @@ type Redis struct {
 }
 
 // Ensure redis implements the Cache interface.
-var _ Cache = (*Redis)(nil)
+var _ kit.Cache = (*Redis)(nil)
 
 func redisErr(err error) Error {
 	return AppError{
@@ -143,7 +144,7 @@ func (r *Redis) cleanKeys(rawKeys []string) []string {
 }
 
 // Save a new item into the cache.
-func(r *Redis) Set(item CacheItem) Error {
+func(r *Redis) Set(item kit.CacheItem) Error {
 	key := item.GetKey()
 	if key == "" {
 		return AppError{Code: "empty_key"}
@@ -213,8 +214,8 @@ func(r *Redis) SetString(key string, value string, expiresAt *time.Time, tags []
 }
 
 // Retrieve a cache item from the cache.
-func(r *Redis) Get(key string, items ...CacheItem) (CacheItem, Error) {
-	var item CacheItem = &StrItem{}
+func(r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
+	var item kit.CacheItem = &StrItem{}
 	if items != nil {
 		if len(items) != 1 {
 			return nil, AppError{

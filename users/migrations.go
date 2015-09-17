@@ -1,11 +1,12 @@
 package users
 
 import (
-	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
+
+	kit "github.com/theduke/go-appkit"
 )
 
-func GetUserMigrations(app *kit.App) []db.Migration {
+func GetUserMigrations(app kit.App) []db.Migration {
 	migrations := make([]db.Migration, 0)
 
 	v1 := db.Migration{
@@ -27,8 +28,8 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 				return err
 			}
 
-			if userHandler := app.GetUserHandler(); userHandler != nil {
-				if profile := userHandler.GetProfileModel(); profile != nil {
+			if userService := app.UserService(); userService != nil {
+				if profile := userService.ProfileModel(); profile != nil {
 					b.CreateCollection(profile.Collection())
 				}
 			}
@@ -41,9 +42,9 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 	v2 := db.Migration{
 		Name: "Create admin role and user",
 		Up: func(b db.MigrationBackend) error {
-			userHandler := app.GetUserHandler()
+			userService := app.UserService()
 
-			permissions := userHandler.GetPermissionResource()
+			permissions := userService.PermissionResource()
 			allPerm := &Permission{Name: "all"}
 			if err := permissions.Create(allPerm, nil); err != nil {
 				return err
@@ -52,17 +53,17 @@ func GetUserMigrations(app *kit.App) []db.Migration {
 			// Create admin role.
 			adminRole := &Role{Name: "admin"}
 			adminRole.Permissions = []*Permission{allPerm}
-			roles := userHandler.GetRoleResource()
+			roles := userService.RoleResource()
 			if err := roles.Create(adminRole, nil); err != nil {
 				return err
 			}
 
-			user := userHandler.GetUserResource().NewModel().(kit.ApiUser)
+			user := userService.UserResource().NewModel().(kit.User)
 			user.SetUsername("admin")
 			user.SetEmail("admin@admin.com")
 			user.AddRole(adminRole)
 
-			userHandler.CreateUser(user, "password", map[string]interface{}{"password": "admin"})
+			userService.CreateUser(user, "password", map[string]interface{}{"password": "admin"})
 
 			return nil
 		},

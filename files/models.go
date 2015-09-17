@@ -4,9 +4,9 @@ import (
 	"io"
 	"strings"
 
-	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/users"
+	kit "github.com/theduke/go-appkit"
 )
 
 /**
@@ -16,7 +16,7 @@ import (
 // BaseFile that can be extended.
 // You can use BaseFileIntID or BaseFileStrID in almost all cases.
 type BaseFile struct {
-	Backend kit.ApiFileBackend `db:"-"`
+	Backend kit.FileBackend `db:"-"`
 
 	BackendName string
 	BackendID   string
@@ -42,11 +42,11 @@ func (f *BaseFile) Collection() string {
 	return "files"
 }
 
-func (f *BaseFile) GetBackend() kit.ApiFileBackend {
+func (f *BaseFile) GetBackend() kit.FileBackend {
 	return f.Backend
 }
 
-func (f *BaseFile) SetBackend(x kit.ApiFileBackend) {
+func (f *BaseFile) SetBackend(x kit.FileBackend) {
 	f.Backend = x
 	f.BackendName = x.Name()
 }
@@ -175,8 +175,8 @@ type FileStrID struct {
 	BaseFile
 }
 
-// Ensure FileStrID implements ApiFile interface.
-var _ kit.ApiFile = (*FileStrID)(nil)
+// Ensure FileStrID implements File interface.
+var _ kit.File = (*FileStrID)(nil)
 
 func (f *FileStrID) Reader() (io.ReadCloser, Error) {
 	if f.Backend == nil {
@@ -201,8 +201,8 @@ type FileIntID struct {
 	BaseFile
 }
 
-// Ensure FileIntID implements ApiFile interface.
-var _ kit.ApiFile = (*FileIntID)(nil)
+// Ensure FileIntID implements File interface.
+var _ kit.File = (*FileIntID)(nil)
 
 func (f *FileIntID) Reader() (io.ReadCloser, Error) {
 	if f.Backend == nil {

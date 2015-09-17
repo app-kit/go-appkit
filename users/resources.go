@@ -5,10 +5,10 @@ import (
 	"math/big"
 	"time"
 
-	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
 
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
 func randomToken() string {
@@ -35,21 +35,21 @@ func randomToken() string {
 }
 
 type SessionResourceHooks struct {
-	ApiUpdateAllowed bool
+	UpdateAllowed bool
 	ApiDeleteAllowed bool
 }
 
-func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, Error) {
+func StartSession(res kit.Resource, user kit.User) (kit.Session, Error) {
 	token := randomToken()
 	if token == "" {
 		return nil, AppError{Code: "token_creation_failed"}
 	}
 
-	rawSession, err := res.GetBackend().NewModel(res.GetModel().Collection())
+	rawSession, err := res.Backend().NewModel(res.Model().Collection())
 	if err != nil {
 		return nil, err
 	}
-	session := rawSession.(kit.ApiSession)
+	session := rawSession.(kit.Session)
 
 	session.SetUserID(user.GetID())
 	session.SetToken(token)
@@ -64,7 +64,7 @@ func StartSession(res kit.ApiResource, user kit.ApiUser) (kit.ApiSession, Error)
 	return session, nil
 }
 
-func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
+func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {
 	meta := r.GetMeta()
 
 	userIdentifier := meta.String("user")
@@ -73,18 +73,18 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
 	}
 
 	// Find user.
-	userResource := res.GetUserHandler().GetUserResource()
+	userResource := res.UserService().UserResource()
 
 	rawUser, err := userResource.Q().
 		Filter("username", userIdentifier).Or("email", userIdentifier).First()
 
 	if err != nil {
-		return &kit.Response{Error: err}
+		return &kit.AppResponse{Error: err}
 	} else if rawUser == nil {
 		return kit.NewErrorResponse("user_not_found", "User not found for identifier: "+userIdentifier)
 	}
 
-	user := rawUser.(kit.ApiUser)
+	user := rawUser.(kit.User)
 
 	adaptor := meta.String("adaptor")
 	if adaptor == "" {
@@ -96,17 +96,17 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
 		kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
 	}
 
-	err = res.GetUserHandler().AuthenticateUser(user, adaptor, data)
+	err = res.UserService().AuthenticateUser(user, adaptor, data)
 	if err != nil {
-		return &kit.Response{Error: err}
+		return &kit.AppResponse{Error: err}
 	}
 
 	session, err := StartSession(res, user)
 	if err != nil {
-		return &kit.Response{Error: err}
+		return &kit.AppResponse{Error: err}
 	}
 
-	return &kit.Response{
+	return &kit.AppResponse{
 		Data: session,
 	}
 }
@@ -116,10 +116,10 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r
  */
 
 type UserResourceHooks struct {
-	ProfileModel kit.ApiUserProfile
+	ProfileModel kit.UserProfile
 }
 
-func (hooks UserResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
+func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {
 	meta := r.GetMeta()
 
 	adaptor := meta.String("adaptor")
@@ -132,26 +132,26 @@ func (hooks UserResourceHooks) ApiCreate(res kit.ApiResource, obj db.Model, r ki
 		return kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
 	}
 
-	user := obj.(kit.ApiUser)
-	if err := res.GetUserHandler().CreateUser(user, adaptor, data); err != nil {
-		return &kit.Response{Error: err}
+	user := obj.(kit.User)
+	if err := res.UserService().CreateUser(user, adaptor, data); err != nil {
+		return &kit.AppResponse{Error: err}
 	}
 
-	return &kit.Response{
+	return &kit.AppResponse{
 		Data: user,
 	}
 }
 
-func (hooks UserResourceHooks) AllowFind(res kit.ApiResource, obj db.Model, user kit.ApiUser) bool {
-	u := obj.(kit.ApiUser)
+func (hooks UserResourceHooks) AllowFind(res kit.Resource, obj db.Model, user kit.User) bool {
+	u := obj.(kit.User)
 	return u.GetID() == user.GetID()
 }
 
-func (hooks UserResourceHooks) AllowUpdate(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
+func (hooks UserResourceHooks) AllowUpdate(res kit.Resource, obj db.Model, old db.Model, user kit.User) bool {
 	return user != nil && obj.GetID() == user.GetID()
 }
 
-func (hooks UserResourceHooks) AllowDelete(res kit.ApiResource, obj db.Model, old db.Model, user kit.ApiUser) bool {
+func (hooks UserResourceHooks) AllowDelete(res kit.Resource, obj db.Model, old db.Model, user kit.User) bool {
 	return false
 }
 

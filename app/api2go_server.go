@@ -1,4 +1,4 @@
-package appkit
+package app
 
 import (
 	"encoding/json"
@@ -15,9 +15,10 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
-func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, Error) {
+func JsonHandler(r *http.Request, app kit.App, method *Method) (interface{}, Error) {
 	// Read request body.
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
@@ -46,10 +47,10 @@ func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, Error)
 	// Build the request.
 	data, _ := rawData["data"]
 	meta := make(map[string]interface{})
-	request := buildRequest(app.GetUserHandler(), r.Header, data, meta)
+	request := buildRequest(app.UserService(), r.Header, data, meta)
 
 	// Check permissions.
-	if method.RequiresUser && request.User == nil {
+	if method.RequiresUser() && request.GetUser() == nil {
 		return nil, AppError{Code: "permission_denied"}
 	}
 
@@ -65,7 +66,7 @@ func JsonHandler(r *http.Request, app *App, method *Method) (interface{}, Error)
 	return nil, nil
 }
 
-func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app *App, method *Method) {
+func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app kit.App, method *Method) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
@@ -113,17 +114,17 @@ func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app *App, method *M
 }
 
 func buildRequest(
-	userHandler ApiUserHandler,
+	userService kit.UserService,
 	header http.Header,
 	data interface{},
-	meta map[string]interface{}) *Request {
+	meta map[string]interface{}) kit.Request {
 
-	req := NewRequest()
+	req := kit.NewRequest()
 
 	// Handle authentication.
 	if token := header.Get("Authentication"); token != "" {
-		if userHandler != nil {
-			user, session, err := userHandler.VerifySession(token)
+		if userService != nil {
+			user, session, err := userService.VerifySession(token)
 			if err == nil {
 				req.User = user
 				req.Session = session
@@ -133,7 +134,7 @@ func buildRequest(
 		}
 	}
 
-	req.Meta = NewContext()
+	req.Meta = kit.NewContext()
 	req.Meta.Data = meta
 
 	req.Data = data
@@ -163,8 +164,8 @@ func (r Api2GoResponse) StatusCode() int {
 }
 
 type Api2GoResource struct {
-	AppResource ApiResource
-	App         *App
+	AppResource kit.Resource
+	App         kit.App
 }
 
 func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, Error) {
@@ -180,7 +181,7 @@ func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, Error) {
 				}
 			}
 
-			collection := res.AppResource.GetModel().Collection()
+			collection := res.AppResource.Model().Collection()
 			query, err := db.ParseQuery(collection, queryData)
 			if err != nil {
 				return nil, err
@@ -228,7 +229,7 @@ func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, Error) {
 	return q, nil
 }
 
-func (r Api2GoResource) convertResult(res ApiResponse, status int) (api2go.Responder, error) {
+func (r Api2GoResource) convertResult(res kit.Response, status int) (api2go.Responder, error) {
 	if err := res.GetError(); err != nil {
 		status := 500
 		if err.GetCode() == "not_found" || err.GetCode() == "record_not_found" {
@@ -249,7 +250,7 @@ func (r Api2GoResource) convertResult(res ApiResponse, status int) (api2go.Respo
 	data := res.GetData()
 	if apiModel, ok := data.(Api2GoModel); ok {
 		apiModel.SetFullModel(data.(db.Model))
-		info := r.AppResource.GetBackend().GetModelInfo(r.AppResource.GetModel().Collection())
+		info := r.AppResource.Backend().GetModelInfo(r.AppResource.Model().Collection())
 		apiModel.SetModelInfo(info)
 	}
 
@@ -257,7 +258,7 @@ func (r Api2GoResource) convertResult(res ApiResponse, status int) (api2go.Respo
 }
 
 func (res Api2GoResource) FindOne(rawId string, r api2go.Request) (api2go.Responder, error) {
-	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
+	request := buildRequest(res.App.UserService(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiFindOne(rawId, request)
 	return res.convertResult(response, 200)
 }
@@ -268,7 +269,7 @@ func (res Api2GoResource) FindAll(r api2go.Request) (api2go.Responder, error) {
 		return nil, api2go.NewHTTPError(errors.New("invalid_query"), err.Error(), 500)
 	}
 
-	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
+	request := buildRequest(res.App.UserService(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiFind(q, request)
 	return res.convertResult(response, 200)
 }
@@ -279,7 +280,7 @@ func (res Api2GoResource) PaginatedFindAll(r api2go.Request) (uint, api2go.Respo
 		return 0, nil, api2go.NewHTTPError(errors.New("invalid_query"), err.Error(), 500)
 	}
 
-	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
+	request := buildRequest(res.App.UserService(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiFindPaginated(q, request)
 
 	var count uint64
@@ -294,20 +295,20 @@ func (res Api2GoResource) PaginatedFindAll(r api2go.Request) (uint, api2go.Respo
 
 func (res Api2GoResource) Create(obj interface{}, r api2go.Request) (api2go.Responder, error) {
 	model := obj.(db.Model)
-	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
+	request := buildRequest(res.App.UserService(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiCreate(model, request)
 	return res.convertResult(response, 201)
 }
 
 func (res Api2GoResource) Update(obj interface{}, r api2go.Request) (api2go.Responder, error) {
 	model := obj.(db.Model)
-	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
+	request := buildRequest(res.App.UserService(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiUpdate(model, request)
 	return res.convertResult(response, 200)
 }
 
 func (res Api2GoResource) Delete(rawId string, r api2go.Request) (api2go.Responder, error) {
-	request := buildRequest(res.App.GetUserHandler(), r.Header, r.Data, r.Meta)
+	request := buildRequest(res.App.UserService(), r.Header, r.Data, r.Meta)
 	response := res.AppResource.ApiDelete(rawId, request)
 	return res.convertResult(response, 200)
 }

@@ -17,11 +17,12 @@ import (
 
 	"github.com/disintegration/gift"
 	"github.com/twinj/uuid"
+	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/utils"
 	. "github.com/theduke/go-appkit/error"
-	db "github.com/theduke/go-dukedb"
+	"github.com/theduke/go-appkit/utils"
+	"github.com/theduke/go-appkit/resources"
 )
 
 type rateLimiter struct {
@@ -129,10 +130,10 @@ type FilesResource struct {
 	thumbnailRateLimiter *rateLimiter
 }
 
-func getTmpPath(res kit.ApiResource) string {
-	tmpPath := res.App().Config.UString("tmpDirUploads")
+func getTmpPath(res kit.Resource) string {
+	tmpPath := res.App().Config().UString("tmpDirUploads")
 	if tmpPath == "" {
-		tmpPath = res.App().Config.UString("tmpDir")
+		tmpPath = res.App().Config().UString("tmpDir")
 		if tmpPath != "" {
 			tmpPath += string(os.PathSeparator) + "uploads"
 		}
@@ -141,10 +142,10 @@ func getTmpPath(res kit.ApiResource) string {
 	return tmpPath
 }
 
-func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiRequest) kit.ApiResponse {
+func (_ FilesResource) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {
 	tmpPath := getTmpPath(res)
 	if tmpPath == "" {
-		return &kit.Response{
+		return &kit.AppResponse{
 			Error: AppError{
 				Code:    "no_tmp_path",
 				Message: "Tmp path is not configured",
@@ -154,7 +155,7 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 
 	tmpFile := r.GetMeta().String("file")
 	if tmpFile == "" {
-		return &kit.Response{
+		return &kit.AppResponse{
 			Error: AppError{
 				Code:    "missing_file_in_meta",
 				Message: "Expected 'file' in metadata with id of tmp file",
@@ -165,26 +166,26 @@ func (_ FilesResource) ApiCreate(res kit.ApiResource, obj db.Model, r kit.ApiReq
 	tmpPath = tmpPath + string(os.PathSeparator) + tmpFile
 
 	user := r.GetUser()
-	if allowCreate, ok := r.(kit.AllowCreateHook); ok {
+	if allowCreate, ok := r.(resources.AllowCreateHook); ok {
 		if !allowCreate.AllowCreate(res, obj, user) {
 			return kit.NewErrorResponse("permission_denied", "")
 		}
 	}
 
-	file := obj.(kit.ApiFile)
-	err := res.App().FileHandler().BuildFile(file, user, tmpPath, true)
+	file := obj.(kit.File)
+	err := res.App().FileService().BuildFile(file, user, tmpPath, true)
 
 	err = res.Create(obj, user)
 	if err != nil {
-		return &kit.Response{Error: err}
+		return &kit.AppResponse{Error: err}
 	}
 
-	return &kit.Response{
+	return &kit.AppResponse{
 		Data: obj,
 	}
 }
 
-func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, Error) {
+func handleUpload(a kit.App, tmpPath string, r *http.Request) ([]string, Error) {
 	reader, err := r.MultipartReader()
 	if err != nil {
 		return nil, AppError{Code: "multipart_error", Message: err.Error()}
@@ -251,7 +252,7 @@ func handleUpload(a *kit.App, tmpPath string, r *http.Request) ([]string, Error)
 	return files, nil
 }
 
-func serveFile(w http.ResponseWriter, file kit.ApiFile, reader io.Reader) {
+func serveFile(w http.ResponseWriter, file kit.File, reader io.Reader) {
 	header := w.Header()
 
 	if file.GetMime() != "" {
@@ -282,7 +283,7 @@ func serveFile(w http.ResponseWriter, file kit.ApiFile, reader io.Reader) {
 	}
 }
 
-func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.ApiFile, width, height int64, ip string) (io.Reader, Error) {
+func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File, width, height int64, ip string) (io.Reader, Error) {
 	if width == 0 && height == 0 {
 		return file.Reader()
 	}
@@ -314,8 +315,8 @@ func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.Api
 		height = int64(float64(width) * ratio)
 	}
 
-	maxWidth := app.Config.UInt("files.thumbGenerator.maxWidth", 2000)
-	maxHeight := app.Config.UInt("files.thumbGenerator.maxHeight", 2000)
+	maxWidth := app.Config().UInt("files.thumbGenerator.maxWidth", 2000)
+	maxHeight := app.Config().UInt("files.thumbGenerator.maxHeight", 2000)
 
 	if width > int64(maxWidth) || height > int64(maxHeight) {
 		return nil, AppError{
@@ -376,40 +377,38 @@ func (r *FilesResource) getImageReader(app *kit.App, tmpDir string, file kit.Api
 	return file.GetBackend().ReaderById("thumbs", thumbId)
 }
 
-func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
-	maxRunning := res.App().Config.UInt("files.thumbGenerator.maxRunning", 10)
-	maxPerIPPerMinute := res.App().Config.UInt("files.thumbGenerator.maxPerIPPerMinute", 100)
-	maxQueueSize := res.App().Config.UInt("files.thumbGenerator.maxQueueSize", 100)
+func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
+	maxRunning := res.App().Config().UInt("files.thumbGenerator.maxRunning", 10)
+	maxPerIPPerMinute := res.App().Config().UInt("files.thumbGenerator.maxPerIPPerMinute", 100)
+	maxQueueSize := res.App().Config().UInt("files.thumbGenerator.maxQueueSize", 100)
 	hooks.thumbnailRateLimiter = newRateLimiter(maxRunning, maxPerIPPerMinute, maxQueueSize)
 
-	routes := make([]*kit.HttpRoute, 0)
+	routes := make([]kit.HttpRoute, 0)
 
 	// Upload route.
-	uploadOptionsRoute := &kit.HttpRoute{
-		Route:  "/api/files/upload",
-		Method: "OPTIONS",
-		Handler: func(a *kit.App, r kit.ApiRequest) (kit.ApiResponse, bool) {
-			header := r.GetContext().MustGet("ResponseWriter").(http.ResponseWriter).Header()
+	uploadOptionsHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
+		header := r.GetContext().MustGet("ResponseWriter").(http.ResponseWriter).Header()
 
-			allowedOrigins := a.Config.UString("fileHandler.allowedOrigins", "*")
-			header.Set("Access-Control-Allow-Origin", allowedOrigins)
+		allowedOrigins := a.Config().UString("fileHandler.allowedOrigins", "*")
+		header.Set("Access-Control-Allow-Origin", allowedOrigins)
 
-			header.Set("Access-Control-Allow-Methods", "OPTIONS, POST")
+		header.Set("Access-Control-Allow-Methods", "OPTIONS, POST")
 
-			allowedHeaders := a.Config.UString("accessControl.allowedHeaders")
-			if allowedHeaders == "" {
-				allowedHeaders = "Authentication, Content-Type, Content-Range, Content-Disposition"
-			} else {
-				allowedHeaders += ", Authentication, Content-Type, Content-Range, Content-Disposition"
-			}
-			header.Set("Access-Control-Allow-Headers", allowedHeaders)
+		allowedHeaders := a.Config().UString("accessControl.allowedHeaders")
+		if allowedHeaders == "" {
+			allowedHeaders = "Authentication, Content-Type, Content-Range, Content-Disposition"
+		} else {
+			allowedHeaders += ", Authentication, Content-Type, Content-Range, Content-Disposition"
+		}
+		header.Set("Access-Control-Allow-Headers", allowedHeaders)
 
-			return &kit.Response{
-				HttpStatus: 200,
-				RawData: []byte{},
-			}, true
-		},
+		return &kit.AppResponse{
+			HttpStatus: 200,
+			RawData: []byte{},
+		}, true
 	}
+
+	uploadOptionsRoute := kit.NewHttpRoute("/api/files/upload", "OPTIONS", uploadOptionsHandler)
 	routes = append(routes, uploadOptionsRoute)
 
 	tmpPath := getTmpPath(res)
@@ -417,134 +416,125 @@ func (hooks FilesResource) HttpRoutes(res kit.ApiResource) []*kit.HttpRoute {
 		panic("Empty tmp path")
 	}
 
-	uploadRoute := &kit.HttpRoute{
-		Route:  "/api/files/upload",
-		Method: "POST",
-		Handler: func(a *kit.App, r kit.ApiRequest) (kit.ApiResponse, bool) {
-			if a.Config.UBool("fileHandler.requiresAuth", false) {
-				if r.GetUser() == nil {
-					return kit.NewErrorResponse("permission_denied", ""), false
-				}
+	uploadHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
+		if a.Config().UBool("fileHandler.requiresAuth", false) {
+			if r.GetUser() == nil {
+				return kit.NewErrorResponse("permission_denied", ""), false
 			}
+		}
 
-			var files []string
-			var err Error
+		var files []string
+		var err Error
 
-			if err == nil {
-				files, err = handleUpload(a, tmpPath, r.GetContext().MustGet("httpRequest").(*http.Request))
-				if err != nil {
-					return &kit.Response{Error: err}, false
-				}
+		if err == nil {
+			files, err = handleUpload(a, tmpPath, r.GetContext().MustGet("httpRequest").(*http.Request))
+			if err != nil {
+				return &kit.AppResponse{Error: err}, false
 			}
+		}
 
-			data := map[string]interface{}{
-				"data": files,
-			}
+		data := map[string]interface{}{
+			"data": files,
+		}
 
-			return &kit.Response{Data: data}, false
-		},
+		return &kit.AppResponse{Data: data}, false
 	}
+	uploadRoute := kit.NewHttpRoute("/api/files/upload", "POST", uploadHandler)
 	routes = append(routes, uploadRoute)
 
-	serveFileRoute := &kit.HttpRoute{
-		Route:  "/files/:id/*rest",
-		Method: "GET",
-		Handler: func(a *kit.App, r kit.ApiRequest) (kit.ApiResponse, bool) {
-			file, err := a.FileHandler().FindOne(r.GetContext().String("id"))
+	serveFileHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
+		file, err := a.FileService().FindOne(r.GetContext().String("id"))
 
-			if err != nil {
-				return &kit.Response{
-					Error: err,
-				}, false
-			}
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
+			}, false
+		}
 
-			if file == nil {
-				return &kit.Response{
-					HttpStatus: 404,
-					RawData: []byte("File not found"),
-				}, false
-			}
+		if file == nil {
+			return &kit.AppResponse{
+				HttpStatus: 404,
+				RawData: []byte("File not found"),
+			}, false
+		}
 
-			reader, err := file.Reader()
-			if err != nil {
-				return &kit.Response{
-					Error: err,
-				}, false
-			}
-			defer reader.Close()
+		reader, err := file.Reader()
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
+			}, false
+		}
+		defer reader.Close()
 
-			w := r.GetContext().MustGet("responseWriter").(http.ResponseWriter)
-			serveFile(w, file, reader)
-			return nil, true
-		},
+		w := r.GetContext().MustGet("responseWriter").(http.ResponseWriter)
+		serveFile(w, file, reader)
+		return nil, true
 	}
+	serveFileRoute := kit.NewHttpRoute("/files/:id/*rest", "GET", serveFileHandler)
 	routes = append(routes, serveFileRoute)
 
-	serveImageRoute := &kit.HttpRoute{
-		Route:  "/images/:id/*rest",
-		Method: "GET",
-		Handler: func(a *kit.App, r kit.ApiRequest) (kit.ApiResponse, bool) {
-			file, err := a.FileHandler().FindOne(r.GetContext().String("id"))
-			if err != nil {
-				return &kit.Response{
-					Error: err,
-				}, false
-			}
+	serveImageHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
+		file, err := a.FileService().FindOne(r.GetContext().String("id"))
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
+			}, false
+		}
 
-			if file == nil {
-				return &kit.Response{
-					HttpStatus: 404,
-					RawData: []byte("File not found"),
-				}, false
-			}
+		if file == nil {
+			return &kit.AppResponse{
+				HttpStatus: 404,
+				RawData: []byte("File not found"),
+			}, false
+		}
 
-			if !file.GetIsImage() {
-				return &kit.Response{
-					Error: AppError{
-						Code: "file_is_no_image",
-						Message: "The requested file is not an image",
-					},
-				}, false
-			}
+		if !file.GetIsImage() {
+			return &kit.AppResponse{
+				Error: AppError{
+					Code: "file_is_no_image",
+					Message: "The requested file is not an image",
+				},
+			}, false
+		}
 
-			httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+		httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
 
-			query := httpRequest.URL.Query()
-			rawWidth := query.Get("width")
-			rawHeight := query.Get("height")
+		query := httpRequest.URL.Query()
+		rawWidth := query.Get("width")
+		rawHeight := query.Get("height")
 
-			var width, height int64
+		var width, height int64
 
-			if rawWidth != "" {
-				width, _ = strconv.ParseInt(rawWidth, 10, 64)
-			}
-			if rawHeight != "" {
-				height, _ = strconv.ParseInt(rawHeight, 10, 64)
-			}
+		if rawWidth != "" {
+			width, _ = strconv.ParseInt(rawWidth, 10, 64)
+		}
+		if rawHeight != "" {
+			height, _ = strconv.ParseInt(rawHeight, 10, 64)
+		}
 
-			thumbDir := a.Config.UString("thumbnailDir")
-			if thumbDir == "" {
-				thumbDir = tmpPath + string(os.PathSeparator) + "thumbnails"
-			}
+		thumbDir := a.Config().UString("thumbnailDir")
+		if thumbDir == "" {
+			thumbDir = tmpPath + string(os.PathSeparator) + "thumbnails"
+		}
 
-			ip := strings.Split(httpRequest.RemoteAddr, ":")[0]
-			if ip == "" {
-				ip = httpRequest.Header.Get("X-Forwarded-For")
-			}
+		ip := strings.Split(httpRequest.RemoteAddr, ":")[0]
+		if ip == "" {
+			ip = httpRequest.Header.Get("X-Forwarded-For")
+		}
 
-			reader, err := hooks.getImageReader(a, thumbDir, file, width, height, ip)
-			if err != nil {
-				return &kit.Response{
-					Error: err,
-				}, false
-			}
+		reader, err := hooks.getImageReader(a, thumbDir, file, width, height, ip)
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
+			}, false
+		}
 
-			w := r.GetContext().MustGet("responseWriter").(http.ResponseWriter)
-			serveFile(w, file, reader)
+		w := r.GetContext().MustGet("responseWriter").(http.ResponseWriter)
+		serveFile(w, file, reader)
 
-			return nil, true
-		},
+		return nil, true
 	}
+	serveImageRoute := kit.NewHttpRoute("/images/:id/*rest", "GET", serveImageHandler)
 	routes = append(routes, serveImageRoute)
 
 	return routes

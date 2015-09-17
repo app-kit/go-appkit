@@ -6,6 +6,7 @@ import(
 
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/utils"
+	. "github.com/theduke/go-appkit"
 )
 
 type Recipient struct {

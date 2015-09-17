@@ -7,38 +7,39 @@ import (
 	"os"
 	"strings"
 
-	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/resources"
 	"github.com/theduke/go-appkit/files/backends/fs"
 	db "github.com/theduke/go-dukedb"
 )
 
-type FileHandler struct {
-	app            *kit.App
+type FileService struct {
+	app            kit.App
 	model          interface{}
-	resource       kit.ApiResource
-	backends       map[string]kit.ApiFileBackend
-	defaultBackend kit.ApiFileBackend
+	resource       kit.Resource
+	backends       map[string]kit.FileBackend
+	defaultBackend kit.FileBackend
 }
 
-// Ensure FileHandler implements ApiFileHandler interface.
-var _ kit.ApiFileHandler = (*FileHandler)(nil)
+// Ensure FileService implements FileService interface.
+var _ kit.FileService = (*FileService)(nil)
 
-func NewFileHandler() *FileHandler {
-	return &FileHandler{
+func NewFileService() *FileService {
+	return &FileService{
 		model:    &FileIntID{},
-		backends: make(map[string]kit.ApiFileBackend),
+		backends: make(map[string]kit.FileBackend),
 	}
 }
 
-func NewFileHandlerWithFs(dataPath string) *FileHandler {
+func NewFileServiceWithFs(dataPath string) *FileService {
 	if dataPath == "" {
 		panic("Empty data path")
 	}
 
-	handler := NewFileHandler()
+	handler := NewFileService()
 
-	res := kit.NewResource(&FileIntID{}, FilesResource{})
+	res := resources.NewResource(&FileIntID{}, FilesResource{})
 	handler.SetResource(res)
 
 	fs, err := fs.New(dataPath)
@@ -50,23 +51,23 @@ func NewFileHandlerWithFs(dataPath string) *FileHandler {
 	return handler
 }
 
-func (h *FileHandler) SetApp(app *kit.App) {
+func (h *FileService) SetApp(app kit.App) {
 	h.app = app
 }
 
-func (h *FileHandler) Resource() kit.ApiResource {
+func (h *FileService) Resource() kit.Resource {
 	return h.resource
 }
 
-func (h *FileHandler) SetResource(x kit.ApiResource) {
+func (h *FileService) SetResource(x kit.Resource) {
 	h.resource = x
 }
 
-func (h *FileHandler) Backend(name string) kit.ApiFileBackend {
+func (h *FileService) Backend(name string) kit.FileBackend {
 	return h.backends[name]
 }
 
-func (h *FileHandler) AddBackend(backend kit.ApiFileBackend) {
+func (h *FileService) AddBackend(backend kit.FileBackend) {
 	h.backends[backend.Name()] = backend
 
 	if h.defaultBackend == nil {
@@ -74,23 +75,23 @@ func (h *FileHandler) AddBackend(backend kit.ApiFileBackend) {
 	}
 }
 
-func (h *FileHandler) DefaultBackend() kit.ApiFileBackend {
+func (h *FileService) DefaultBackend() kit.FileBackend {
 	return h.defaultBackend
 }
 
-func (h *FileHandler) SetDefaultBackend(name string) {
+func (h *FileService) SetDefaultBackend(name string) {
 	h.defaultBackend = h.backends[name]
 }
 
-func (h *FileHandler) Model() interface{} {
+func (h *FileService) Model() interface{} {
 	return h.model
 }
 
-func (h *FileHandler) SetModel(x interface{}) {
+func (h *FileService) SetModel(x interface{}) {
 	h.model = x
 }
 
-func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath string, deleteDir bool) Error {
+func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, deleteDir bool) Error {
 	if h.DefaultBackend == nil {
 		return AppError{
 			Code:    "no_default_backend",
@@ -222,20 +223,20 @@ func (h FileHandler) BuildFile(file kit.ApiFile, user kit.ApiUser, filePath stri
 	return nil
 }
 
-func (h *FileHandler) New() kit.ApiFile {
-	f := h.resource.NewModel().(kit.ApiFile)
+func (h *FileService) New() kit.File {
+	f := h.resource.NewModel().(kit.File)
 	f.SetBackend(h.defaultBackend)
 	return f
 }
 
-func (h *FileHandler) FindOne(id string) (kit.ApiFile, Error) {
+func (h *FileService) FindOne(id string) (kit.File, Error) {
 	file, err := h.resource.FindOne(id)
 	if err != nil {
 		return nil, err
 	} else if file == nil {
 		return nil, nil
 	} else {
-		file := file.(kit.ApiFile)
+		file := file.(kit.File)
 
 		// Set backend on the file if found.
 		if file.GetBackendName() != "" {
@@ -248,15 +249,15 @@ func (h *FileHandler) FindOne(id string) (kit.ApiFile, Error) {
 	}
 }
 
-func (h *FileHandler) Find(q *db.Query) ([]kit.ApiFile, Error) {
+func (h *FileService) Find(q *db.Query) ([]kit.File, Error) {
 	rawFiles, err := h.resource.Find(q)
 	if err != nil {
 		return nil, err
 	}
 
-	files := make([]kit.ApiFile, 0)
+	files := make([]kit.File, 0)
 	for _, rawFile := range rawFiles {
-		file := rawFile.(kit.ApiFile)
+		file := rawFile.(kit.File)
 
 		// Set backend on the file if found.
 		if file.GetBackendName() != "" {
@@ -271,14 +272,14 @@ func (h *FileHandler) Find(q *db.Query) ([]kit.ApiFile, Error) {
 	return files, nil
 }
 
-func (h *FileHandler) Create(f kit.ApiFile, u kit.ApiUser) Error {
+func (h *FileService) Create(f kit.File, u kit.User) Error {
 	return h.resource.Create(f, u)
 }
 
-func (h *FileHandler) Update(f kit.ApiFile, u kit.ApiUser) Error {
+func (h *FileService) Update(f kit.File, u kit.User) Error {
 	return h.resource.Update(f, u)
 }
 
-func (h *FileHandler) Delete(f kit.ApiFile, u kit.ApiUser) Error {
+func (h *FileService) Delete(f kit.File, u kit.User) Error {
 	return h.resource.Delete(f, u)
 }

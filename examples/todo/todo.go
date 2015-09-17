@@ -12,6 +12,7 @@ import (
 	"github.com/theduke/go-dukedb/backends/sql"
 
 	kit "github.com/theduke/go-appkit"
+	kitapp "github.com/theduke/go-appkit/app"
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/users"
@@ -49,7 +50,7 @@ func (p Project) Collection() string {
 type ProjectHooks struct {
 }
 
-func (p ProjectHooks) BeforeCreate(res kit.ApiResource, obj db.Model, user kit.ApiUser) Error {
+func (p ProjectHooks) BeforeCreate(res kit.Resource, obj db.Model, user kit.User) Error {
 	log.Printf("obj: %+v\n", obj)
 	return nil
 }
@@ -83,8 +84,8 @@ func (t Todo) Collection() string {
 	return "todos"
 }
 
-func InitMigrations(app *kit.App) {
-	handler := app.GetBackend("gorm").(db.MigrationBackend).GetMigrationHandler()
+func InitMigrations(app kit.App) {
+	handler := app.Backend("gorm").(db.MigrationBackend).GetMigrationHandler()
 
 	userMigrations := users.GetUserMigrations(app)
 	handler.Add(userMigrations[0])
@@ -110,7 +111,7 @@ func InitMigrations(app *kit.App) {
 }
 
 func start() error {
-	app := kit.NewApp("")
+	app := kitapp.NewApp("")
 
 	// Build backend.
 	backend, err := sql.New("postgres", "postgres://test:test@localhost/test?sslmode=disable")
@@ -127,30 +128,27 @@ func start() error {
 	}
 	app.RegisterCache("fs", fsCache)
 
-	userHandler := users.NewUserHandler(nil)
-	app.RegisterUserHandler(userHandler)
+	userHandler := users.NewService(nil)
+	app.RegisterUserService(userHandler)
 
-	fileHandler := files.NewFileHandlerWithFs("data")
-	app.RegisterFileHandler(fileHandler)
+	fileHandler := files.NewFileServiceWithFs("data")
+	app.RegisterFileService(fileHandler)
 
 	app.RegisterResource(&Project{}, ProjectHooks{})
 	app.RegisterResource(&Todo{}, nil)
 
 	app.PrepareBackends()
 
-	app.RegisterMethod(&kit.Method{
-		Name:         "todo-count",
-		RequiresUser: false,
-		Run: func(app *kit.App, request kit.ApiRequest, unblock func()) kit.ApiResponse {
-			//todos := app.GetResource("projects")
-			//count, _ := todos.GetQuery().Last()
-			//count := 10
+	todoMethod := kitapp.NewMethod("todo-count", func(app kit.App, request kit.Request, unblock func()) kit.Response {
+		//todos := app.GetResource("projects")
+		//count, _ := todos.GetQuery().Last()
+		//count := 10
 
-			return &kit.Response{
-				Data: 22,
-			}
-		},
+		return &kit.AppResponse{
+			Data: 22,
+		}
 	})
+	app.RegisterMethod(todoMethod)
 
 	InitMigrations(app)
 

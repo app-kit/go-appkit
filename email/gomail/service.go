@@ -10,17 +10,18 @@ import(
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/email"
 	"github.com/theduke/go-appkit/utils"
+	. "github.com/theduke/go-appkit"
 )
 
 type Service struct {
-	defaultSender email.EmailRecipient
+	defaultSender EmailRecipient
 	logger *log.Logger
 
 	dialer *gomail.Dialer
 }
 
 // Ensure Service implements email.Service.
-var _ email.EmailService = (*Service)(nil)
+var _ EmailService = (*Service)(nil)
 
 func New(host string, port int, user, password, defaultSenderEmail, defaultSenderName string) *Service {
 	s := &Service{
@@ -39,11 +40,11 @@ func (s *Service) SetLogger(l *log.Logger) {
 	s.logger = l
 }
 
-func (s *Service) SetDefaultFrom(r email.EmailRecipient) {
+func (s *Service) SetDefaultFrom(r EmailRecipient) {
 	s.defaultSender = r
 }
 
-func setAddressHeader(msg *gomail.Message, name string, recipients []email.EmailRecipient) {
+func setAddressHeader(msg *gomail.Message, name string, recipients []EmailRecipient) {
 	if len(recipients) < 1 {
 		return
 	}
@@ -56,7 +57,7 @@ func setAddressHeader(msg *gomail.Message, name string, recipients []email.Email
 	msg.SetHeader(name, header...)
 }
 
-func (s Service) buildMessage(e email.Email) (*gomail.Message, []string, Error) {
+func (s Service) buildMessage(e Email) (*gomail.Message, []string, Error) {
 	msg := gomail.NewMessage()
 
 	msg.SetHeader("Subject", e.GetSubject())
@@ -102,7 +103,7 @@ func (s Service) buildMessage(e email.Email) (*gomail.Message, []string, Error) 
 	return msg, files, nil
 }
 
-func (s Service) Send(mail email.Email) Error {
+func (s Service) Send(mail Email) Error {
 	err, errs := s.SendMultiple(mail)
 	if err != nil {
 		return err
@@ -110,7 +111,7 @@ func (s Service) Send(mail email.Email) Error {
 	return errs[0]
 }
 
-func (s Service) SendMultiple(emails ...email.Email) (Error, []Error) {
+func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 	sender, err := s.dialer.Dial()
 	if err != nil {
 		return AppError{

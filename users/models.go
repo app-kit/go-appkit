@@ -5,8 +5,10 @@ import (
 	"strconv"
 	"time"
 
-	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
+
+	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 type BaseAuthItem struct {
@@ -93,10 +95,12 @@ func (u *BaseAuthItemIntID) GetUserID() string {
 type BaseUser struct {
 	Active bool `sql:"not null"`
 
-	Username string `sql:"size:100; not null; unique"`
-	Email    string `sql:"size:255; not null; unique"`
+	Username string `db:"unique;not-null"`
+	Email    string `db:"unique;not-null"`
 
 	LastLogin time.Time `jsonapi:"name=last-login"`
+
+	Data string `db:"ignore-zero;max:10000"`
 
 	CreatedAt time.Time `jsonapi:"name=created-at"`
 	UpdatedAt time.Time `jsonapi:"name=updated-at"`
@@ -117,11 +121,11 @@ func (a BaseUser) TableName() string {
 	return "users"
 }
 
-func (a BaseUser) GetProfile() kit.ApiUserProfile {
+func (a BaseUser) GetProfile() kit.UserProfile {
 	return nil
 }
 
-func (a BaseUser) SetProfile(p kit.ApiUserProfile) {
+func (a BaseUser) SetProfile(p kit.UserProfile) {
 
 }
 
@@ -159,6 +163,35 @@ func (u *BaseUser) GetLastLogin() time.Time {
 	return u.LastLogin
 }
 
+func(u *BaseUser) GetData() (interface{}, Error) {
+	if u.Data == "" {
+		return nil, nil
+	}
+	var data interface{}
+	err := json.Unmarshal([]byte(u.Data), &data)
+	if err != nil {
+		return nil, AppError{
+			Code: "json_marshal_error",
+			Message: err.Error(),
+			Internal: true,
+		}
+	}
+	return data, nil
+}
+
+func(u *BaseUser) SetData(x interface{}) Error {
+	js, err := json.Marshal(x)
+	if err != nil {
+		return AppError{
+			Code: "json_marshal_error",
+			Message: err.Error(),
+			Internal: true,
+		}
+	}
+	u.Data = string(js)
+	return nil
+}
+
 func (u *BaseUser) SetCreatedAt(x time.Time) {
 	u.CreatedAt = x
 }
@@ -179,15 +212,15 @@ func (u *BaseUser) GetUpdatedAt() time.Time {
  * RBAC methods.
  */
 
-func (u *BaseUser) GetRoles() []kit.ApiRole {
-	slice := make([]kit.ApiRole, 0)
+func (u *BaseUser) GetRoles() []kit.Role {
+	slice := make([]kit.Role, 0)
 	for _, r := range u.Roles {
 		slice = append(slice, r)
 	}
 	return slice
 }
 
-func (u *BaseUser) AddRole(r kit.ApiRole) {
+func (u *BaseUser) AddRole(r kit.Role) {
 	if u.Roles == nil {
 		u.Roles = make([]*Role, 0)
 	}
@@ -196,7 +229,7 @@ func (u *BaseUser) AddRole(r kit.ApiRole) {
 	}
 }
 
-func (u *BaseUser) RemoveRole(r kit.ApiRole) {
+func (u *BaseUser) RemoveRole(r kit.Role) {
 	if u.Roles == nil {
 		return
 	}
@@ -212,7 +245,7 @@ func (u *BaseUser) ClearRoles() {
 	u.Roles = make([]*Role, 0)
 }
 
-func (u *BaseUser) HasRole(r kit.ApiRole) bool {
+func (u *BaseUser) HasRole(r kit.Role) bool {
 	return u.HasRoleStr(r.GetName())
 }
 
@@ -430,6 +463,14 @@ func (r *Role) SetID(n string) error {
 	return nil
 }
 
+func (r *Role) GetPermissions() []kit.Permission {
+	perms := make([]kit.Permission, 0)
+	for _, p := range r.Permissions {
+		perms = append(perms, p)
+	}
+	return perms
+}
+
 /**
  * Permission.
  */
@@ -474,11 +515,11 @@ type BaseUserModelStrID struct {
 	userID string
 }
 
-func (m *BaseUserModelStrID) User() kit.ApiUser {
+func (m *BaseUserModelStrID) User() kit.User {
 	return m.user
 }
 
-func (m *BaseUserModelStrID) SetUser(x kit.ApiUser) {
+func (m *BaseUserModelStrID) SetUser(x kit.User) {
 	m.user = x.(*BaseUserStrID)
 	m.SetUserID(x.GetID())
 }
@@ -499,11 +540,11 @@ type BaseUserModelIntID struct {
 	userID uint64
 }
 
-func (m *BaseUserModelIntID) User() kit.ApiUser {
+func (m *BaseUserModelIntID) User() kit.User {
 	return m.user
 }
 
-func (m *BaseUserModelIntID) SetUser(x kit.ApiUser) {
+func (m *BaseUserModelIntID) SetUser(x kit.User) {
 	m.user = x.(*BaseUserIntID)
 	m.SetUserID(x.GetID())
 }

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
 func FileExists(path string) (bool, error) {
@@ -68,8 +68,8 @@ type Fs struct {
 	path string
 }
 
-// Ensure Fs implements the ApiFileBackend interface.
-var _ kit.ApiFileBackend = (*Fs)(nil)
+// Ensure Fs implements the FileBackend interface.
+var _ kit.FileBackend = (*Fs)(nil)
 
 func New(path string) (*Fs, Error) {
 	fs := &Fs{
@@ -157,7 +157,7 @@ func (fs Fs) HasBucket(bucket string) (bool, Error) {
 	}
 }
 
-func (fs Fs) CreateBucket(bucket string, _ kit.ApiBucketConfig) Error {
+func (fs Fs) CreateBucket(bucket string, _ kit.BucketConfig) Error {
 	if err := os.Mkdir(fs.bucketPath(bucket), 0777); err != nil {
 		return AppError{
 			Code:    "create_bucket_failed",
@@ -179,12 +179,12 @@ func (fs Fs) DeleteBucket(bucket string) Error {
 	return nil
 }
 
-func (fs Fs) BucketConfig(string) kit.ApiBucketConfig {
+func (fs Fs) BucketConfig(string) kit.BucketConfig {
 	// FS does not support any bucket configuration.
 	return nil
 }
 
-func (fs Fs) ConfigureBucket(string, kit.ApiBucketConfig) Error {
+func (fs Fs) ConfigureBucket(string, kit.BucketConfig) Error {
 	// FS does not support any bucket configuration.
 	return nil
 }
@@ -252,7 +252,7 @@ func (fs Fs) FileIDs(bucket string) ([]string, Error) {
 	return ids, nil
 }
 
-func (fs Fs) HasFile(f kit.ApiFile) (bool, Error) {
+func (fs Fs) HasFile(f kit.File) (bool, Error) {
 	return fs.HasFileById(f.GetBucket(), f.GetFullName())
 }
 
@@ -267,7 +267,7 @@ func (fs Fs) HasFileById(bucket, id string) (bool, Error) {
 	}
 }
 
-func (fs Fs) DeleteFile(f kit.ApiFile) Error {
+func (fs Fs) DeleteFile(f kit.File) Error {
 	return fs.DeleteFileById(f.GetBucket(), f.GetFullName())
 }
 
@@ -283,7 +283,7 @@ func (fs Fs) DeleteFileById(bucket, id string) Error {
 	return nil
 }
 
-func (fs Fs) Reader(f kit.ApiFile) (io.ReadCloser, Error) {
+func (fs Fs) Reader(f kit.File) (io.ReadCloser, Error) {
 	return fs.ReaderById(f.GetBucket(), f.GetBackendID())
 }
 
@@ -304,7 +304,7 @@ func (fs Fs) ReaderById(bucket, id string) (io.ReadCloser, Error) {
 	return f, nil
 }
 
-func (fs Fs) Writer(f kit.ApiFile, create bool) (string, io.WriteCloser, Error) {
+func (fs Fs) Writer(f kit.File, create bool) (string, io.WriteCloser, Error) {
 	return fs.WriterById(f.GetBucket(), f.GetFullName(), create)
 }
 

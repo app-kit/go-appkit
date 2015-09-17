@@ -8,6 +8,7 @@ import(
 	"encoding/json"
 
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/caches"
 	"github.com/theduke/go-appkit/utils"
 )
@@ -17,7 +18,7 @@ type Fs struct {
 }
 
 // Ensure redis implements the Cache interface.
-var _ Cache = (*Fs)(nil)
+var _ kit.Cache = (*Fs)(nil)
 
 func fsErr(err error) Error {
 	return AppError{
@@ -65,7 +66,7 @@ func (fs *Fs) keyMetaPath(key string) string {
 }
 
 // Save a new item into the cache.
-func(fs *Fs) Set(item CacheItem) Error {
+func(fs *Fs) Set(item kit.CacheItem) Error {
 	key := fs.key(item.GetKey())
 	if key == "" {
 		return AppError{Code: "empty_key"}
@@ -126,8 +127,8 @@ func(fs *Fs) SetString(key string, value string, expiresAt *time.Time, tags []st
 }
 
 // Retrieve a cache item from the cache.
-func(fs *Fs) Get(key string, items ...CacheItem) (CacheItem, Error) {
-	var item CacheItem = &StrItem{}
+func(fs *Fs) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
+	var item kit.CacheItem = &StrItem{}
 	if items != nil {
 		if len(items) != 1 {
 			return nil, AppError{

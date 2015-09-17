@@ -1,4 +1,4 @@
-package appkit
+package app
 
 import (
 	"encoding/json"
@@ -9,20 +9,45 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
 type Method struct {
-	Name         string
-	RequiresUser bool
-	Run          func(a *App, r ApiRequest, unblock func()) ApiResponse
+	name         string
+	isBlocking bool
+	requiresUser bool
+	run          func(a kit.App, r kit.Request, unblock func()) kit.Response
+}
+
+func NewMethod(name string, run func(a kit.App, r kit.Request, unblock func()) kit.Response) *Method {
+	return &Method{
+		name: name,
+		run: run,
+	}
+}
+
+func (m Method) Name() string {
+	return m.name
+}
+
+func (m Method) IsBlocking() bool {
+	return m.isBlocking
+}
+
+func (m Method) RequiresUser() bool {
+	return m.requiresUser
+}
+
+func (m Method) Run(a kit.App, r kit.Request, unblock func()) kit.Response {
+	return m.run(a, r, unblock)
 }
 
 type methodInstance struct {
-	method *Method
+	method kit.Method
 
-	request ApiRequest
+	request kit.Request
 
-	responder func(ApiResponse)
+	responder func(kit.Response)
 
 	createdAt  time.Time
 	startedAt  time.Time
@@ -34,12 +59,12 @@ type methodInstance struct {
 	stale   bool
 }
 
-func NewMethodInstance(m *Method, r ApiRequest, responder func(ApiResponse)) *methodInstance {
+func NewMethodInstance(m kit.Method, r kit.Request, responder func(kit.Response)) *methodInstance {
 	return &methodInstance{
 		method:    m,
 		request:   r,
 		responder: responder,
-		blocked:   true,
+		blocked:   m.IsBlocking(),
 		stale:     false,
 	}
 }
@@ -204,7 +229,7 @@ func (m *methodQueue) Process() {
 			rawErr := recover()
 			if rawErr != nil {
 				// Panic occurred, finish with error response.
-				resp := &Response{
+				resp := &kit.AppResponse{
 					Error: AppError{
 						Code: "method_panic",
 					},
@@ -226,7 +251,7 @@ func (m *methodQueue) Process() {
 	}(next)
 }
 
-func (m *methodQueue) Finish(method *methodInstance, response ApiResponse) {
+func (m *methodQueue) Finish(method *methodInstance, response kit.Response) {
 	// Send the response.
 
 	// Recover a panic in the responder.
@@ -266,7 +291,7 @@ type SessionManager struct {
 
 	sync.Mutex
 
-	queues map[ApiSession]*methodQueue
+	queues map[kit.Session]*methodQueue
 
 	maxQueued    int
 	maxRunning   int
@@ -280,19 +305,19 @@ type SessionManager struct {
 func NewSessionManager(app *App) *SessionManager {
 	return &SessionManager{
 		app:    app,
-		queues: make(map[ApiSession]*methodQueue),
+		queues: make(map[kit.Session]*methodQueue),
 
-		maxQueued:    app.Config.UInt("methods.maxQueued", 30),
-		maxRunning:   app.Config.UInt("methods.maxRunning", 5),
-		maxPerMinute: app.Config.UInt("methods.maxPerMinute", 100),
-		timeout:      app.Config.UInt("methods.timeout", 30),
+		maxQueued:    app.Config().UInt("methods.maxQueued", 30),
+		maxRunning:   app.Config().UInt("methods.maxRunning", 5),
+		maxPerMinute: app.Config().UInt("methods.maxPerMinute", 100),
+		timeout:      app.Config().UInt("methods.timeout", 30),
 
-		sessionTimeout: app.Config.UInt("sessions.sessionTimeout", 60*4),
-		pruneInterval:  app.Config.UInt("sessions.pruneInterval", 60*5),
+		sessionTimeout: app.Config().UInt("sessions.sessionTimeout", 60*4),
+		pruneInterval:  app.Config().UInt("sessions.pruneInterval", 60*5),
 	}
 }
 
-func (m *SessionManager) QueueMethod(session ApiSession, method *methodInstance) Error {
+func (m *SessionManager) QueueMethod(session kit.Session, method *methodInstance) Error {
 	queue := m.queues[session]
 	if queue == nil {
 		m.Lock()
@@ -327,13 +352,13 @@ func (m *SessionManager) Run() {
 }
 
 type ResourceMethodData struct {
-	Resource ApiResource
+	Resource kit.Resource
 	Objects  []db.Model
 	IDs      []string
 	Query    *db.Query
 }
 
-func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData, Error) {
+func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodData, Error) {
 	if data, ok := rawData.(ResourceMethodData); ok {
 		return &data, nil
 	}
@@ -356,7 +381,7 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 		}
 	}
 
-	resource := app.GetResource(resourceName)
+	resource := app.Resource(resourceName)
 	if resource == nil {
 		return nil, AppError{
 			Code:    "unknown_resource",
@@ -438,22 +463,22 @@ func buildResourceMethodData(app *App, rawData interface{}) (*ResourceMethodData
 	return methodData, nil
 }
 
-func createMethod() *Method {
+func createMethod() kit.Method {
 	return &Method{
-		Name: "create",
-		Run: func(a *App, r ApiRequest, unblock func()) ApiResponse {
+		name: "create",
+		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
 			methodData, err := buildResourceMethodData(a, r.GetData())
 			if err != nil {
-				return &Response{
+				return &kit.AppResponse{
 					Error: err,
 				}
 			}
 
 			if methodData.Objects == nil || len(methodData.Objects) < 1 {
-				return NewErrorResponse("no_objects", "No objects sent in data.objects")
+				return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
 			}
 			if len(methodData.Objects) != 1 {
-				return NewErrorResponse("only_one_object_allowed", "")
+				return kit.NewErrorResponse("only_one_object_allowed", "")
 			}
 
 			return methodData.Resource.ApiCreate(methodData.Objects[0], r)
@@ -461,22 +486,22 @@ func createMethod() *Method {
 	}
 }
 
-func updateMethod() *Method {
+func updateMethod() kit.Method {
 	return &Method{
-		Name: "update",
-		Run: func(a *App, r ApiRequest, unblock func()) ApiResponse {
+		name: "update",
+		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
 			methodData, err := buildResourceMethodData(a, r.GetData())
 			if err != nil {
-				return &Response{
+				return &kit.AppResponse{
 					Error: err,
 				}
 			}
 
 			if methodData.Objects == nil || len(methodData.Objects) < 1 {
-				return NewErrorResponse("no_objects", "No objects sent in data.objects")
+				return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
 			}
 			if len(methodData.Objects) != 1 {
-				return NewErrorResponse("only_one_object_allowed", "")
+				return kit.NewErrorResponse("only_one_object_allowed", "")
 			}
 
 			return methodData.Resource.ApiUpdate(methodData.Objects[0], r)
@@ -484,22 +509,22 @@ func updateMethod() *Method {
 	}
 }
 
-func deleteMethod() *Method {
+func deleteMethod() kit.Method {
 	return &Method{
-		Name: "delete",
-		Run: func(a *App, r ApiRequest, unblock func()) ApiResponse {
+		name: "delete",
+		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
 			methodData, err := buildResourceMethodData(a, r.GetData())
 			if err != nil {
-				return &Response{
+				return &kit.AppResponse{
 					Error: err,
 				}
 			}
 
 			if methodData.IDs == nil || len(methodData.IDs) < 1 {
-				return NewErrorResponse("no_ids", "No ids sent in data.ids")
+				return kit.NewErrorResponse("no_ids", "No ids sent in data.ids")
 			}
 			if len(methodData.IDs) != 1 {
-				return NewErrorResponse("only_one_object_allowed", "")
+				return kit.NewErrorResponse("only_one_object_allowed", "")
 			}
 
 			return methodData.Resource.ApiDelete(methodData.IDs[0], r)
@@ -507,19 +532,19 @@ func deleteMethod() *Method {
 	}
 }
 
-func queryMethod() *Method {
+func queryMethod() kit.Method {
 	return &Method{
-		Name: "query",
-		Run: func(a *App, r ApiRequest, unblock func()) ApiResponse {
+		name: "query",
+		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
 			methodData, err := buildResourceMethodData(a, r.GetData())
 			if err != nil {
-				return &Response{
+				return &kit.AppResponse{
 					Error: err,
 				}
 			}
 
 			if methodData.Query == nil {
-				return NewErrorResponse("no_query", "No query sent")
+				return kit.NewErrorResponse("no_query", "No query sent")
 			}
 
 			return methodData.Resource.ApiFind(methodData.Query, r)

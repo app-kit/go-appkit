@@ -1,9 +1,10 @@
 package auth
 
 import (
-	"errors"
-
 	"golang.org/x/crypto/bcrypt"
+
+	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 func GetStringFromMap(rawData interface{}, field string) (string, bool) {
@@ -26,15 +27,18 @@ func (a AuthAdaptorPassword) GetName() string {
 	return "password"
 }
 
-func (a AuthAdaptorPassword) BuildData(rawData interface{}) (interface{}, error) {
+func (a AuthAdaptorPassword) BuildData(user kit.User, rawData interface{}) (interface{}, Error) {
 	pw, _ := GetStringFromMap(rawData, "password")
 	if pw == "" {
-		return nil, errors.New("invalid_data")
+		return nil, AppError{Code:"invalid_data"}
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), 10)
 	if err != nil {
-		return nil, err
+		return nil, AppError{
+			Code: "hash_error",
+			Message: err.Error(),
+		}
 	}
 
 	data := map[string]interface{}{
@@ -44,14 +48,14 @@ func (a AuthAdaptorPassword) BuildData(rawData interface{}) (interface{}, error)
 	return interface{}(data), nil
 }
 
-func (a AuthAdaptorPassword) Authenticate(rawData, rawCheckable interface{}) (bool, error) {
+func (a AuthAdaptorPassword) Authenticate(user kit.User, rawData, rawCheckable interface{}) (bool, Error) {
 	hash, _ := GetStringFromMap(rawData, "hash")
 	pw, _ := GetStringFromMap(rawCheckable, "password")
 
 	if hash == "" || pw == "" {
-		return false, errors.New("invalid_data")
+		return false, AppError{Code: "invalid_data"}
 	}
 
 	err := bcrypt.CompareHashAndPassword([]byte(hash), []byte(pw))
-	return err == nil, err
+	return err == nil, nil
 }

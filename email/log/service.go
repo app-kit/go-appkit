@@ -4,23 +4,23 @@ package log
 import(
 	log "github.com/Sirupsen/logrus"
 
-	"github.com/theduke/go-appkit/email"
 	. "github.com/theduke/go-appkit/error"
+	. "github.com/theduke/go-appkit"
 )
 
 type Service struct {
 	logger *log.Logger
-	defaultSender email.EmailRecipient
+	defaultSender EmailRecipient
 }
 
-func New(logger *log.Logger, defaultSender email.EmailRecipient) *Service {
+func New(logger *log.Logger, defaultSender EmailRecipient) *Service {
 	return &Service{
 		logger: logger,
 		defaultSender: defaultSender,
 	}
 }
 
-func (s *Service) SetDefaultFrom(r email.EmailRecipient) {
+func (s *Service) SetDefaultFrom(r EmailRecipient) {
 	s.defaultSender = r
 }
 
@@ -29,7 +29,7 @@ func (s *Service) SetLogger(l *log.Logger) {
 	s.logger = l
 }
 
-func (s Service) Send(e email.Email) Error {
+func (s Service) Send(e Email) Error {
 	err, errs := s.SendMultiple(e)
 	if err != nil {
 		return err
@@ -37,7 +37,7 @@ func (s Service) Send(e email.Email) Error {
 	return errs[0]
 }
 
-func (s Service) SendMultiple(emails ...email.Email) (Error, []Error) {
+func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 	for _, e := range emails {
 		from := e.GetFrom().GetEmail()
 		if from == "" {
