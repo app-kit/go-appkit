@@ -21,6 +21,8 @@ import (
 	"github.com/theduke/go-appkit/email"
 	"github.com/theduke/go-appkit/email/gomail"
 	emaillog "github.com/theduke/go-appkit/email/log"
+
+	"github.com/theduke/go-appkit/templateengines"
 )
 
 type App struct {
@@ -38,6 +40,8 @@ type App struct {
 	caches map[string]caches.Cache
 
 	emailService email.EmailService
+
+	templateEngine templateengines.TemplateEngine
 
 	resources   map[string]ApiResource
 	userHandler ApiUserHandler
@@ -371,6 +375,18 @@ func (a *App) RegisterEmailService(s email.EmailService) {
 
 func (a *App) EmailService() email.EmailService {
 	return a.emailService
+}
+
+/** 
+ * TemplateEngine.
+ */
+
+func (a *App) RegisterTemplateEngine(e templateengines.TemplateEngine) {
+	a.templateEngine = e
+}
+
+func (a *App) TemplateEngine() templateengines.TemplateEngine {
+	return a.templateEngine
 }
 
 /**
