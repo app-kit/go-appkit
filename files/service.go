@@ -7,10 +7,10 @@ import (
 	"os"
 	"strings"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/resources"
+	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/files/backends/fs"
+	"github.com/theduke/go-appkit/resources"
 	db "github.com/theduke/go-dukedb"
 )
 

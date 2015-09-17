@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 func FileExists(path string) (bool, error) {

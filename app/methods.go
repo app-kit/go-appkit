@@ -8,13 +8,13 @@ import (
 
 	db "github.com/theduke/go-dukedb"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 type Method struct {
 	name         string
-	isBlocking bool
+	isBlocking   bool
 	requiresUser bool
 	run          func(a kit.App, r kit.Request, unblock func()) kit.Response
 }
@@ -22,7 +22,7 @@ type Method struct {
 func NewMethod(name string, run func(a kit.App, r kit.Request, unblock func()) kit.Response) *Method {
 	return &Method{
 		name: name,
-		run: run,
+		run:  run,
 	}
 }
 

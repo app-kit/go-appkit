@@ -1,27 +1,27 @@
 package crawler
 
-import(
-	"sync"
+import (
 	"net/http"
 	"net/url"
-	"strings"
 	"regexp"
+	"strings"
+	"sync"
 
-	"github.com/Sirupsen/logrus"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/Sirupsen/logrus"
 )
 
 type CrawlItem struct {
-	Url string
+	Url     string
 	Retries int
-	Result Result
+	Result  Result
 }
 
-type Result struct{
+type Result struct {
 	// The final (possibly redirected) url.
 	Url string
 
-	Error error
+	Error    error
 	CanRetry bool
 
 	Urls []string
@@ -31,20 +31,20 @@ type Crawler struct {
 	sync.Mutex
 
 	ConcurrentRequests int
-	MaxRetries int
-	
+	MaxRetries         int
+
 	AllowCrawlPatterns []*regexp.Regexp
 
 	Logger *logrus.Logger
 
 	Client *http.Client
 
-	itemQueue []*CrawlItem
+	itemQueue   []*CrawlItem
 	crawledUrls map[string]bool
 	pendingUrls map[string]bool
 
 	activeRequests int
-	resultChannel chan *CrawlItem
+	resultChannel  chan *CrawlItem
 }
 
 func New(concurrentRequests int, hosts []string, startUrls []string) *Crawler {
@@ -56,7 +56,7 @@ func New(concurrentRequests int, hosts []string, startUrls []string) *Crawler {
 
 		Client: &http.Client{},
 
-		itemQueue: make([]*CrawlItem, 0),
+		itemQueue:   make([]*CrawlItem, 0),
 		crawledUrls: make(map[string]bool),
 		pendingUrls: make(map[string]bool),
 
@@ -107,7 +107,7 @@ func (c *Crawler) AddUrl(url string) {
 func (c *Crawler) Run() {
 	for {
 		select {
-		case item := <- c.resultChannel:
+		case item := <-c.resultChannel:
 			c.activeRequests -= 1
 			delete(c.pendingUrls, item.Url)
 
@@ -181,7 +181,7 @@ func normalizeUrl(response *http.Response, rawUrl string) string {
 	return rawUrl
 }
 
-func (c *Crawler) crawlItem(item  *CrawlItem) {
+func (c *Crawler) crawlItem(item *CrawlItem) {
 	c.activeRequests += 1
 	go func() {
 		resp, err := c.Client.Get(item.Url)
@@ -209,14 +209,14 @@ func (c *Crawler) crawlItem(item  *CrawlItem) {
 		doc.Find("a").Each(func(i int, a *goquery.Selection) {
 			href, ok := a.Attr("href")
 			if ok {
-		    url := normalizeUrl(resp, href)
-		    if url != "" {
-		    	urls = append(urls, url)
-		    }
+				url := normalizeUrl(resp, href)
+				if url != "" {
+					urls = append(urls, url)
+				}
 			}
-	  })
-	  item.Result.Urls = urls
+		})
+		item.Result.Urls = urls
 
-	  c.resultChannel <- item
+		c.resultChannel <- item
 	}()
 }

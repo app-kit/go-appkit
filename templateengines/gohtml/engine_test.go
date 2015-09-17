@@ -25,7 +25,7 @@ var _ = Describe("Engine", func() {
 	It("Should .Get()", func() {
 		t, _ := engine.Build("tpl1", tpl1)
 		Expect(engine.Get("tpl1")).To(Equal(t))
-	})	
+	})
 
 	It("Should .BuildAndRender()", func() {
 		output, err := engine.BuildAndRender("tpl1", tpl1, map[string]interface{}{"var": "test"})

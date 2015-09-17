@@ -1,11 +1,11 @@
 package appkit
 
-import(
+import (
+	"encoding/json"
+	"fmt"
 	"io"
 	"io/ioutil"
-	"encoding/json"
 	"net/http"
-	"fmt"
 
 	. "github.com/theduke/go-appkit/error"
 )
@@ -15,7 +15,7 @@ type AppRequest struct {
 	Meta    Context
 	Data    interface{}
 
-	User User
+	User    User
 	Session Session
 }
 
@@ -26,7 +26,6 @@ func NewRequest() *AppRequest {
 
 	return &r
 }
-
 
 func (r *AppRequest) BuildFromJsonBody(request *http.Request) Error {
 	// Read request body.
@@ -106,13 +105,13 @@ func (r *AppRequest) SetData(x interface{}) {
 }
 
 type AppResponse struct {
-	Error Error
+	Error      Error
 	HttpStatus int
 
-	Meta  map[string]interface{}
+	Meta map[string]interface{}
 
-	Data  interface{}
-	RawData []byte
+	Data          interface{}
+	RawData       []byte
 	RawDataReader io.ReadCloser
 }
 
@@ -144,7 +143,7 @@ func (r *AppResponse) SetData(data interface{}) {
 	r.Data = data
 }
 
-func (r *AppResponse)  GetRawData() []byte {
+func (r *AppResponse) GetRawData() []byte {
 	return r.RawData
 }
 
@@ -186,8 +185,8 @@ func (r *AppHttpRoute) Handler() RequestHandler {
 
 func NewHttpRoute(route, method string, handler RequestHandler) *AppHttpRoute {
 	return &AppHttpRoute{
-		route: route,
-		method: method,
+		route:   route,
+		method:  method,
 		handler: handler,
 	}
 }

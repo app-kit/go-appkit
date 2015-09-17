@@ -17,7 +17,7 @@ var _ = Describe("Redis", func() {
 	if err != nil {
 		panic(err)
 	}
-	
+
 	It("Should create", func() {
 		_, err := fs.New(tmpDir)
 		Expect(err).ToNot(HaveOccurred())

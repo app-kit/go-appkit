@@ -7,8 +7,8 @@ import (
 
 	db "github.com/theduke/go-dukedb"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 func randomToken() string {
@@ -35,7 +35,7 @@ func randomToken() string {
 }
 
 type SessionResourceHooks struct {
-	UpdateAllowed bool
+	UpdateAllowed    bool
 	ApiDeleteAllowed bool
 }
 

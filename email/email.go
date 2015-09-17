@@ -1,17 +1,17 @@
 package email
 
-import(
+import (
 	"io"
 	"io/ioutil"
 
+	. "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/utils"
-	. "github.com/theduke/go-appkit"
 )
 
 type Recipient struct {
 	Email string
-	Name string
+	Name  string
 }
 
 // Ensure Recipient implements EmailRecipient.
@@ -27,8 +27,8 @@ func (r Recipient) GetName() string {
 
 type Part struct {
 	MimeType string
-	Content []byte
-	Reader io.ReadCloser
+	Content  []byte
+	Reader   io.ReadCloser
 	FilePath string
 }
 
@@ -61,12 +61,12 @@ func (p *Part) SetFilePath(path string) {
 
 type Mail struct {
 	From Recipient
-	To []Recipient
-	Cc []Recipient
-	Bcc []Recipient
+	To   []Recipient
+	Cc   []Recipient
+	Bcc  []Recipient
 
-	BodyParts []*Part
-	Attachments []*Part
+	BodyParts           []*Part
+	Attachments         []*Part
 	EmbeddedAttachments []*Part
 
 	Headers map[string][]string
@@ -106,7 +106,7 @@ func (e *Mail) GetFrom() EmailRecipient {
 }
 
 func (e *Mail) AddTo(email, name string) {
-	e.To = append(e.To, Recipient{Email: email, Name: name})	
+	e.To = append(e.To, Recipient{Email: email, Name: name})
 }
 
 func (e *Mail) GetTo() []EmailRecipient {
@@ -114,7 +114,7 @@ func (e *Mail) GetTo() []EmailRecipient {
 }
 
 func (e *Mail) AddCc(email, name string) {
-	e.Cc = append(e.Cc, Recipient{Email: email, Name: name})	
+	e.Cc = append(e.Cc, Recipient{Email: email, Name: name})
 }
 
 func (e *Mail) GetCc() []EmailRecipient {
@@ -122,7 +122,7 @@ func (e *Mail) GetCc() []EmailRecipient {
 }
 
 func (e *Mail) AddBcc(email, name string) {
-	e.Bcc = append(e.Bcc, Recipient{Email: email, Name: name})	
+	e.Bcc = append(e.Bcc, Recipient{Email: email, Name: name})
 }
 
 func (e *Mail) GetBcc() []EmailRecipient {

@@ -30,13 +30,13 @@ func (a AuthAdaptorPassword) GetName() string {
 func (a AuthAdaptorPassword) BuildData(user kit.User, rawData interface{}) (interface{}, Error) {
 	pw, _ := GetStringFromMap(rawData, "password")
 	if pw == "" {
-		return nil, AppError{Code:"invalid_data"}
+		return nil, AppError{Code: "invalid_data"}
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), 10)
 	if err != nil {
 		return nil, AppError{
-			Code: "hash_error",
+			Code:    "hash_error",
 			Message: err.Error(),
 		}
 	}

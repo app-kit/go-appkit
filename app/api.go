@@ -1,34 +1,34 @@
 package app
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"html/template"
 	"io"
 	"io/ioutil"
 	"net/http"
-	"strings"
-	"html/template"
 	"os"
-	"runtime"
-	"path"
 	"os/exec"
+	"path"
 	"regexp"
+	"runtime"
 	"strconv"
+	"strings"
 	"time"
-	"bytes"
 
 	log "github.com/Sirupsen/logrus"
-	"github.com/twinj/uuid"
 	"github.com/julienschmidt/httprouter"
+	"github.com/twinj/uuid"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/utils"
 	"github.com/theduke/go-appkit/caches"
+	. "github.com/theduke/go-appkit/error"
+	"github.com/theduke/go-appkit/utils"
 )
 
 type HttpHandlerStruct struct {
-	App kit.App
+	App     kit.App
 	Handler kit.RequestHandler
 }
 
@@ -36,7 +36,6 @@ func (h *HttpHandlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	params := new(httprouter.Params)
 	httpHandler(w, r, *params, h.App, h.Handler)
 }
-
 
 func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	url := r.GetContext().MustGet("httpRequest").(*http.Request).URL
@@ -79,7 +78,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 
 			return &kit.AppResponse{
 				HttpStatus: int(status),
-				RawData: []byte(data),
+				RawData:    []byte(data),
 			}
 		}
 	}
@@ -92,8 +91,8 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 		if err := os.MkdirAll(tmpDir, 0777); err != nil {
 			return &kit.AppResponse{
 				Error: AppError{
-					Code: "create_tmp_dir_failed",
-					Message: fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
+					Code:     "create_tmp_dir_failed",
+					Message:  fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
 					Internal: true,
 				},
 			}
@@ -101,7 +100,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	}
 
 	// Build a unique file name.
-	filePath := path.Join(tmpDir, uuid.NewV4().String() + ".html")
+	filePath := path.Join(tmpDir, uuid.NewV4().String()+".html")
 
 	// Execute phantom js.
 
@@ -112,25 +111,25 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	start := time.Now()
 
 	phantomPath := app.Config().UString("serverRenderer.phantomJsPath", "phantomjs")
-	
+
 	args := []string{
 		"--web-security=false",
-		"--local-to-remote-url-access=true", 
-		scriptPath, 
-		"10", 
-		strUrl, 
+		"--local-to-remote-url-access=true",
+		scriptPath,
+		"10",
+		strUrl,
 		filePath,
-	}	
+	}
 	result, err := exec.Command(phantomPath, args...).CombinedOutput()
 	if err != nil {
 		app.Logger().Errorf("Phantomjs execution error: %v", string(result))
 
 		return &kit.AppResponse{
 			Error: AppError{
-				Code: "phantom_execution_failed",
-				Message: err.Error(),
-				Data: result,
-				Errors: []error{err},
+				Code:     "phantom_execution_failed",
+				Message:  err.Error(),
+				Data:     result,
+				Errors:   []error{err},
 				Internal: true,
 			},
 		}
@@ -139,7 +138,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	// Get time taken as milliseconds.
 	timeTaken := int(time.Now().Sub(start) / time.Millisecond)
 	app.Logger().WithFields(log.Fields{
-		"action": "phantomjs_render",
+		"action":       "phantomjs_render",
 		"milliseconds": timeTaken,
 	}).Debugf("Rendered url %v with phantomjs", url)
 
@@ -161,19 +160,19 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 		lifetime := app.Config().UInt("serverRenderer.cacheLiftetime", 3600)
 
 		err := cache.Set(&caches.StrItem{
-			Key: cacheKey,
-			Value: string(content),
-			Tags: []string{strconv.FormatInt(int64(status), 10)},
+			Key:       cacheKey,
+			Value:     string(content),
+			Tags:      []string{strconv.FormatInt(int64(status), 10)},
 			ExpiresAt: time.Now().Add(time.Duration(lifetime) * time.Second),
 		})
 		if err != nil {
-			app.Logger().Errorf("serverRenderer: Cache persist error: %v",  err)
+			app.Logger().Errorf("serverRenderer: Cache persist error: %v", err)
 		}
 	}
 
 	return &kit.AppResponse{
 		HttpStatus: status,
-		RawData: content,
+		RawData:    content,
 	}
 }
 
@@ -211,7 +210,7 @@ func defaultNotFoundTpl() *template.Template {
 	</html>
 	`
 
-	t, _ := template.New("error").Parse(tpl)	
+	t, _ := template.New("error").Parse(tpl)
 	return t
 }
 
@@ -220,7 +219,7 @@ func getIndexTpl(app kit.App) ([]byte, Error) {
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, AppError{
-				Code: "cant_open_index_tpl",
+				Code:    "cant_open_index_tpl",
 				Message: fmt.Sprintf("The index template at %v could not be opened: %v", path, err),
 			}
 		}
@@ -228,7 +227,7 @@ func getIndexTpl(app kit.App) ([]byte, Error) {
 		tpl, err := ioutil.ReadAll(f)
 		if err != nil {
 			return nil, AppError{
-				Code: "index_tpl_read_error",
+				Code:    "index_tpl_read_error",
 				Message: fmt.Sprintf("Could not read index template at %v: %v", path, err),
 			}
 		}
@@ -284,7 +283,7 @@ func notFoundHandler(app kit.App, r kit.Request) (kit.Response, bool) {
 	// For api requests, render the api not found error.
 	return &kit.AppResponse{
 		Error: AppError{
-			Code: "not_found",
+			Code:    "not_found",
 			Message: "This api route does not exist",
 		},
 	}, false
@@ -485,7 +484,7 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 	apiPrefix := "/" + app.Config().UString("api.prefix", "api")
 	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
 
-	response.SetHttpStatus(500)	
+	response.SetHttpStatus(500)
 
 	data := map[string]interface{}{"errors": []error{response.GetError()}}
 
@@ -535,19 +534,19 @@ func RequestLoggerMiddleware(app kit.App, r kit.Request, response kit.Response) 
 	// Log the request.
 	if response.GetError() != nil {
 		app.Logger().WithFields(log.Fields{
-			"action": "request",
-			"method": method,
-			"url": url.String(),
-			"status": response.GetHttpStatus(),
-			"err": response.GetError(),
+			"action":       "request",
+			"method":       method,
+			"url":          url.String(),
+			"status":       response.GetHttpStatus(),
+			"err":          response.GetError(),
 			"milliseconds": timeTaken,
 		}).Errorf("%v: %v - %v - %v", response.GetHttpStatus(), method, url, response.GetError())
 	} else {
 		app.Logger().WithFields(log.Fields{
-			"action": "request",
-			"method": method,
-			"url": url.String(),
-			"status": response.GetHttpStatus(),
+			"action":       "request",
+			"method":       method,
+			"url":          url.String(),
+			"status":       response.GetHttpStatus(),
 			"milliseconds": timeTaken,
 		}).Debugf("%v: %v - %v", response.GetHttpStatus(), method, url)
 	}

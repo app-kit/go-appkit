@@ -1,14 +1,14 @@
 package redis
 
-import(
-	"time"
+import (
 	"strings"
+	"time"
 
 	"github.com/garyburd/redigo/redis"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/caches"
+	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/utils"
 )
 
@@ -20,8 +20,8 @@ type Config struct {
 
 	// Prefix under which all keys will be stored.
 	Prefix string
-	
-	// Maximum number of idle connections in the connection pool.	
+
+	// Maximum number of idle connections in the connection pool.
 	MaxIdleConnections int
 
 	// Timeout for idle connections in the pool in seconds.
@@ -40,7 +40,7 @@ type Config struct {
 
 type Redis struct {
 	config Config
-	pool *redis.Pool
+	pool   *redis.Pool
 }
 
 // Ensure redis implements the Cache interface.
@@ -48,9 +48,9 @@ var _ kit.Cache = (*Redis)(nil)
 
 func redisErr(err error) Error {
 	return AppError{
-		Code: "redis_error",
-		Message: err.Error(),
-		Errors: []error{err},
+		Code:     "redis_error",
+		Message:  err.Error(),
+		Errors:   []error{err},
 		Internal: true,
 	}
 }
@@ -82,28 +82,28 @@ func New(conf Config) (*Redis, Error) {
 
 func (r *Redis) buildPool() {
 	r.pool = &redis.Pool{
-    MaxIdle: r.config.MaxIdleConnections,
-    IdleTimeout: time.Duration(r.config.IdleConnectionTimeout) * time.Second,
-    MaxActive: r.config.MaxActiveConnections,
-    Wait: r.config.WaitForConnection,
-    Dial: func () (redis.Conn, error) {
-        c, err := redis.Dial("tcp", r.config.Address, r.config.DialOptions...)
-        if err != nil {
-            return nil, err
-        }
-        if r.config.Password != "" {
-	        if _, err := c.Do("AUTH", r.config.Password); err != nil {
-	            c.Close()
-	            return nil, err
-	        }
-        }
-        return c, err
-    },
-    TestOnBorrow: func(c redis.Conn, t time.Time) error {
-        _, err := c.Do("PING")
-        return err
-    },
-  }
+		MaxIdle:     r.config.MaxIdleConnections,
+		IdleTimeout: time.Duration(r.config.IdleConnectionTimeout) * time.Second,
+		MaxActive:   r.config.MaxActiveConnections,
+		Wait:        r.config.WaitForConnection,
+		Dial: func() (redis.Conn, error) {
+			c, err := redis.Dial("tcp", r.config.Address, r.config.DialOptions...)
+			if err != nil {
+				return nil, err
+			}
+			if r.config.Password != "" {
+				if _, err := c.Do("AUTH", r.config.Password); err != nil {
+					c.Close()
+					return nil, err
+				}
+			}
+			return c, err
+		},
+		TestOnBorrow: func(c redis.Conn, t time.Time) error {
+			_, err := c.Do("PING")
+			return err
+		},
+	}
 }
 
 func (r *Redis) key(key string) string {
@@ -113,7 +113,7 @@ func (r *Redis) key(key string) string {
 func (r *Redis) keys(keys []string) []string {
 	rawKeys := make([]string, 0)
 	for _, key := range keys {
-		rawKeys = append(rawKeys, r.config.Prefix + ":" + key)
+		rawKeys = append(rawKeys, r.config.Prefix+":"+key)
 	}
 	return rawKeys
 }
@@ -125,26 +125,26 @@ func (r *Redis) tagKey(key string) string {
 func (r *Redis) tagKeys(keys []string) []string {
 	rawKeys := make([]string, 0)
 	for _, key := range keys {
-		rawKeys = append(rawKeys, key + ":tags")
+		rawKeys = append(rawKeys, key+":tags")
 	}
 	return rawKeys
 }
 
 func (r *Redis) cleanKey(rawKey string) string {
-	return strings.Replace(rawKey, r.config.Prefix + ":", "", 1)
+	return strings.Replace(rawKey, r.config.Prefix+":", "", 1)
 }
 
 func (r *Redis) cleanKeys(rawKeys []string) []string {
 	keys := make([]string, 0)
 	for _, key := range rawKeys {
-		keys = append(keys, strings.Replace(key, r.config.Prefix + ":", "", 1))
+		keys = append(keys, strings.Replace(key, r.config.Prefix+":", "", 1))
 	}
 
 	return keys
 }
 
 // Save a new item into the cache.
-func(r *Redis) Set(item kit.CacheItem) Error {
+func (r *Redis) Set(item kit.CacheItem) Error {
 	key := item.GetKey()
 	if key == "" {
 		return AppError{Code: "empty_key"}
@@ -156,7 +156,7 @@ func(r *Redis) Set(item kit.CacheItem) Error {
 	}
 
 	expireSeconds := 0
-	if expires := item.GetExpiresAt(); !expires.IsZero()  {
+	if expires := item.GetExpiresAt(); !expires.IsZero() {
 		seconds := expires.Sub(time.Now()).Seconds()
 		if seconds > 0 && seconds < 1 {
 			return AppError{Code: "item_expired"}
@@ -170,9 +170,9 @@ func(r *Redis) Set(item kit.CacheItem) Error {
 	value, err := item.ToString()
 	if err != nil {
 		return AppError{
-			Code: "cacheitem_tostring_error",
-			Message: err.Error(),
-			Errors: []error{err},
+			Code:     "cacheitem_tostring_error",
+			Message:  err.Error(),
+			Errors:   []error{err},
 			Internal: true,
 		}
 	}
@@ -200,11 +200,11 @@ func(r *Redis) Set(item kit.CacheItem) Error {
 	return nil
 }
 
-func(r *Redis) SetString(key string, value string, expiresAt *time.Time, tags []string) Error {
+func (r *Redis) SetString(key string, value string, expiresAt *time.Time, tags []string) Error {
 	item := &StrItem{
-		Key: key,
+		Key:   key,
 		Value: value,
-		Tags: tags,
+		Tags:  tags,
 	}
 	if expiresAt != nil {
 		item.ExpiresAt = *expiresAt
@@ -214,13 +214,13 @@ func(r *Redis) SetString(key string, value string, expiresAt *time.Time, tags []
 }
 
 // Retrieve a cache item from the cache.
-func(r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
+func (r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
 	var item kit.CacheItem = &StrItem{}
 	if items != nil {
 		if len(items) != 1 {
 			return nil, AppError{
-				Code: "invalid_item",
-				Message: "You must specify one item only",
+				Code:     "invalid_item",
+				Message:  "You must specify one item only",
 				Internal: true,
 			}
 		}
@@ -247,9 +247,9 @@ func(r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
 	}
 	if err := item.FromString(result[0]); err != nil {
 		return nil, AppError{
-			Code: "cacheitem_fromstring_error",
-			Message: err.Error(),
-			Errors: []error{err},
+			Code:     "cacheitem_fromstring_error",
+			Message:  err.Error(),
+			Errors:   []error{err},
 			Internal: true,
 		}
 	}
@@ -276,8 +276,8 @@ func(r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
 	return item, nil
 }
 
-func(r *Redis) GetString(key string) (string, Error) {
-	item, err := r.Get(key)	
+func (r *Redis) GetString(key string) (string, Error) {
+	item, err := r.Get(key)
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +293,7 @@ func(r *Redis) GetString(key string) (string, Error) {
 }
 
 // Delete item from the cache.
-func(r *Redis) Delete(keys ...string) Error {
+func (r *Redis) Delete(keys ...string) Error {
 	ifKeys := make([]interface{}, 0)
 	for _, key := range keys {
 		if key == "" {
@@ -317,7 +317,7 @@ func(r *Redis) Delete(keys ...string) Error {
 }
 
 func (r *Redis) getRawKeys(conn redis.Conn) ([]string, Error) {
-	rawKeys, err := redis.Strings(conn.Do("KEYS", r.key("") + "*"))
+	rawKeys, err := redis.Strings(conn.Do("KEYS", r.key("")+"*"))
 	if err != nil {
 		return nil, redisErr(err)
 	}
@@ -337,7 +337,7 @@ func (r *Redis) Keys() ([]string, Error) {
 	conn := r.pool.Get()
 	defer conn.Close()
 
-	rawKeys, err := r.getRawKeys(conn)	
+	rawKeys, err := r.getRawKeys(conn)
 	if err != nil {
 		return nil, err
 	}
@@ -379,7 +379,7 @@ func (r *Redis) KeysByTags(matchTags ...string) ([]string, Error) {
 }
 
 // Clear all items from the cache.
-func(r *Redis) Clear() Error {
+func (r *Redis) Clear() Error {
 	conn := r.pool.Get()
 	defer conn.Close()
 
@@ -405,13 +405,13 @@ func(r *Redis) Clear() Error {
 }
 
 // Clean up all expired entries.
-func(r *Redis) Cleanup() Error {
+func (r *Redis) Cleanup() Error {
 	// Nothing to do here with redis.
 	return nil
 }
 
 // Clear all items with the specified tags.
-func(r *Redis) ClearTag(tag string) Error {
+func (r *Redis) ClearTag(tag string) Error {
 	conn := r.pool.Get()
 	defer conn.Close()
 

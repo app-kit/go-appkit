@@ -1,12 +1,12 @@
 package appkit
 
-import(
+import (
 	"io"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/olebedev/config"
 	"github.com/julienschmidt/httprouter"
+	"github.com/olebedev/config"
 	db "github.com/theduke/go-dukedb"
 
 	. "github.com/theduke/go-appkit/error"
@@ -48,7 +48,6 @@ type Permission interface {
 	GetName() string
 	SetName(string)
 }
-
 
 type UserProfile interface {
 	db.Model
@@ -111,7 +110,6 @@ type AuthItem interface {
 	GetData() (interface{}, error)
 }
 
-
 type AuthAdaptor interface {
 	GetName() string
 
@@ -138,7 +136,7 @@ type Request interface {
 type Response interface {
 	GetError() Error
 
-	GetHttpStatus()  int
+	GetHttpStatus() int
 	SetHttpStatus(int)
 
 	GetMeta() map[string]interface{}
@@ -154,7 +152,6 @@ type Response interface {
 	SetRawDataReader(io.ReadCloser)
 }
 
-
 type RequestHandler func(App, Request) (Response, bool)
 type AfterRequestMiddleware func(App, Request, Response) bool
 
@@ -168,7 +165,6 @@ type HttpRoute interface {
  * Caches.
  */
 
-
 type CacheItem interface {
 	GetKey() string
 	SetKey(string)
@@ -176,7 +172,7 @@ type CacheItem interface {
 	GetValue() interface{}
 	SetValue(interface{})
 
-	ToString() (string, Error) 
+	ToString() (string, Error)
 	FromString(string) Error
 
 	GetExpiresAt() time.Time
@@ -285,7 +281,7 @@ type TemplateEngine interface {
 
 	Get(name string) interface{}
 
-	BuildAndRender(name string, tpl string, data interface{})  ([]byte, Error)
+	BuildAndRender(name string, tpl string, data interface{}) ([]byte, Error)
 	BuildFileAndRender(name string, data interface{}, paths ...string) ([]byte, Error)
 
 	Render(name string, data interface{}) ([]byte, Error)
@@ -382,7 +378,6 @@ type UserService interface {
 /**
  * Files.
  */
-
 
 type BucketConfig interface {
 }

@@ -15,8 +15,8 @@ import (
 
 	db "github.com/theduke/go-dukedb"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 	//"github.com/theduke/go-appkit/caches"
 	"github.com/theduke/go-appkit/crawler"
 	"github.com/theduke/go-appkit/resources"
@@ -27,7 +27,7 @@ import (
 )
 
 type App struct {
-	env string
+	env   string
 	debug bool
 
 	logger *logrus.Logger
@@ -53,7 +53,7 @@ type App struct {
 	afterMiddlewares  []kit.AfterRequestMiddleware
 
 	serverErrorHandler kit.AfterRequestMiddleware
-	notFoundHandler kit.RequestHandler
+	notFoundHandler    kit.RequestHandler
 
 	sessionManager *SessionManager
 
@@ -72,7 +72,6 @@ func NewApp(cfgPath string) *App {
 	app.backends = make(map[string]db.Backend)
 	app.caches = make(map[string]kit.Cache)
 	app.methods = make(map[string]kit.Method)
-
 
 	app.beforeMiddlewares = make([]kit.RequestHandler, 0)
 	app.afterMiddlewares = make([]kit.AfterRequestMiddleware, 0)
@@ -109,30 +108,29 @@ func NewApp(cfgPath string) *App {
 	return &app
 }
 
-func(a *App) ENV() string {
+func (a *App) ENV() string {
 	return a.env
 }
 
-func(a *App) SetENV(x string) {
+func (a *App) SetENV(x string) {
 	a.env = x
 }
 
-func(a *App) Debug() bool {
+func (a *App) Debug() bool {
 	return a.debug
 }
 
-func(a *App) SetDebug(x bool) {
+func (a *App) SetDebug(x bool) {
 	a.debug = x
 }
 
-func(a *App) Logger() *logrus.Logger {
+func (a *App) Logger() *logrus.Logger {
 	return a.logger
 }
 
-func(a *App) SetLogger(x *logrus.Logger) {
+func (a *App) SetLogger(x *logrus.Logger) {
 	a.logger = x
 }
-
 
 func (a *App) Router() *httprouter.Router {
 	return a.router
@@ -146,11 +144,11 @@ func (a *App) TmpDir() string {
  * Config.
  */
 
-func(a *App) Config() *config.EnvConfig {
+func (a *App) Config() *config.EnvConfig {
 	return a.config
 }
 
-func(a *App) SetConfig(x *config.EnvConfig) {
+func (a *App) SetConfig(x *config.EnvConfig) {
 	a.config = x
 }
 
@@ -230,7 +228,7 @@ func (a *App) Run() {
 
 	// Install not found handler.
 	a.router.NotFound = &HttpHandlerStruct{
-		App: a,
+		App:     a,
 		Handler: a.notFoundHandler,
 	}
 
@@ -413,7 +411,7 @@ func (a *App) buildEmailService() {
 
 	from := email.Recipient{
 		Email: fromEmail,
-		Name: fromName,
+		Name:  fromName,
 	}
 
 	if host != "" && port > 0 && user != "" && pw != "" {
@@ -433,7 +431,7 @@ func (a *App) EmailService() kit.EmailService {
 	return a.emailService
 }
 
-/** 
+/**
  * TemplateEngine.
  */
 
@@ -629,11 +627,11 @@ func (a *App) AfterMiddlewares() []kit.AfterRequestMiddleware {
  * Http handlers.
  */
 
-func(a *App) NotFoundHandler() kit.RequestHandler {
+func (a *App) NotFoundHandler() kit.RequestHandler {
 	return a.notFoundHandler
 }
 
-func(a *App) SetNotFoundHandler(x kit.RequestHandler) {
+func (a *App) SetNotFoundHandler(x kit.RequestHandler) {
 	a.notFoundHandler = x
 }
 

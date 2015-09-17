@@ -4,10 +4,10 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"testing"
 	"os"
 	"os/exec"
 	"path"
+	"testing"
 	"time"
 )
 
@@ -26,8 +26,8 @@ var _ = BeforeSuite(func() {
 	Expect(err).ToNot(HaveOccurred())
 
 	args := []string{
-		"--port", 
-		"9999", 
+		"--port",
+		"9999",
 
 		"--pidfile",
 		path.Join(tmpDir, "redis.pid"),
@@ -35,16 +35,16 @@ var _ = BeforeSuite(func() {
 		"--dir",
 		tmpDir,
 	}
-	serverCmd = exec.Command("redis-server", args...) 
+	serverCmd = exec.Command("redis-server", args...)
 
-  err = serverCmd.Start()
-  Expect(err).NotTo(HaveOccurred())
+	err = serverCmd.Start()
+	Expect(err).NotTo(HaveOccurred())
 
-  // Give the server some time to start.
-  time.Sleep(time.Second * 1)
+	// Give the server some time to start.
+	time.Sleep(time.Second * 1)
 })
 
 var _ = AfterSuite(func() {
 	serverCmd.Process.Kill()
-	os.RemoveAll(tmpDir)  
+	os.RemoveAll(tmpDir)
 })

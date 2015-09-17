@@ -16,13 +16,13 @@ import (
 	_ "image/png"
 
 	"github.com/disintegration/gift"
-	"github.com/twinj/uuid"
 	db "github.com/theduke/go-dukedb"
+	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/error"
-	"github.com/theduke/go-appkit/utils"
 	"github.com/theduke/go-appkit/resources"
+	"github.com/theduke/go-appkit/utils"
 )
 
 type rateLimiter struct {
@@ -404,7 +404,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 
 		return &kit.AppResponse{
 			HttpStatus: 200,
-			RawData: []byte{},
+			RawData:    []byte{},
 		}, true
 	}
 
@@ -454,7 +454,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		if file == nil {
 			return &kit.AppResponse{
 				HttpStatus: 404,
-				RawData: []byte("File not found"),
+				RawData:    []byte("File not found"),
 			}, false
 		}
 
@@ -484,14 +484,14 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		if file == nil {
 			return &kit.AppResponse{
 				HttpStatus: 404,
-				RawData: []byte("File not found"),
+				RawData:    []byte("File not found"),
 			}, false
 		}
 
 		if !file.GetIsImage() {
 			return &kit.AppResponse{
 				Error: AppError{
-					Code: "file_is_no_image",
+					Code:    "file_is_no_image",
 					Message: "The requested file is not an image",
 				},
 			}, false

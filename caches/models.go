@@ -1,35 +1,35 @@
 package caches
 
-import(
-	"time"
+import (
 	"encoding/json"
+	"time"
 
 	. "github.com/theduke/go-appkit/error"
 )
 
 type StrItem struct {
-	Key string
-	Value string
+	Key       string
+	Value     string
 	ExpiresAt time.Time
-	Tags []string
+	Tags      []string
 }
 
 // Ensure Item implements CacheItem
 var _ CacheItem = (*StrItem)(nil)
 
-func(i *StrItem) GetKey() string {
+func (i *StrItem) GetKey() string {
 	return i.Key
 }
 
-func(i *StrItem) SetKey(x string) {
+func (i *StrItem) SetKey(x string) {
 	i.Key = x
 }
 
-func(i *StrItem) GetValue() interface{} {
+func (i *StrItem) GetValue() interface{} {
 	return i.Value
 }
 
-func(i *StrItem) SetValue(x interface{}) {
+func (i *StrItem) SetValue(x interface{}) {
 	if x == nil {
 		i.Value = ""
 	} else {
@@ -37,35 +37,35 @@ func(i *StrItem) SetValue(x interface{}) {
 	}
 }
 
-func(i *StrItem) ToString() (string, Error) {
+func (i *StrItem) ToString() (string, Error) {
 	return i.Value, nil
 }
 
-func(i *StrItem) FromString(x string) Error {
+func (i *StrItem) FromString(x string) Error {
 	i.Value = x
 	return nil
 }
 
-func(i *StrItem) GetExpiresAt() time.Time {
+func (i *StrItem) GetExpiresAt() time.Time {
 	return i.ExpiresAt
 }
 
-func(i *StrItem) SetExpiresAt(x time.Time) {
+func (i *StrItem) SetExpiresAt(x time.Time) {
 	i.ExpiresAt = x
 }
 
 func (i *StrItem) IsExpired() bool {
 	if i.ExpiresAt.IsZero() {
-		return  false
+		return false
 	}
 	return i.ExpiresAt.Sub(time.Now()).Seconds() < 0
 }
 
-func(i *StrItem) GetTags() []string {
+func (i *StrItem) GetTags() []string {
 	return i.Tags
 }
 
-func(i *StrItem) SetTags(x []string) {
+func (i *StrItem) SetTags(x []string) {
 	i.Tags = x
 }
 
@@ -74,11 +74,11 @@ type MapItem struct {
 	Value map[string]interface{}
 }
 
-func(i *MapItem) GetValue() interface{} {
+func (i *MapItem) GetValue() interface{} {
 	return i.Value
 }
 
-func(i *MapItem) SetValue(x interface{}) {
+func (i *MapItem) SetValue(x interface{}) {
 	if x == nil {
 		i.Value = nil
 	} else {
@@ -86,7 +86,7 @@ func(i *MapItem) SetValue(x interface{}) {
 	}
 }
 
-func(i *MapItem) ToString() (string, Error) {
+func (i *MapItem) ToString() (string, Error) {
 	if i.Value == nil {
 		return "", nil
 	}
@@ -94,9 +94,9 @@ func(i *MapItem) ToString() (string, Error) {
 	js, err := json.Marshal(i.Value)
 	if err != nil {
 		return "", AppError{
-			Code: "cache_mapitem_marshal_error",
-			Message: err.Error(),
-			Errors: []error{err},
+			Code:     "cache_mapitem_marshal_error",
+			Message:  err.Error(),
+			Errors:   []error{err},
 			Internal: true,
 		}
 	}
@@ -104,12 +104,12 @@ func(i *MapItem) ToString() (string, Error) {
 	return string(js), nil
 }
 
-func(i *MapItem) FromString(x string) Error {
+func (i *MapItem) FromString(x string) Error {
 	if err := json.Unmarshal([]byte(x), &i.Value); err != nil {
 		return AppError{
-			Code: "cache_mapitem_unmarshal_error",
-			Message: err.Error(),
-			Errors: []error{err},
+			Code:     "cache_mapitem_unmarshal_error",
+			Message:  err.Error(),
+			Errors:   []error{err},
 			Internal: true,
 		}
 	}
@@ -121,15 +121,15 @@ type Item struct {
 	Value interface{}
 }
 
-func(i *Item) GetValue() interface{} {
+func (i *Item) GetValue() interface{} {
 	return i.Value
 }
 
-func(i *Item) SetValue(x interface{}) {
+func (i *Item) SetValue(x interface{}) {
 	i.Value = x
 }
 
-func(i *Item) ToString() (string, Error) {
+func (i *Item) ToString() (string, Error) {
 	if i.Value == nil {
 		return "", nil
 	}
@@ -137,9 +137,9 @@ func(i *Item) ToString() (string, Error) {
 	js, err := json.Marshal(i.Value)
 	if err != nil {
 		return "", AppError{
-			Code: "cache_item_marshal_error",
-			Message: err.Error(),
-			Errors: []error{err},
+			Code:     "cache_item_marshal_error",
+			Message:  err.Error(),
+			Errors:   []error{err},
 			Internal: true,
 		}
 	}
@@ -147,20 +147,20 @@ func(i *Item) ToString() (string, Error) {
 	return string(js), nil
 }
 
-func(i *Item) FromString(x string) Error {
+func (i *Item) FromString(x string) Error {
 	if i.Value == nil {
 		return AppError{
-			Code: "cache_item_empty_value",
-			Message: "When using a generic Item{} for caching, the value must already be set to an empty struct to hold the information",
+			Code:     "cache_item_empty_value",
+			Message:  "When using a generic Item{} for caching, the value must already be set to an empty struct to hold the information",
 			Internal: true,
 		}
 	}
 
 	if err := json.Unmarshal([]byte(x), &i.Value); err != nil {
 		return AppError{
-			Code: "cache_item_unmarshal_error",
-			Message: err.Error(),
-			Errors: []error{err},
+			Code:     "cache_item_unmarshal_error",
+			Message:  err.Error(),
+			Errors:   []error{err},
 			Internal: true,
 		}
 	}

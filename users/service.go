@@ -5,8 +5,8 @@ import (
 
 	"github.com/theduke/go-appkit/users/auth"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/resources"
 )
 

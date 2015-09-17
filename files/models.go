@@ -4,9 +4,9 @@ import (
 	"io"
 	"strings"
 
+	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/users"
-	kit "github.com/theduke/go-appkit"
 )
 
 /**

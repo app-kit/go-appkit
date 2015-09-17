@@ -1,21 +1,21 @@
 // A email service implementation that just logs the mails.
 package log
 
-import(
+import (
 	log "github.com/Sirupsen/logrus"
 
-	. "github.com/theduke/go-appkit/error"
 	. "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 type Service struct {
-	logger *log.Logger
+	logger        *log.Logger
 	defaultSender EmailRecipient
 }
 
 func New(logger *log.Logger, defaultSender EmailRecipient) *Service {
 	return &Service{
-		logger: logger,
+		logger:        logger,
 		defaultSender: defaultSender,
 	}
 }
@@ -23,7 +23,6 @@ func New(logger *log.Logger, defaultSender EmailRecipient) *Service {
 func (s *Service) SetDefaultFrom(r EmailRecipient) {
 	s.defaultSender = r
 }
-
 
 func (s *Service) SetLogger(l *log.Logger) {
 	s.logger = l
@@ -57,9 +56,9 @@ func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 		}
 
 		s.logger.WithFields(log.Fields{
-			"action": "send_email",
-			"from": from,
-			"to": recipients,
+			"action":  "send_email",
+			"from":    from,
+			"to":      recipients,
 			"subject": e.GetSubject(),
 		}).Debugf("Sending mail from %v to %v - subject %v", from, recipients, e.GetSubject())
 	}

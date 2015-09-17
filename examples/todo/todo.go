@@ -13,11 +13,11 @@ import (
 
 	kit "github.com/theduke/go-appkit"
 	kitapp "github.com/theduke/go-appkit/app"
+	"github.com/theduke/go-appkit/caches/fs"
+	"github.com/theduke/go-appkit/email"
 	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/users"
-	"github.com/theduke/go-appkit/caches/fs"
-	"github.com/theduke/go-appkit/email"
 )
 
 type Project struct {

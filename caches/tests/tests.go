@@ -1,8 +1,8 @@
 package tests
 
 import (
-	"time"
 	"sort"
+	"time"
 
 	"github.com/theduke/go-appkit/caches"
 
@@ -27,10 +27,10 @@ func TestCache(cache caches.Cache) {
 
 	It("Should set string cache item with tags and expires", func() {
 		item := &caches.StrItem{
-			Key: "test2",
-			Value: "testval",
+			Key:       "test2",
+			Value:     "testval",
 			ExpiresAt: time.Now().Add(time.Second * 60),
-			Tags: []string{"tag1", "tag2"},
+			Tags:      []string{"tag1", "tag2"},
 		}
 		Expect(cache.Set(item)).ToNot(HaveOccurred())
 
@@ -67,8 +67,8 @@ func TestCache(cache caches.Cache) {
 
 	It("Should fail when setting expired item", func() {
 		item := &caches.StrItem{
-			Key: "expired",
-			Value: "lala",
+			Key:       "expired",
+			Value:     "lala",
 			ExpiresAt: time.Now().Add(time.Second * -1),
 		}
 		Expect(cache.Set(item).GetCode()).To(Equal("item_expired"))
@@ -76,8 +76,8 @@ func TestCache(cache caches.Cache) {
 
 	It("Should return nil for expired items", func() {
 		item := &caches.StrItem{
-			Key: "expiresSoon",
-			Value: "lala",
+			Key:       "expiresSoon",
+			Value:     "lala",
 			ExpiresAt: time.Now().Add(time.Second * 2),
 		}
 		Expect(cache.Set(item)).ToNot(HaveOccurred())

@@ -23,23 +23,22 @@ func GetStringFromMap(rawData interface{}, field string) (string, bool) {
 }
 
 type Config struct {
-	ClientID string
+	ClientID     string
 	ClientSecret string
-	AuthUrl string
-	RedirectUrl string
-	TokenUrl string
+	AuthUrl      string
+	RedirectUrl  string
+	TokenUrl     string
 }
 
-type AuthAdaptorOauth struct{
+type AuthAdaptorOauth struct {
 	endpoints map[string]*Config
 }
 
 // Ensure AuthAdaptorOauth implements ApiAuthAdaptor.
 var _ users.ApiAuthAdaptor = (*AuthAdaptorOauth)(nil)
 
-
 func New() *AuthAdaptorOauth {
-	return &AuthAdaptorOauth {
+	return &AuthAdaptorOauth{
 		endpoints: make(map[string]*Config),
 	}
 }

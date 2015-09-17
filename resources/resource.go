@@ -3,12 +3,12 @@ package resources
 import (
 	db "github.com/theduke/go-dukedb"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/error"
 )
 
 type Resource struct {
-	app kit.App
+	app         kit.App
 	debug       bool
 	backend     db.Backend
 	userService kit.UserService
@@ -27,11 +27,11 @@ func NewResource(model db.Model, hooks interface{}) *Resource {
 	return &r
 }
 
-func(res *Resource) App() kit.App {
+func (res *Resource) App() kit.App {
 	return res.app
 }
 
-func(res *Resource) SetApp(x kit.App) {
+func (res *Resource) SetApp(x kit.App) {
 	res.app = x
 }
 

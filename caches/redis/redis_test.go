@@ -1,7 +1,6 @@
 package redis_test
 
 import (
-
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
@@ -16,13 +15,12 @@ var _ = Describe("Redis", func() {
 		Address: "localhost:9999",
 	}
 	redisCache, _ = redis.New(config)
-	
+
 	It("Should create", func() {
 		var err error
 		redisCache, err = redis.New(config)
 		Expect(err).ToNot(HaveOccurred())
 	})
-
 
 	tests.TestCache(redisCache)
 })

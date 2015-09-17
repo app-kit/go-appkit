@@ -1,21 +1,21 @@
 package gomail
 
-import(
-	"os"
+import (
 	"fmt"
+	"os"
 
-	"gopkg.in/gomail.v2"
 	log "github.com/Sirupsen/logrus"
+	"gopkg.in/gomail.v2"
 
-	. "github.com/theduke/go-appkit/error"
-	"github.com/theduke/go-appkit/email"
-	"github.com/theduke/go-appkit/utils"
 	. "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/email"
+	. "github.com/theduke/go-appkit/error"
+	"github.com/theduke/go-appkit/utils"
 )
 
 type Service struct {
 	defaultSender EmailRecipient
-	logger *log.Logger
+	logger        *log.Logger
 
 	dialer *gomail.Dialer
 }
@@ -27,7 +27,7 @@ func New(host string, port int, user, password, defaultSenderEmail, defaultSende
 	s := &Service{
 		defaultSender: email.Recipient{
 			Email: defaultSenderEmail,
-			Name: defaultSenderName,
+			Name:  defaultSenderName,
 		},
 
 		dialer: gomail.NewPlainDialer(host, port, user, password),
@@ -72,8 +72,8 @@ func (s Service) buildMessage(e Email) (*gomail.Message, []string, Error) {
 	setAddressHeader(msg, "To", e.GetTo())
 	setAddressHeader(msg, "Cc", e.GetCc())
 	setAddressHeader(msg, "Bcc", e.GetBcc())
-	
-	// Body.	
+
+	// Body.
 	for _, part := range e.GetBodyParts() {
 		msg.AddAlternative(part.GetMimeType(), string(part.GetContent()))
 	}
@@ -115,13 +115,13 @@ func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 	sender, err := s.dialer.Dial()
 	if err != nil {
 		return AppError{
-			Code: "smtp_dial_failed",
-			Message: fmt.Sprintf("Could not connect to smtp server at %v:%v: %v", s.dialer.Host, s.dialer.Port, err),
-			Errors: []error{err},
+			Code:     "smtp_dial_failed",
+			Message:  fmt.Sprintf("Could not connect to smtp server at %v:%v: %v", s.dialer.Host, s.dialer.Port, err),
+			Errors:   []error{err},
 			Internal: true,
 		}, nil
 	}
-	defer sender.Close()	
+	defer sender.Close()
 
 	errs := make([]Error, 0)
 
@@ -140,9 +140,9 @@ func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 
 		if err := gomail.Send(sender, msg); err != nil {
 			errs = append(errs, AppError{
-				Code: "smtp_send_error",
-				Message: err.Error(),
-				Errors: []error{err},
+				Code:     "smtp_send_error",
+				Message:  err.Error(),
+				Errors:   []error{err},
 				Internal: true,
 			})
 			continue

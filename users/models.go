@@ -163,7 +163,7 @@ func (u *BaseUser) GetLastLogin() time.Time {
 	return u.LastLogin
 }
 
-func(u *BaseUser) GetData() (interface{}, Error) {
+func (u *BaseUser) GetData() (interface{}, Error) {
 	if u.Data == "" {
 		return nil, nil
 	}
@@ -171,20 +171,20 @@ func(u *BaseUser) GetData() (interface{}, Error) {
 	err := json.Unmarshal([]byte(u.Data), &data)
 	if err != nil {
 		return nil, AppError{
-			Code: "json_marshal_error",
-			Message: err.Error(),
+			Code:     "json_marshal_error",
+			Message:  err.Error(),
 			Internal: true,
 		}
 	}
 	return data, nil
 }
 
-func(u *BaseUser) SetData(x interface{}) Error {
+func (u *BaseUser) SetData(x interface{}) Error {
 	js, err := json.Marshal(x)
 	if err != nil {
 		return AppError{
-			Code: "json_marshal_error",
-			Message: err.Error(),
+			Code:     "json_marshal_error",
+			Message:  err.Error(),
 			Internal: true,
 		}
 	}
