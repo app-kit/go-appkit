@@ -5,6 +5,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
@@ -259,7 +260,7 @@ func (a *App) Run() {
 
 	// Crawl on startup if enabled.
 	if a.Config.UBool("crawler.onRun", false) {
-		a.Crawl()
+		a.RunCrawler()
 	}
 
 	url := a.Config.UString("host", "localhost") + ":" + a.Config.UString("port", "8000")
@@ -276,6 +277,24 @@ func (a *App) Run() {
  * Crawling.
  */
 
+func (a *App) RunCrawler() {
+	recrawlInterval := a.Config.UInt("crawler.recrawlInterval", 0)
+
+	a.Logger.Infof("Running crawler with recrawl interval %v", recrawlInterval)
+
+	go func() {
+		for {
+			a.Crawl()
+			if recrawlInterval == 0 {
+				break
+			} else {
+				time.Sleep(time.Second * time.Duration(recrawlInterval))
+				a.Crawl()
+			}
+		}
+	}()
+}
+
 func (a *App) Crawl() {
 	concurrentRequests := a.Config.UInt("crawler.concurrentRequests", 5)
 	host := a.Config.UString("url")
@@ -289,9 +308,7 @@ func (a *App) Crawl() {
 	crawler := crawler.New(concurrentRequests, hosts, startUrls)
 	crawler.Logger = a.Logger
 
-	go func() {
-		crawler.Run()
-	}()
+	crawler.Run()
 }
 
 /**
