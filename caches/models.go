@@ -5,6 +5,7 @@ import (
 	"time"
 
 	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
 type StrItem struct {
@@ -15,7 +16,7 @@ type StrItem struct {
 }
 
 // Ensure Item implements CacheItem
-var _ CacheItem = (*StrItem)(nil)
+var _ kit.CacheItem = (*StrItem)(nil)
 
 func (i *StrItem) GetKey() string {
 	return i.Key
