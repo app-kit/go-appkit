@@ -2,9 +2,11 @@ package users
 
 import (
 	"crypto/rand"
+	"fmt"
 	"math/big"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -119,12 +121,116 @@ type UserResourceHooks struct {
 	ProfileModel kit.UserProfile
 }
 
-func (UserResourceHooks) Methods() []kit.Method {
-	resetPw := methods.NewMethod("users.reset-password", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
-		return nil
+func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
+	deps := res.Dependencies()
+
+	confirmEmail := methods.NewMethod("users.confirm-email", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		data, ok := r.GetData().(map[string]interface{})
+		if !ok {
+			return kit.NewErrorResponse("invalid_data", "Expected data dict with 'token' key")
+		}
+		token, ok := data["token"].(string)
+		if !ok {
+			return kit.NewErrorResponse("invalid_data", "Expected 'token' string key in data")
+		}
+		if token == "" {
+			return kit.NewErrorResponse("empty_token", "")
+		}
+
+		_, err := deps.UserService().ConfirmEmail(token)
+		if err != nil {
+			return kit.NewErrorResponse("confirm_failed", "Could not confirm email")
+		}
+
+		return &kit.AppResponse{
+			Data: map[string]interface{}{"success": true},
+		}
 	})
 
-	return []kit.Method{resetPw}
+	requestPwReset := methods.NewMethod("users.request-password-reset", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		deps := res.Dependencies()
+
+		data, ok := r.GetData().(map[string]interface{})
+		if !ok {
+			return kit.NewErrorResponse("invalid_data", "Expected data dict with 'user' key")
+		}
+
+		userIdentifier, ok := data["user"].(string)
+		if !ok {
+			return kit.NewErrorResponse("invalid_data", "Expected data dict with 'user' string key")
+		}
+
+		rawUser, err := res.Q().Filter("email", userIdentifier).Or("username", userIdentifier).First()
+		if err != nil {
+			return &kit.AppResponse{Error: err}
+		}
+		if rawUser == nil {
+			return kit.NewErrorResponse("unknown_user", fmt.Sprintf("The user %v does not exist", userIdentifier))
+		}
+
+		user := rawUser.(kit.User)
+
+		err = deps.UserService().SendPasswordResetEmail(user)
+		if err != nil {
+			deps.Logger().Errorf("Could not send password reset email for user %v: %v", user, err)
+			return kit.NewErrorResponse("reset_email_send_failed", "Could not send the reset password mail.")
+		}
+
+		deps.Logger().WithFields(logrus.Fields{
+			"action":  "password_reset_request",
+			"user_id": user.GetID(),
+		}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetID())
+
+		return &kit.AppResponse{
+			Data: map[string]interface{}{"success": true},
+		}
+	})
+
+	pwReset := methods.NewMethod("users.password-reset", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		// Verify that token is in data.
+		data, ok := r.GetData().(map[string]interface{})
+		if !ok {
+			return kit.NewErrorResponse("invalid_data", "Expected 'token' key in data")
+		}
+		token, ok := data["token"].(string)
+		if !ok {
+			return kit.NewErrorResponse("invalid_data", "Expected 'token' string key in data")
+		}
+		if token == "" {
+			return kit.NewErrorResponse("empty_token", "")
+		}
+
+		// Verify that password is in data.
+		newPw, ok := data["password"].(string)
+		if !ok {
+			return kit.NewErrorResponse("invalid_passord", "Expected 'password' string key in data")
+		}
+		if newPw == "" {
+			return kit.NewErrorResponse("empty_password", "Password may not be empty")
+		}
+
+		deps := res.Dependencies()
+
+		user, err := deps.UserService().ResetPassword(token, newPw)
+		if err != nil {
+			return kit.NewErrorResponse("password_reset_failed", "Could not reset the password.")
+		}
+
+		deps.Logger().WithFields(logrus.Fields{
+			"action":  "password_reset",
+			"user_id": user.GetID(),
+		}).Debugf("Password for user %v was reset", user.GetID())
+
+		return &kit.AppResponse{
+			Data: map[string]interface{}{
+				"success":   true,
+				"userId":    user.GetID(),
+				"userEmail": user.GetEmail(),
+			},
+		}
+	})
+
+	return []kit.Method{confirmEmail, requestPwReset, pwReset}
 }
 
 func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {

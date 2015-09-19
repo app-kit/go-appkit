@@ -124,6 +124,8 @@ type UserToken interface {
 
 	GetExpiresAt() time.Time
 	SetExpiresAt(time.Time)
+
+	IsValid() bool
 }
 
 type AuthAdaptor interface {
@@ -443,10 +445,6 @@ type EmailService interface {
 type UserService interface {
 	Service
 
-	CreateUser(user User, adaptor string, data interface{}) Error
-	AuthenticateUser(user User, adaptor string, data interface{}) Error
-	VerifySession(token string) (User, Session, Error)
-
 	AuthAdaptor(name string) AuthAdaptor
 	AddAuthAdaptor(a AuthAdaptor)
 
@@ -463,6 +461,19 @@ type UserService interface {
 
 	SetPermissionResource(Resource)
 	PermissionResource() Resource
+
+	// Build a token, persist it and return it.
+	BuildToken(typ, userId string, expiresAt time.Time) (UserToken, Error)
+
+	CreateUser(user User, adaptor string, data interface{}) Error
+	AuthenticateUser(user User, adaptor string, data interface{}) Error
+	VerifySession(token string) (User, Session, Error)
+
+	SendConfirmationEmail(User) Error
+	ConfirmEmail(token string) (User, Error)
+
+	SendPasswordResetEmail(User) Error
+	ResetPassword(token, newPassword string) (User, Error)
 }
 
 /**

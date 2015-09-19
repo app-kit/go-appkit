@@ -182,6 +182,21 @@ func (u *Service) SetPermissionResource(x kit.Resource) {
 	u.Permissions = x
 }
 
+func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserToken, kit.Error) {
+	token := uuid.NewV4().String()
+
+	tokenItem := s.Tokens.NewModel().(kit.UserToken)
+	tokenItem.SetType(typ)
+	tokenItem.SetToken(token)
+	tokenItem.SetUserID(userId)
+
+	if err := s.Tokens.Create(tokenItem, nil); err != nil {
+		return nil, kit.WrapError(err, "token_create_error", "Could not save token to database")
+	}
+
+	return tokenItem, nil
+}
+
 func (s *Service) CreateUser(user kit.User, adaptorName string, authData interface{}) kit.Error {
 	adaptor := s.AuthAdaptor(adaptorName)
 	if adaptor == nil {
@@ -263,7 +278,11 @@ func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
 	}
 
 	// Generate a token.
-	token := uuid.NewV4().String()
+	tokenItem, err := s.BuildToken("email_confirmation", user.GetID(), time.Time{})
+	if err != nil {
+		return err
+	}
+	token := tokenItem.GetToken()
 
 	// Build the confirmation url.
 
@@ -283,16 +302,6 @@ func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
 		}
 	}
 	confirmationUrl := conf.UString("url") + "/" + strings.Replace(confirmationPath, "{token}", token, -1)
-
-	// Save token to database.
-
-	tokenItem := s.Tokens.Model().(kit.UserToken)
-	tokenItem.SetType("email_confirmation")
-	tokenItem.SetToken(token)
-	tokenItem.SetUserID(user.GetID())
-	if err := s.Tokens.Create(tokenItem, user); err != nil {
-		return kit.WrapError(err, "token_create_error", "Could not save token to database")
-	}
 
 	// Render email.
 
@@ -360,8 +369,15 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 		return kit.AppError{Code: "no_email_service"}
 	}
 
+	hoursValid := 48
+
 	// Generate a token.
-	token := uuid.NewV4().String()
+	expiresAt := time.Now().Add(time.Hour * time.Duration(hoursValid))
+	tokenItem, err := s.BuildToken("password_reset", user.GetID(), expiresAt)
+	if err != nil {
+		return err
+	}
+	token := tokenItem.GetToken()
 
 	conf := s.deps.Config()
 
@@ -384,16 +400,6 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 	}
 	resetUrl := conf.UString("url") + "/" + strings.Replace(resetPath, "{token}", token, -1)
 
-	// Save token to database.
-
-	tokenItem := s.Tokens.Model().(kit.UserToken)
-	tokenItem.SetType("password_reset")
-	tokenItem.SetToken(token)
-	tokenItem.SetUserID(user.GetID())
-	if err := s.Tokens.Create(tokenItem, user); err != nil {
-		return kit.WrapError(err, "token_create_error", "Could not save token to database")
-	}
-
 	// Render email.
 
 	subject := conf.UString("users.passwordResetSubject", "Password reset")
@@ -410,8 +416,9 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 		}
 
 		data := map[string]interface{}{
-			"user":  user,
-			"token": token,
+			"user":        user,
+			"token":       token,
+			"hours_valid": hoursValid,
 		}
 		var err kit.Error
 
@@ -428,14 +435,16 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 		tpl := `Password reset
 
 To reset your password, please visit %v.
+The link will be valid for %v hours.
 `
 
 		htmlTpl := `Password Reset<br><br>
 
-To reset your password, please visit <a href="%v">this link</a>.
+To reset your password, please visit <a href="%v">this link</a>.<br>
+The link will be valid for %v hours.
 `
-		txtContent = []byte(fmt.Sprintf(tpl, resetUrl))
-		htmlContent = []byte(fmt.Sprintf(htmlTpl, resetUrl))
+		txtContent = []byte(fmt.Sprintf(tpl, resetUrl, hoursValid))
+		htmlContent = []byte(fmt.Sprintf(htmlTpl, resetUrl, hoursValid))
 	}
 
 	// Now build the email and send it.
@@ -450,6 +459,94 @@ To reset your password, please visit <a href="%v">this link</a>.
 	}
 
 	return nil
+}
+
+func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
+	rawToken, err := s.Tokens.FindOne(token)
+	if err != nil {
+		return nil, kit.WrapError(err, "token_query_error", "")
+	}
+	if rawToken == nil {
+		return nil, kit.AppError{Code: "invalid_token"}
+	}
+
+	tokenItem := rawToken.(kit.UserToken)
+	if !tokenItem.IsValid() {
+		return nil, kit.AppError{Code: "expired_token"}
+	}
+
+	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
+	if err != nil {
+		return nil, kit.WrapError(err, "user_query_error", "")
+	}
+	if rawUser == nil {
+		return nil, kit.AppError{Code: "invalid_user"}
+	}
+
+	user := rawUser.(kit.User)
+	user.SetIsEmailConfirmed(true)
+	if err := s.Users.Backend().Update(user); err != nil {
+		return nil, kit.WrapError(err, "user_persist_error", "")
+	}
+
+	return user, nil
+}
+
+func (s *Service) ChangePassword(user kit.User, newPassword string) kit.Error {
+	rawAuth, err := s.AuthItems.Q().
+		Filter("typ", "password").And("user_id", user.GetID()).First()
+
+	if err != nil {
+		return kit.WrapError(err, "auth_item_query_error", "")
+	}
+	if rawAuth == nil {
+		return kit.AppError{Code: "no_password_auth", Message: "User is not configured for password authentication"}
+	}
+
+	auth := rawAuth.(kit.AuthItem)
+
+	adaptor := s.AuthAdaptor("password")
+	data, err := adaptor.BuildData(user, map[string]interface{}{"password": newPassword})
+	if err != nil {
+		return err
+	}
+
+	auth.SetData(data)
+	if err := s.AuthItems.Backend().Update(auth); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) ResetPassword(token, newPassword string) (kit.User, kit.Error) {
+	rawToken, err := s.Tokens.FindOne(token)
+	if err != nil {
+		return nil, kit.WrapError(err, "token_query_error", "")
+	}
+	if rawToken == nil {
+		return nil, kit.AppError{Code: "invalid_token"}
+	}
+
+	tokenItem := rawToken.(kit.UserToken)
+	if !tokenItem.IsValid() {
+		return nil, kit.AppError{Code: "expired_token"}
+	}
+
+	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
+	if err != nil {
+		return nil, kit.WrapError(err, "user_query_error", "")
+	}
+	if rawUser == nil {
+		return nil, kit.AppError{Code: "invalid_user"}
+	}
+	user := rawUser.(kit.User)
+
+	if err := s.ChangePassword(user, newPassword); err != nil {
+		return nil, err
+	}
+
+	return user, nil
 }
 
 func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data interface{}) kit.Error {

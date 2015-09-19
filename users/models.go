@@ -389,6 +389,10 @@ func (t *Token) SetExpiresAt(tm time.Time) {
 	t.ExpiresAt = tm
 }
 
+func (t *Token) IsValid() bool {
+	return t.ExpiresAt.IsZero() || t.ExpiresAt.Sub(time.Now()) > 0
+}
+
 /**
  * BaseSession
  */
