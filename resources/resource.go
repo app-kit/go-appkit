@@ -4,15 +4,14 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 )
 
 type Resource struct {
-	app         kit.App
-	debug       bool
-	backend     db.Backend
-	userService kit.UserService
-	hooks       interface{}
+	debug bool
+	deps  kit.Dependencies
+
+	backend db.Backend
+	hooks   interface{}
 
 	model db.Model
 }
@@ -27,12 +26,20 @@ func NewResource(model db.Model, hooks interface{}) *Resource {
 	return &r
 }
 
-func (res *Resource) App() kit.App {
-	return res.app
+func (res *Resource) Debug() bool {
+	return res.debug
 }
 
-func (res *Resource) SetApp(x kit.App) {
-	res.app = x
+func (res *Resource) SetDebug(x bool) {
+	res.debug = x
+}
+
+func (res *Resource) Dependencies() kit.Dependencies {
+	return res.deps
+}
+
+func (res *Resource) SetDependencies(x kit.Dependencies) {
+	res.deps = x
 }
 
 func (res *Resource) Backend() db.Backend {
@@ -43,20 +50,8 @@ func (res *Resource) SetBackend(x db.Backend) {
 	res.backend = x
 }
 
-func (res *Resource) Debug() bool {
-	return res.debug
-}
-
-func (res *Resource) SetDebug(x bool) {
-	res.debug = x
-}
-
-func (res *Resource) UserService() kit.UserService {
-	return res.userService
-}
-
-func (res *Resource) SetUserService(x kit.UserService) {
-	res.userService = x
+func (res *Resource) Collection() string {
+	return res.model.Collection()
 }
 
 func (res *Resource) Model() db.Model {
@@ -90,14 +85,14 @@ func (res *Resource) SetHooks(h interface{}) {
 /**
  * Perform a query.
  */
-func (res Resource) Query(q *db.Query) ([]db.Model, Error) {
+func (res Resource) Query(q db.Query) ([]db.Model, kit.Error) {
 	return res.backend.Query(q)
 }
 
 /**
  * Return a new query initialized with the backend.
  */
-func (res Resource) Q() *db.Query {
+func (res Resource) Q() db.Query {
 	return res.backend.Q(res.model.Collection())
 }
 
@@ -105,7 +100,7 @@ func (res Resource) Q() *db.Query {
  * FindOne
  */
 
-func (res *Resource) FindOne(rawId string) (db.Model, Error) {
+func (res *Resource) FindOne(rawId string) (db.Model, kit.Error) {
 	return res.backend.FindOne(res.model.Collection(), rawId)
 }
 
@@ -113,7 +108,7 @@ func (res *Resource) FindOne(rawId string) (db.Model, Error) {
  * Find.
  */
 
-func (res Resource) Find(query *db.Query) ([]db.Model, Error) {
+func (res Resource) Find(query db.Query) ([]db.Model, kit.Error) {
 	return res.backend.Query(query)
 }
 
@@ -137,7 +132,7 @@ func (res *Resource) ApiFindOne(rawId string, r kit.Request) kit.Response {
 	}
 }
 
-func (res *Resource) ApiFind(query *db.Query, r kit.Request) kit.Response {
+func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
 	apiFindHook, ok := res.hooks.(ApiFindHook)
 	if ok {
 		return apiFindHook.ApiFind(res, query, r)
@@ -166,7 +161,7 @@ func (res *Resource) ApiFind(query *db.Query, r kit.Request) kit.Response {
 	}
 }
 
-func (res *Resource) ApiFindPaginated(query *db.Query, r kit.Request) kit.Response {
+func (res *Resource) ApiFindPaginated(query db.Query, r kit.Request) kit.Response {
 	resp := res.ApiFind(query, r)
 	if resp.GetError() == nil {
 		count, _ := res.backend.Count(query)
@@ -180,10 +175,10 @@ func (res *Resource) ApiFindPaginated(query *db.Query, r kit.Request) kit.Respon
  * Create.
  */
 
-func (res *Resource) Create(obj db.Model, user kit.User) Error {
+func (res *Resource) Create(obj db.Model, user kit.User) kit.Error {
 	if allowCreate, ok := res.hooks.(AllowCreateHook); ok {
 		if !allowCreate.AllowCreate(res, obj, user) {
-			return AppError{Code: "permission_denied"}
+			return kit.AppError{Code: "permission_denied"}
 		}
 	}
 
@@ -226,17 +221,17 @@ func (res *Resource) ApiCreate(obj db.Model, r kit.Request) kit.Response {
  * Update.
  */
 
-func (res *Resource) Update(obj db.Model, user kit.User) Error {
+func (res *Resource) Update(obj db.Model, user kit.User) kit.Error {
 	oldObj, err := res.FindOne(obj.GetID())
 	if err != nil {
 		return err
 	} else if oldObj == nil {
-		return AppError{Code: "not_found"}
+		return kit.AppError{Code: "not_found"}
 	}
 
 	if allowUpdate, ok := res.hooks.(AllowUpdateHook); ok {
 		if !allowUpdate.AllowUpdate(res, obj, oldObj, user) {
-			return AppError{Code: "permission_denied"}
+			return kit.AppError{Code: "permission_denied"}
 		}
 	}
 
@@ -279,10 +274,10 @@ func (res *Resource) ApiUpdate(obj db.Model, r kit.Request) kit.Response {
  * Delete.
  */
 
-func (res *Resource) Delete(obj db.Model, user kit.User) Error {
+func (res *Resource) Delete(obj db.Model, user kit.User) kit.Error {
 	if allowDelete, ok := res.hooks.(AllowDeleteHook); ok {
 		if !allowDelete.AllowDelete(res, obj, user) {
-			return AppError{Code: "permission_denied"}
+			return kit.AppError{Code: "permission_denied"}
 		}
 	}
 

@@ -15,15 +15,14 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 )
 
-func JsonHandler(r *http.Request, app kit.App, method *Method) (interface{}, Error) {
+func JsonHandler(r *http.Request, app kit.App, method *Method) (interface{}, kit.Error) {
 	// Read request body.
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:    "read_post_error",
 			Message: fmt.Sprintf("Request body could not be read: %v", err),
 		}
@@ -37,7 +36,7 @@ func JsonHandler(r *http.Request, app kit.App, method *Method) (interface{}, Err
 	} else {
 		err = json.Unmarshal(body, &rawData)
 		if err != nil {
-			return nil, AppError{
+			return nil, kit.AppError{
 				Code:    "invalid_json_body",
 				Message: fmt.Sprintf("POST body json could not be unmarshaled: %v", err),
 			}
@@ -51,7 +50,7 @@ func JsonHandler(r *http.Request, app kit.App, method *Method) (interface{}, Err
 
 	// Check permissions.
 	if method.RequiresUser() && request.GetUser() == nil {
-		return nil, AppError{Code: "permission_denied"}
+		return nil, kit.AppError{Code: "permission_denied"}
 	}
 
 	// Call the method callback.
@@ -96,7 +95,7 @@ func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app kit.App, method
 		log.Printf("JSON encode error: %v\n", err)
 		code = 500
 		resp["errors"] = []error{
-			&AppError{
+			&kit.AppError{
 				Code:    "json_encode_error",
 				Message: err.Error(),
 			},
@@ -168,14 +167,14 @@ type Api2GoResource struct {
 	App         kit.App
 }
 
-func (res Api2GoResource) buildQuery(r api2go.Request) (*db.Query, Error) {
+func (res Api2GoResource) buildQuery(r api2go.Request) (db.Query, kit.Error) {
 
 	// Handle a json query in metadata.
 	if r.Meta != nil {
 		if rawQuery, ok := r.Meta["query"]; ok {
 			queryData, ok := rawQuery.(map[string]interface{})
 			if !ok {
-				return nil, AppError{
+				return nil, kit.AppError{
 					Code:    "invalid_query",
 					Message: "Expected query to be dictionary",
 				}

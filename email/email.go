@@ -5,7 +5,6 @@ import (
 	"io/ioutil"
 
 	. "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/utils"
 )
 

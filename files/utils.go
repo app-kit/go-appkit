@@ -5,7 +5,7 @@ import (
 	"strconv"
 	"strings"
 
-	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
 func GetMimeType(path string) string {
@@ -22,10 +22,10 @@ type ImageInfo struct {
 	Format string
 }
 
-func GetImageInfo(path string) (*ImageInfo, Error) {
+func GetImageInfo(path string) (*ImageInfo, kit.Error) {
 	output, err := exec.Command("identify", "-verbose", path).Output()
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:     "identify_failed",
 			Message:  err.Error(),
 			Internal: true,

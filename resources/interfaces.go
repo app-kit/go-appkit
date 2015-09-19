@@ -4,7 +4,6 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 )
 
 /**
@@ -17,6 +16,10 @@ type ApiHttpRoutes interface {
 	HttpRoutes(kit.Resource) []kit.HttpRoute
 }
 
+type MethodsHook interface {
+	Methods(kit.Resource) []kit.Method
+}
+
 /**
  * Find hooks.
  */
@@ -26,15 +29,15 @@ type AllowFindHook interface {
 }
 
 type ApiFindHook interface {
-	ApiFind(res kit.Resource, query *db.Query, r kit.Request) kit.Response
+	ApiFind(res kit.Resource, query db.Query, r kit.Request) kit.Response
 }
 
 type ApiAlterQueryHook interface {
-	ApiAlterQuery(res kit.Resource, query *db.Query, r kit.Request) Error
+	ApiAlterQuery(res kit.Resource, query db.Query, r kit.Request) kit.Error
 }
 
 type ApiAfterFindHook interface {
-	ApiAfterFind(res kit.Resource, obj []db.Model, user kit.User) Error
+	ApiAfterFind(res kit.Resource, obj []db.Model, user kit.User) kit.Error
 }
 
 /**
@@ -46,11 +49,11 @@ type ApiCreateHook interface {
 }
 
 type CreateHook interface {
-	Create(res kit.Resource, obj db.Model, user kit.User) Error
+	Create(res kit.Resource, obj db.Model, user kit.User) kit.Error
 }
 
 type BeforeCreateHook interface {
-	BeforeCreate(res kit.Resource, obj db.Model, user kit.User) Error
+	BeforeCreate(res kit.Resource, obj db.Model, user kit.User) kit.Error
 }
 
 type AllowCreateHook interface {
@@ -58,7 +61,7 @@ type AllowCreateHook interface {
 }
 
 type AfterCreateHook interface {
-	AfterCreate(res kit.Resource, obj db.Model, user kit.User) Error
+	AfterCreate(res kit.Resource, obj db.Model, user kit.User) kit.Error
 }
 
 /**
@@ -70,11 +73,11 @@ type ApiUpdateHook interface {
 }
 
 type UpdateHook interface {
-	Update(res kit.Resource, obj db.Model, r kit.Request) Error
+	Update(res kit.Resource, obj db.Model, r kit.Request) kit.Error
 }
 
 type BeforeUpdateHook interface {
-	BeforeUpdate(res kit.Resource, obj, oldobj db.Model, user kit.User) Error
+	BeforeUpdate(res kit.Resource, obj, oldobj db.Model, user kit.User) kit.Error
 }
 
 type AllowUpdateHook interface {
@@ -82,7 +85,7 @@ type AllowUpdateHook interface {
 }
 
 type AfterUpdateHook interface {
-	AfterUpdate(res kit.Resource, obj, oldobj db.Model, user kit.User) Error
+	AfterUpdate(res kit.Resource, obj, oldobj db.Model, user kit.User) kit.Error
 }
 
 /**
@@ -94,11 +97,11 @@ type ApiDeleteHook interface {
 }
 
 type DeleteHook interface {
-	Delete(res kit.Resource, obj db.Model, user kit.User) Error
+	Delete(res kit.Resource, obj db.Model, user kit.User) kit.Error
 }
 
 type BeforeDeleteHook interface {
-	BeforeDelete(res kit.Resource, obj db.Model, user kit.User) Error
+	BeforeDelete(res kit.Resource, obj db.Model, user kit.User) kit.Error
 }
 
 type AllowDeleteHook interface {
@@ -106,5 +109,5 @@ type AllowDeleteHook interface {
 }
 
 type AfterDeleteHook interface {
-	AfterDelete(res kit.Resource, obj db.Model, user kit.User) Error
+	AfterDelete(res kit.Resource, obj db.Model, user kit.User) kit.Error
 }

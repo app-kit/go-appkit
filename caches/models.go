@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"time"
 
-	. "github.com/theduke/go-appkit/error"
 	kit "github.com/theduke/go-appkit"
 )
 
@@ -38,11 +37,11 @@ func (i *StrItem) SetValue(x interface{}) {
 	}
 }
 
-func (i *StrItem) ToString() (string, Error) {
+func (i *StrItem) ToString() (string, kit.Error) {
 	return i.Value, nil
 }
 
-func (i *StrItem) FromString(x string) Error {
+func (i *StrItem) FromString(x string) kit.Error {
 	i.Value = x
 	return nil
 }
@@ -87,14 +86,14 @@ func (i *MapItem) SetValue(x interface{}) {
 	}
 }
 
-func (i *MapItem) ToString() (string, Error) {
+func (i *MapItem) ToString() (string, kit.Error) {
 	if i.Value == nil {
 		return "", nil
 	}
 
 	js, err := json.Marshal(i.Value)
 	if err != nil {
-		return "", AppError{
+		return "", kit.AppError{
 			Code:     "cache_mapitem_marshal_error",
 			Message:  err.Error(),
 			Errors:   []error{err},
@@ -105,9 +104,9 @@ func (i *MapItem) ToString() (string, Error) {
 	return string(js), nil
 }
 
-func (i *MapItem) FromString(x string) Error {
+func (i *MapItem) FromString(x string) kit.Error {
 	if err := json.Unmarshal([]byte(x), &i.Value); err != nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "cache_mapitem_unmarshal_error",
 			Message:  err.Error(),
 			Errors:   []error{err},
@@ -130,14 +129,14 @@ func (i *Item) SetValue(x interface{}) {
 	i.Value = x
 }
 
-func (i *Item) ToString() (string, Error) {
+func (i *Item) ToString() (string, kit.Error) {
 	if i.Value == nil {
 		return "", nil
 	}
 
 	js, err := json.Marshal(i.Value)
 	if err != nil {
-		return "", AppError{
+		return "", kit.AppError{
 			Code:     "cache_item_marshal_error",
 			Message:  err.Error(),
 			Errors:   []error{err},
@@ -148,9 +147,9 @@ func (i *Item) ToString() (string, Error) {
 	return string(js), nil
 }
 
-func (i *Item) FromString(x string) Error {
+func (i *Item) FromString(x string) kit.Error {
 	if i.Value == nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "cache_item_empty_value",
 			Message:  "When using a generic Item{} for caching, the value must already be set to an empty struct to hold the information",
 			Internal: true,
@@ -158,7 +157,7 @@ func (i *Item) FromString(x string) Error {
 	}
 
 	if err := json.Unmarshal([]byte(x), &i.Value); err != nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "cache_item_unmarshal_error",
 			Message:  err.Error(),
 			Errors:   []error{err},

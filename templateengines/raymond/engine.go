@@ -5,7 +5,6 @@ import (
 
 	"github.com/aymerick/raymond"
 
-	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/templateengines"
 	"github.com/theduke/go-appkit/utils"
 )
@@ -26,7 +25,7 @@ func New() *Engine {
 func (e *Engine) Build(name, tpl string) (interface{}, Error) {
 	t, err := raymond.Parse(tpl)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:    "tpl_parse_error",
 			Message: err.Error(),
 		}
@@ -79,7 +78,7 @@ func (e *Engine) BuildFileAndRender(name string, data interface{}, paths ...stri
 func (e *Engine) Render(name string, data interface{}) ([]byte, Error) {
 	t, ok := e.templates[name]
 	if !ok {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:    "unknown_template",
 			Message: fmt.Sprintf("Template %v was not registered with engine", name),
 		}
@@ -87,7 +86,7 @@ func (e *Engine) Render(name string, data interface{}) ([]byte, Error) {
 
 	output, err := t.Exec(data)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:    "tpl_render_error",
 			Message: err.Error(),
 		}

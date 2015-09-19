@@ -8,7 +8,6 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 )
 
 func randomToken() string {
@@ -39,10 +38,10 @@ type SessionResourceHooks struct {
 	ApiDeleteAllowed bool
 }
 
-func StartSession(res kit.Resource, user kit.User) (kit.Session, Error) {
+func StartSession(res kit.Resource, user kit.User) (kit.Session, kit.Error) {
 	token := randomToken()
 	if token == "" {
-		return nil, AppError{Code: "token_creation_failed"}
+		return nil, kit.AppError{Code: "token_creation_failed"}
 	}
 
 	rawSession, err := res.Backend().NewModel(res.Model().Collection())
@@ -73,7 +72,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r ki
 	}
 
 	// Find user.
-	userResource := res.UserService().UserResource()
+	userResource := res.Dependencies().UserService().UserResource()
 
 	rawUser, err := userResource.Q().
 		Filter("username", userIdentifier).Or("email", userIdentifier).First()
@@ -96,7 +95,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r ki
 		kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
 	}
 
-	err = res.UserService().AuthenticateUser(user, adaptor, data)
+	err = res.Dependencies().UserService().AuthenticateUser(user, adaptor, data)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
@@ -133,7 +132,7 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.R
 	}
 
 	user := obj.(kit.User)
-	if err := res.UserService().CreateUser(user, adaptor, data); err != nil {
+	if err := res.Dependencies().UserService().CreateUser(user, adaptor, data); err != nil {
 		return &kit.AppResponse{Error: err}
 	}
 

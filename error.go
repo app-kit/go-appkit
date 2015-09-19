@@ -1,8 +1,21 @@
-package error
+package appkit
 
 import (
 	"fmt"
 )
+
+type Error interface {
+	GetCode() string
+	GetMessage() string
+	GetData() interface{}
+
+	IsInternal() bool
+
+	GetErrors() []error
+	AddError(error)
+
+	Error() string
+}
 
 type AppError struct {
 	Code     string      `json:"code,omitempty"`
@@ -50,4 +63,12 @@ func (e AppError) Error() string {
 	}
 
 	return s
+}
+
+func WrapError(code string, err error) *AppError {
+	return &AppError{
+		Code:    code,
+		Message: err.Error(),
+		Errors:  []error{err},
+	}
 }

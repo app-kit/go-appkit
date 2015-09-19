@@ -8,7 +8,6 @@ import (
 
 	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/caches"
-	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/utils"
 )
 
@@ -39,6 +38,7 @@ type Config struct {
 }
 
 type Redis struct {
+	name   string
 	config Config
 	pool   *redis.Pool
 }
@@ -47,7 +47,7 @@ type Redis struct {
 var _ kit.Cache = (*Redis)(nil)
 
 func redisErr(err error) Error {
-	return AppError{
+	return kit.AppError{
 		Code:     "redis_error",
 		Message:  err.Error(),
 		Errors:   []error{err},
@@ -70,6 +70,7 @@ func New(conf Config) (*Redis, Error) {
 	}
 
 	r := &Redis{
+		name:   "redis",
 		config: conf,
 	}
 
@@ -78,6 +79,10 @@ func New(conf Config) (*Redis, Error) {
 	// Test connection.
 
 	return r, nil
+}
+
+func (r *Redis) Name() string {
+	return r.name
 }
 
 func (r *Redis) buildPool() {
@@ -147,19 +152,19 @@ func (r *Redis) cleanKeys(rawKeys []string) []string {
 func (r *Redis) Set(item kit.CacheItem) Error {
 	key := item.GetKey()
 	if key == "" {
-		return AppError{Code: "empty_key"}
+		return kit.AppError{Code: "empty_key"}
 	}
 	key = r.key(key)
 
 	if item.IsExpired() {
-		return AppError{Code: "item_expired"}
+		return kit.AppError{Code: "item_expired"}
 	}
 
 	expireSeconds := 0
 	if expires := item.GetExpiresAt(); !expires.IsZero() {
 		seconds := expires.Sub(time.Now()).Seconds()
 		if seconds > 0 && seconds < 1 {
-			return AppError{Code: "item_expired"}
+			return kit.AppError{Code: "item_expired"}
 		}
 		expireSeconds = int(seconds)
 	}
@@ -169,7 +174,7 @@ func (r *Redis) Set(item kit.CacheItem) Error {
 
 	value, err := item.ToString()
 	if err != nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "cacheitem_tostring_error",
 			Message:  err.Error(),
 			Errors:   []error{err},
@@ -177,7 +182,7 @@ func (r *Redis) Set(item kit.CacheItem) Error {
 		}
 	}
 	if value == "" {
-		return AppError{Code: "empty_value"}
+		return kit.AppError{Code: "empty_value"}
 	}
 
 	conn.Send("SET", key, value)
@@ -218,7 +223,7 @@ func (r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
 	var item kit.CacheItem = &StrItem{}
 	if items != nil {
 		if len(items) != 1 {
-			return nil, AppError{
+			return nil, kit.AppError{
 				Code:     "invalid_item",
 				Message:  "You must specify one item only",
 				Internal: true,
@@ -228,7 +233,7 @@ func (r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
 	}
 
 	if key == "" {
-		return nil, AppError{Code: "empty_key"}
+		return nil, kit.AppError{Code: "empty_key"}
 	}
 	item.SetKey(key)
 	key = r.key(key)
@@ -246,7 +251,7 @@ func (r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
 		return nil, nil
 	}
 	if err := item.FromString(result[0]); err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:     "cacheitem_fromstring_error",
 			Message:  err.Error(),
 			Errors:   []error{err},
@@ -297,7 +302,7 @@ func (r *Redis) Delete(keys ...string) Error {
 	ifKeys := make([]interface{}, 0)
 	for _, key := range keys {
 		if key == "" {
-			return AppError{Code: "empty_key"}
+			return kit.AppError{Code: "empty_key"}
 		}
 
 		key = r.key(key)

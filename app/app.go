@@ -16,7 +16,6 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 	//"github.com/theduke/go-appkit/caches"
 	"github.com/theduke/go-appkit/crawler"
 	"github.com/theduke/go-appkit/resources"
@@ -32,20 +31,7 @@ type App struct {
 
 	logger *logrus.Logger
 
-	config *config.EnvConfig
-
-	defaultBackend db.Backend
-	backends       map[string]db.Backend
-
-	caches map[string]kit.Cache
-
-	emailService kit.EmailService
-
-	templateEngine kit.TemplateEngine
-
-	resources   map[string]kit.Resource
-	userService kit.UserService
-	fileService kit.FileService
+	deps kit.Dependencies
 
 	methods map[string]kit.Method
 
@@ -67,45 +53,47 @@ type App struct {
 var _ kit.App = (*App)(nil)
 
 func NewApp(cfgPath string) *App {
-	app := App{}
-	app.resources = make(map[string]kit.Resource)
-	app.backends = make(map[string]db.Backend)
-	app.caches = make(map[string]kit.Cache)
-	app.methods = make(map[string]kit.Method)
-
-	app.beforeMiddlewares = make([]kit.RequestHandler, 0)
-	app.afterMiddlewares = make([]kit.AfterRequestMiddleware, 0)
-
-	app.RegisterBeforeMiddleware(RequestTraceMiddleware)
-	app.RegisterBeforeMiddleware(AuthenticationMiddleware)
-
-	app.RegisterAfterMiddleware(ServerErrorMiddleware)
-	app.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
-	app.RegisterAfterMiddleware(RequestLoggerMiddleware)
-
-	// Configure logger.
-	app.logger = &logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: new(logrus.TextFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
+	app := App{
+		deps:              NewDependencies(),
+		methods:           make(map[string]kit.Method),
+		beforeMiddlewares: make([]kit.RequestHandler, 0),
+		afterMiddlewares:  make([]kit.AfterRequestMiddleware, 0),
 	}
 
 	app.api2go = api2go.NewAPI("api")
 	app.router = app.api2go.Router()
 
+	// Configure logger.
+	app.SetLogger(&logrus.Logger{
+		Out:       os.Stderr,
+		Formatter: new(logrus.TextFormatter),
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.DebugLevel,
+	})
+
 	app.InitCli()
 	app.ReadConfig(cfgPath)
 
-	app.RegisterMethod(createMethod())
-	app.RegisterMethod(updateMethod())
-	app.RegisterMethod(deleteMethod())
-	app.RegisterMethod(queryMethod())
-
-	// EmailService setup.
-	app.buildEmailService()
+	app.Defaults()
 
 	return &app
+}
+
+func (a *App) Defaults() {
+	// EmailService setup.
+	a.buildEmailService()
+
+	a.RegisterMethod(createMethod())
+	a.RegisterMethod(updateMethod())
+	a.RegisterMethod(deleteMethod())
+	a.RegisterMethod(queryMethod())
+
+	a.RegisterBeforeMiddleware(RequestTraceMiddleware)
+	a.RegisterBeforeMiddleware(AuthenticationMiddleware)
+
+	a.RegisterAfterMiddleware(ServerErrorMiddleware)
+	a.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
+	a.RegisterAfterMiddleware(RequestLoggerMiddleware)
 }
 
 func (a *App) ENV() string {
@@ -124,12 +112,17 @@ func (a *App) SetDebug(x bool) {
 	a.debug = x
 }
 
+func (a *App) Dependencies() kit.Dependencies {
+	return a.deps
+}
+
 func (a *App) Logger() *logrus.Logger {
 	return a.logger
 }
 
 func (a *App) SetLogger(x *logrus.Logger) {
 	a.logger = x
+	a.deps.SetLogger(x)
 }
 
 func (a *App) Router() *httprouter.Router {
@@ -137,19 +130,19 @@ func (a *App) Router() *httprouter.Router {
 }
 
 func (a *App) TmpDir() string {
-	return a.config.UString("tmpDir", "tmp")
+	return a.deps.Config().UString("tmpDir", "tmp")
 }
 
 /**
  * Config.
  */
 
-func (a *App) Config() *config.EnvConfig {
-	return a.config
+func (a *App) Config() *config.Config {
+	return a.deps.Config()
 }
 
-func (a *App) SetConfig(x *config.EnvConfig) {
-	a.config = x
+func (a *App) SetConfig(x *config.Config) {
+	a.deps.SetConfig(x)
 }
 
 func (a *App) ReadConfig(path string) {
@@ -160,7 +153,7 @@ func (a *App) ReadConfig(path string) {
 	var cfg *config.Config
 
 	if f, err := os.Open(path); err != nil {
-		a.logger.Infof("Could not find or read config at '%v' - Using default settings\n", path)
+		a.Logger().Infof("Could not find or read config at '%v' - Using default settings\n", path)
 	} else {
 		defer f.Close()
 		content, err := ioutil.ReadAll(f)
@@ -186,7 +179,7 @@ func (a *App) ReadConfig(path string) {
 	// Set default values if not present.
 	env := cfg.UString("ENV", "dev")
 	if env == "dev" {
-		a.logger.Info("No environment specified, defaulting to 'dev'")
+		a.Logger().Info("No environment specified, defaulting to 'dev'")
 		a.debug = true
 	}
 	a.env = env
@@ -199,12 +192,13 @@ func (a *App) ReadConfig(path string) {
 		panic(fmt.Sprintf("Could not read or create tmp dir at '%v': %v", tmpDir, err))
 	}
 
-	a.config = &config.EnvConfig{Env: env, Config: cfg}
+	a.deps.SetConfig(cfg)
 }
 
 func (a *App) PrepareBackends() {
-	for name := range a.backends {
-		a.backends[name].BuildRelationshipInfo()
+	backends := a.deps.Backends()
+	for name := range backends {
+		backends[name].BuildRelationshipInfo()
 	}
 }
 
@@ -212,9 +206,9 @@ func (a *App) PrepareForRun() {
 	a.PrepareBackends()
 
 	// Auto migrate if enabled or not explicitly disabled and env is debug.
-	if auto, err := a.config.Bool("autoRunMigrations"); (err == nil && auto) || (err != nil && a.env == "dev") {
+	if auto, err := a.Config().Bool("autoRunMigrations"); (err == nil && auto) || (err != nil && a.env == "dev") {
 		if err := a.MigrateAllBackends(false); err != nil {
-			a.logger.Errorf("Migration FAILED: %v\n", err)
+			a.Logger().Errorf("Migration FAILED: %v\n", err)
 		}
 	}
 }
@@ -247,11 +241,11 @@ func (a *App) Run() {
 	})
 
 	// Serve files routes.
-	serveFiles := a.config.UMap("serveFiles")
+	serveFiles := a.Config().UMap("serveFiles")
 	for route := range serveFiles {
 		path, ok := serveFiles[route].(string)
 		if !ok {
-			a.logger.Error("Config error: serveFiles configuration invalid: Must be map/dictionary with paths")
+			a.Logger().Error("Config error: serveFiles configuration invalid: Must be map/dictionary with paths")
 			continue
 		}
 		a.ServeFiles(route, path)
@@ -283,8 +277,9 @@ func (a *App) Run() {
 	})
 
 	// Register api2json resources.
-	for key := range a.resources {
-		res := a.resources[key]
+	resources := a.deps.Resources()
+	for key := range resources {
+		res := resources[key]
 		a.api2go.AddResource(res.Model(), Api2GoResource{
 			AppResource: res,
 			App:         a,
@@ -296,17 +291,17 @@ func (a *App) Run() {
 	a.sessionManager.Run()
 
 	// Crawl on startup if enabled.
-	if a.config.UBool("crawler.onRun", false) {
+	if a.Config().UBool("crawler.onRun", false) {
 		a.RunCrawler()
 	}
 
-	url := a.config.UString("host", "localhost") + ":" + a.config.UString("port", "8000")
-	a.logger.Infof("Serving on %v", url)
+	url := a.Config().UString("host", "localhost") + ":" + a.Config().UString("port", "8000")
+	a.Logger().Infof("Serving on %v", url)
 
 	handler := a.api2go.Handler()
 	err2 := http.ListenAndServe(url, handler)
 	if err2 != nil {
-		a.logger.Panicf("Could not start server: %v\n", err)
+		a.Logger().Panicf("Could not start server: %v\n", err)
 	}
 }
 
@@ -315,9 +310,9 @@ func (a *App) Run() {
  */
 
 func (a *App) RunCrawler() {
-	recrawlInterval := a.config.UInt("crawler.recrawlInterval", 0)
+	recrawlInterval := a.Config().UInt("crawler.recrawlInterval", 0)
 
-	a.logger.Infof("Running crawler with recrawl interval %v", recrawlInterval)
+	a.Logger().Infof("Running crawler with recrawl interval %v", recrawlInterval)
 
 	go func() {
 		for {
@@ -333,10 +328,10 @@ func (a *App) RunCrawler() {
 }
 
 func (a *App) Crawl() {
-	concurrentRequests := a.config.UInt("crawler.concurrentRequests", 5)
-	host := a.config.UString("url")
+	concurrentRequests := a.Config().UInt("crawler.concurrentRequests", 5)
+	host := a.Config().UString("url")
 	if host == "" {
-		a.logger.Error("Can't crawl because 'url' setting is not specified")
+		a.Logger().Error("Can't crawl because 'url' setting is not specified")
 		return
 	}
 
@@ -353,7 +348,7 @@ func (a *App) Crawl() {
  */
 
 func (a App) ServeFiles(route string, path string) {
-	a.logger.Debugf("Serving files from directory '%v' at route '%v'", path, route)
+	a.Logger().Debugf("Serving files from directory '%v' at route '%v'", path, route)
 
 	server := http.FileServer(http.Dir(path))
 	a.Router().GET(route+"/*path", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -367,33 +362,27 @@ func (a App) ServeFiles(route string, path string) {
  * Backends.
  */
 
-func (a *App) RegisterBackend(name string, b db.Backend) {
-	b.SetLogger(a.logger)
-	a.backends[name] = b
-	if a.defaultBackend == nil {
-		a.defaultBackend = b
+func (a *App) RegisterBackend(b db.Backend) {
+	if b.GetLogger() == nil {
+		b.SetLogger(a.Logger())
 	}
+	a.deps.AddBackend(b)
 }
 
 func (a *App) Backend(name string) db.Backend {
-	b, ok := a.backends[name]
-	if !ok {
-		panic("Unknown backend: " + name)
-	}
-
-	return b
+	return a.deps.Backend(name)
 }
 
 /**
  * Caches.
  */
 
-func (a *App) RegisterCache(name string, c kit.Cache) {
-	a.caches[name] = c
+func (a *App) RegisterCache(c kit.Cache) {
+	a.deps.AddCache(c)
 }
 
 func (a *App) Cache(name string) kit.Cache {
-	return a.caches[name]
+	return a.deps.Cache(name)
 }
 
 /**
@@ -401,13 +390,13 @@ func (a *App) Cache(name string) kit.Cache {
  */
 
 func (a *App) buildEmailService() {
-	host := a.config.UString("email.host")
-	port := a.config.UInt("email.port")
-	user := a.config.UString("email.user")
-	pw := a.config.UString("email.password")
+	host := a.deps.Config().UString("email.host")
+	port := a.deps.Config().UInt("email.port")
+	user := a.deps.Config().UString("email.user")
+	pw := a.deps.Config().UString("email.password")
 
-	fromEmail := a.config.UString("email.from", "no-reply@appkit")
-	fromName := a.config.UString("email.fromName", "Appkit")
+	fromEmail := a.deps.Config().UString("email.from", "no-reply@appkit")
+	fromName := a.deps.Config().UString("email.fromName", "Appkit")
 
 	from := email.Recipient{
 		Email: fromEmail,
@@ -415,20 +404,24 @@ func (a *App) buildEmailService() {
 	}
 
 	if host != "" && port > 0 && user != "" && pw != "" {
-		a.emailService = gomail.New(host, port, user, pw, fromEmail, fromName)
-		a.logger.Debug("Using gomail email service")
+		a.RegisterEmailService(gomail.New(a.deps, host, port, user, pw, fromEmail, fromName))
+		a.Logger().Debug("Using gomail email service")
 	} else {
-		a.emailService = emaillog.New(a.logger, from)
-		a.logger.Debug("Using log email service")
+		a.RegisterEmailService(emaillog.New(a.deps, from))
+		a.Logger().Debug("Using log email service")
 	}
 }
 
 func (a *App) RegisterEmailService(s kit.EmailService) {
-	a.emailService = s
+	if s.Dependencies() == nil {
+		s.SetDependencies(a.deps)
+	}
+	s.SetDebug(a.debug)
+	a.deps.SetEmailService(s)
 }
 
 func (a *App) EmailService() kit.EmailService {
-	return a.emailService
+	return a.deps.EmailService()
 }
 
 /**
@@ -436,11 +429,11 @@ func (a *App) EmailService() kit.EmailService {
  */
 
 func (a *App) RegisterTemplateEngine(e kit.TemplateEngine) {
-	a.templateEngine = e
+	a.deps.SetTemplateEngine(e)
 }
 
 func (a *App) TemplateEngine() kit.TemplateEngine {
-	return a.templateEngine
+	return a.deps.TemplateEngine()
 }
 
 /**
@@ -455,9 +448,9 @@ func (a *App) RegisterMethod(method kit.Method) {
 	a.methods[method.Name()] = method
 }
 
-func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, Error) {
+func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, kit.Error) {
 	if r.GetSession() == nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:    "no_session",
 			Message: "Can't run a method without a session",
 		}
@@ -465,7 +458,7 @@ func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response)
 
 	method := a.methods[name]
 	if method == nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:    "unknown_method",
 			Message: fmt.Sprintf("The method %v does not exist", name),
 		}
@@ -486,34 +479,25 @@ func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response)
  * Resources.
  */
 
-func (a *App) RegisterResource(model db.Model, hooks interface{}) {
-	res := resources.NewResource(model, hooks)
-	a.RegisterCustomResource(res)
-}
-
-func (a *App) RegisterCustomResource(res kit.Resource) {
-	res.SetApp(a)
-	res.SetDebug(a.debug)
-
+func (a *App) RegisterResource(res kit.Resource) {
 	if res.Backend() == nil {
-		if a.defaultBackend == nil {
+		if a.deps.DefaultBackend() == nil {
 			panic("Registering resource without backend, but no default backend set.")
 		}
 
 		// Set backend.
-		res.SetBackend(a.defaultBackend)
+		res.SetBackend(a.deps.DefaultBackend())
 	}
 
-	// Register model with the backend.
-	res.Backend().RegisterModel(res.Model())
-
-	// Set userhandler if neccessary.
-	if res.UserService() == nil {
-		res.SetUserService(a.userService)
+	if res.Dependencies() == nil {
+		res.SetDependencies(a.deps)
 	}
 
-	// Allow a resource to register custom http routes.
+	res.SetDebug(a.debug)
+
+	// Allow a resource to register custom http routes and methods.
 	if res.Hooks() != nil {
+		// Handle http routes.
 		if resRoutes, ok := res.Hooks().(resources.ApiHttpRoutes); ok {
 			for _, route := range resRoutes.HttpRoutes(res) {
 				// Need to wrap this in a lambda, because otherwise, the last routes
@@ -525,54 +509,41 @@ func (a *App) RegisterCustomResource(res kit.Resource) {
 				}(route)
 			}
 		}
+
+		// Handle methods.
+		if resMethods, ok := res.Hooks().(resources.MethodsHook); ok {
+			for _, method := range resMethods.Methods(res) {
+				a.RegisterMethod(method)
+			}
+		}
 	}
 
-	a.resources[res.Model().Collection()] = res
+	a.deps.AddResource(res)
 }
 
 func (a App) Resource(name string) kit.Resource {
-	r, ok := a.resources[name]
-	if !ok {
-		return nil
-	}
-
-	return r
+	return a.deps.Resource(name)
 }
 
 /**
  * UserHandler.
  */
 
-func (a *App) RegisterUserService(h kit.UserService) {
-	a.userService = h
-	a.RegisterCustomResource(h.UserResource())
-	a.RegisterCustomResource(h.SessionResource())
-
-	if profileModel := h.ProfileModel(); profileModel != nil {
-		a.defaultBackend.RegisterModel(profileModel)
+func (a *App) RegisterUserService(s kit.UserService) {
+	if s.Dependencies() == nil {
+		s.SetDependencies(a.deps)
 	}
 
-	auth := h.AuthItemResource()
-	if auth.Backend() == nil {
-		a.defaultBackend.RegisterModel(auth.Model())
-		auth.SetBackend(a.defaultBackend)
-	}
+	s.SetDebug(a.debug)
 
-	roles := h.RoleResource()
-	if roles.Backend() == nil {
-		a.defaultBackend.RegisterModel(roles.Model())
-		roles.SetBackend(a.defaultBackend)
-	}
+	a.RegisterResource(s.UserResource())
+	a.RegisterResource(s.SessionResource())
 
-	permissions := h.PermissionResource()
-	if permissions.Backend() == nil {
-		a.defaultBackend.RegisterModel(permissions.Model())
-		permissions.SetBackend(a.defaultBackend)
-	}
+	a.deps.SetUserService(s)
 }
 
 func (a *App) UserService() kit.UserService {
-	return a.userService
+	return a.deps.UserService()
 }
 
 /**
@@ -585,14 +556,17 @@ func (a *App) RegisterFileService(f kit.FileService) {
 		panic("Trying to register file handler without resource")
 	}
 
-	a.RegisterCustomResource(r)
-	f.SetApp(a)
+	if f.Dependencies() == nil {
+		f.SetDependencies(a.deps)
+	}
+	f.SetDebug(a.debug)
 
-	a.fileService = f
+	a.RegisterResource(r)
+	a.deps.SetFileService(f)
 }
 
 func (a *App) FileService() kit.FileService {
-	return a.fileService
+	return a.deps.FileService()
 }
 
 /**
@@ -645,11 +619,11 @@ func (a *App) RegisterHttpHandler(method, path string, handler kit.RequestHandle
  * Migrations and Backend functionality.
  */
 
-func (a *App) MigrateBackend(name string, version int, force bool) Error {
-	a.logger.Infof("MIGRATE: Migrating backend '%v'", name)
+func (a *App) MigrateBackend(name string, version int, force bool) kit.Error {
+	a.Logger().Infof("MIGRATE: Migrating backend '%v'", name)
 	backend := a.Backend(name)
 	if backend == nil {
-		return AppError{
+		return kit.AppError{
 			Code:    "unknown_backend",
 			Message: fmt.Sprint("The backend '%v' does not exist", name),
 		}
@@ -657,7 +631,7 @@ func (a *App) MigrateBackend(name string, version int, force bool) Error {
 
 	migrationBackend, ok := backend.(db.MigrationBackend)
 	if !ok {
-		return AppError{
+		return kit.AppError{
 			Code:    "backend_cant_migrate",
 			Message: fmt.Sprintf("The backend '%v' does not support migrations", name),
 		}
@@ -672,9 +646,10 @@ func (a *App) MigrateBackend(name string, version int, force bool) Error {
 	return nil
 }
 
-func (a *App) MigrateAllBackends(force bool) Error {
-	a.logger.Infof("MIGRATE: Migrating all backends to newest version")
-	for key := range a.backends {
+func (a *App) MigrateAllBackends(force bool) kit.Error {
+	a.Logger().Infof("MIGRATE: Migrating all backends to newest version")
+	backends := a.deps.Backends()
+	for key := range backends {
 		if err := a.MigrateBackend(key, 0, force); err != nil {
 			return err
 		}
@@ -683,48 +658,48 @@ func (a *App) MigrateAllBackends(force bool) Error {
 	return nil
 }
 
-func (a *App) DropBackend(name string) Error {
+func (a *App) DropBackend(name string) kit.Error {
 	b := a.Backend(name)
 	if b == nil {
 		panic("Unknown backend " + name)
 	}
 
-	a.logger.Infof("Dropping all collections on backend " + name)
+	a.Logger().Infof("Dropping all collections on backend " + name)
 
 	if err := b.DropAllCollections(); err != nil {
-		a.logger.Errorf("Dropping all collections failed: %v", err)
+		a.Logger().Errorf("Dropping all collections failed: %v", err)
 		return err
 	}
 
 	return nil
 }
 
-func (a *App) DropAllBackends() Error {
-	a.logger.Infof("Dropping all backends")
-	for name := range a.backends {
+func (a *App) DropAllBackends() kit.Error {
+	a.Logger().Infof("Dropping all backends")
+	for name := range a.deps.Backends() {
 		if err := a.DropBackend(name); err != nil {
 			return err
 		}
 	}
-	a.logger.Infof("Successfully dropped all collections")
+	a.Logger().Infof("Successfully dropped all collections")
 	return nil
 }
 
-func (a *App) RebuildBackend(name string) Error {
+func (a *App) RebuildBackend(name string) kit.Error {
 	b := a.Backend(name)
 	if b == nil {
 		panic("Unknown backend " + name)
 	}
 
-	a.logger.Infof("Rebuilding backend " + name)
+	a.Logger().Infof("Rebuilding backend " + name)
 
 	if err := a.DropBackend(name); err != nil {
 		return err
 	}
 
 	if err := a.MigrateBackend(name, 0, false); err != nil {
-		a.logger.Errorf("Migration failed: %v", err)
-		return AppError{
+		a.Logger().Errorf("Migration failed: %v", err)
+		return kit.AppError{
 			Code:    "backend_migration_failed",
 			Message: err.Error(),
 		}
@@ -733,19 +708,19 @@ func (a *App) RebuildBackend(name string) Error {
 	return nil
 }
 
-func (a *App) RebuildAllBackends() Error {
-	a.logger.Infof("Rebuilding all backends")
-	for key := range a.backends {
+func (a *App) RebuildAllBackends() kit.Error {
+	a.Logger().Infof("Rebuilding all backends")
+	for key := range a.deps.Backends() {
 		if err := a.RebuildBackend(key); err != nil {
 			return err
 		}
 	}
 
-	a.logger.Infof("Successfully migrated all backends")
+	a.Logger().Infof("Successfully migrated all backends")
 
 	return nil
 }
 
 func (a App) UserHandler() kit.UserService {
-	return a.userService
+	return a.UserService()
 }

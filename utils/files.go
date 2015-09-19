@@ -8,14 +8,14 @@ import (
 
 	"github.com/twinj/uuid"
 
-	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
-func AbsPath(p string) (string, Error) {
+func AbsPath(p string) (string, kit.Error) {
 	if !path.IsAbs(p) {
 		wd, err := os.Getwd()
 		if err != nil {
-			return "", AppError{
+			return "", kit.AppError{
 				Code:     "get_wd_error",
 				Message:  err.Error(),
 				Internal: true,
@@ -27,13 +27,13 @@ func AbsPath(p string) (string, Error) {
 	return p, nil
 }
 
-func FileExists(path string) (bool, Error) {
+func FileExists(path string) (bool, kit.Error) {
 	f, err := os.Open(path)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
 		} else {
-			return false, AppError{
+			return false, kit.AppError{
 				Code:     "file_read_error",
 				Message:  err.Error(),
 				Internal: true,
@@ -45,10 +45,10 @@ func FileExists(path string) (bool, Error) {
 	return true, nil
 }
 
-func ReadFile(path string) ([]byte, Error) {
+func ReadFile(path string) ([]byte, kit.Error) {
 	f, err := os.Open(path)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:     "file_open_error",
 			Message:  fmt.Sprintf("Could not open file at %v: %v", path, err),
 			Errors:   []error{err},
@@ -58,7 +58,7 @@ func ReadFile(path string) ([]byte, Error) {
 
 	content, err := ioutil.ReadAll(f)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:     "file_read_error",
 			Message:  fmt.Sprintf("Could not read file at %v: %v", path, err),
 			Errors:   []error{err},
@@ -69,7 +69,7 @@ func ReadFile(path string) ([]byte, Error) {
 	return content, nil
 }
 
-func WriteFile(p string, content []byte, createDir bool) Error {
+func WriteFile(p string, content []byte, createDir bool) kit.Error {
 	if createDir {
 		dir, err := AbsPath(path.Dir(p))
 		if err != nil {
@@ -78,7 +78,7 @@ func WriteFile(p string, content []byte, createDir bool) Error {
 
 		if dir != "" {
 			if err := os.MkdirAll(dir, 0777); err != nil {
-				return AppError{
+				return kit.AppError{
 					Code:     "mkdir_error",
 					Message:  err.Error(),
 					Internal: true,
@@ -89,7 +89,7 @@ func WriteFile(p string, content []byte, createDir bool) Error {
 
 	f, err := os.Create(p)
 	if err != nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "file_create_error",
 			Message:  err.Error(),
 			Internal: true,
@@ -98,7 +98,7 @@ func WriteFile(p string, content []byte, createDir bool) Error {
 	defer f.Close()
 
 	if _, err := f.Write(content); err != nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "file_write_error",
 			Message:  err.Error(),
 			Internal: true,
@@ -109,7 +109,7 @@ func WriteFile(p string, content []byte, createDir bool) Error {
 }
 
 // Write contents to a tmp file and return the path to the file.
-func WriteTmpFile(content []byte, name string) (string, Error) {
+func WriteTmpFile(content []byte, name string) (string, kit.Error) {
 	if name == "" {
 		name = uuid.NewV4().String()
 	} else if name[0] == '.' {
@@ -124,10 +124,10 @@ func WriteTmpFile(content []byte, name string) (string, Error) {
 	return p, nil
 }
 
-func ListFiles(path string) ([]string, Error) {
+func ListFiles(path string) ([]string, kit.Error) {
 	dir, err := os.Open(path)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:     "open_dir_error",
 			Message:  err.Error(),
 			Internal: true,
@@ -137,7 +137,7 @@ func ListFiles(path string) ([]string, Error) {
 
 	items, err := dir.Readdir(-1)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:    "read_error",
 			Message: err.Error(),
 		}

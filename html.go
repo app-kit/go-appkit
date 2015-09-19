@@ -6,8 +6,6 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
-
-	. "github.com/theduke/go-appkit/error"
 )
 
 type AppRequest struct {

@@ -1,13 +1,13 @@
 package app_test
 
 import (
-	"net/http"
 	"bytes"
-	"time"
-	"io"
-	"io/ioutil"
 	"encoding/json"
 	"fmt"
+	"io"
+	"io/ioutil"
+	"net/http"
+	"time"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
@@ -16,8 +16,8 @@ import (
 
 	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/app"
-	"github.com/theduke/go-appkit/users"
 	"github.com/theduke/go-appkit/files"
+	"github.com/theduke/go-appkit/users"
 )
 
 func buildApp() kit.App {
@@ -28,12 +28,12 @@ func buildApp() kit.App {
 	conf.Set("port", 10010)
 
 	backend := memory.New()
-	app.RegisterBackend("memory", backend)
+	app.RegisterBackend(backend)
 
-	userService := users.NewService(nil)
+	userService := users.NewService(nil, nil)
 	app.RegisterUserService(userService)
 
-	fileHandler := files.NewFileServiceWithFs("data")
+	fileHandler := files.NewFileServiceWithFs(nil, "data")
 	app.RegisterFileService(fileHandler)
 
 	app.PrepareBackends()
@@ -42,20 +42,20 @@ func buildApp() kit.App {
 }
 
 type Data struct {
-	Data interface{} `json:"data"`
-	Errors []error `json:"errors"`
-	Meta map[string]interface{} `json:"meta"`
+	Data   interface{}            `json:"data"`
+	Errors []kit.AppError         `json:"errors"`
+	Meta   map[string]interface{} `json:"meta"`
 }
 
 type Client struct {
 	Client *http.Client
-	Host string
+	Host   string
 }
 
 func NewClient(host string) *Client {
 	return &Client{
 		Client: &http.Client{},
-		Host: host,
+		Host:   host,
 	}
 }
 
@@ -68,7 +68,7 @@ func (c *Client) DoJson(method, path string, data string) (int, *Data, error) {
 	if path[0] != '/' {
 		path = "/" + path
 	}
-	req, err := http.NewRequest(method, c.Host + path, reader)
+	req, err := http.NewRequest(method, c.Host+path, reader)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -142,25 +142,25 @@ var _ = Describe("App", func() {
 				"meta": {"user": "user1@appkit.com", "adaptor": "password", "auth-data": {"password": "test"}}
 			}
 			`
-			status, rawData, err := client.PostJson("/api/sessions", js)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(status).To(Equal(201))
+		status, rawData, err := client.PostJson("/api/sessions", js)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(status).To(Equal(201))
 
-			data := rawData.Data.(map[string]interface{})
-			id := data["id"].(string)
+		data := rawData.Data.(map[string]interface{})
+		id := data["id"].(string)
 
-			rawSession, err := app.Backend("memory").FindOne("sessions", id)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(rawSession).ToNot(BeNil())
+		rawSession, err := app.Backend("memory").FindOne("sessions", id)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rawSession).ToNot(BeNil())
 
-			session := rawSession.(kit.Session)
+		session := rawSession.(kit.Session)
 
-			userId := session.GetUserID()
-			rawUser, err := app.Backend("memory").FindOne("users", userId)
-			Expect(err).ToNot(HaveOccurred())
-			Expect(rawUser).ToNot(BeNil())
+		userId := session.GetUserID()
+		rawUser, err := app.Backend("memory").FindOne("users", userId)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(rawUser).ToNot(BeNil())
 
-			user := rawUser.(kit.User)
-			Expect(user.GetEmail()).To(Equal("user1@appkit.com"))
+		user := rawUser.(kit.User)
+		Expect(user.GetEmail()).To(Equal("user1@appkit.com"))
 	})
 })

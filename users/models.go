@@ -8,7 +8,6 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 )
 
 type BaseAuthItem struct {
@@ -54,28 +53,28 @@ func (b *BaseAuthItem) GetType() string {
 	return b.Typ
 }
 
-func (b *BaseAuthItem) SetData(data interface{}) error {
+func (b *BaseAuthItem) SetData(data interface{}) kit.Error {
 	json, err := json.Marshal(data)
 	if err != nil {
-		return err
+		return kit.WrapError("auth_item_json_marshal_error", err)
 	}
 
 	b.Data = string(json)
 	return nil
 }
 
-func (b *BaseAuthItem) GetData() (interface{}, error) {
+func (b *BaseAuthItem) GetData() (interface{}, kit.Error) {
 	var data interface{}
 	if err := json.Unmarshal([]byte(b.Data), &data); err != nil {
-		return nil, err
+		return nil, kit.WrapError("auth_item_json_unmarshal_error", err)
 	}
 
 	return data, nil
 }
 
 type BaseAuthItemIntID struct {
-	ID uint64
 	BaseAuthItem
+	ID     uint64
 	UserID uint64 `gorm:"primary-key" sql:"not null;"`
 }
 
@@ -97,6 +96,8 @@ type BaseUser struct {
 
 	Username string `db:"unique;not-null"`
 	Email    string `db:"unique;not-null"`
+
+	EmailConfirmed bool
 
 	LastLogin time.Time `jsonapi:"name=last-login"`
 
@@ -147,6 +148,14 @@ func (u *BaseUser) GetEmail() string {
 	return u.Email
 }
 
+func (u *BaseUser) IsEmailConfirmed() bool {
+	return u.EmailConfirmed
+}
+
+func (u *BaseUser) SetIsEmailConfirmed(x bool) {
+	u.EmailConfirmed = x
+}
+
 func (u *BaseUser) SetUsername(x string) {
 	u.Username = x
 }
@@ -163,14 +172,14 @@ func (u *BaseUser) GetLastLogin() time.Time {
 	return u.LastLogin
 }
 
-func (u *BaseUser) GetData() (interface{}, Error) {
+func (u *BaseUser) GetData() (interface{}, kit.Error) {
 	if u.Data == "" {
 		return nil, nil
 	}
 	var data interface{}
 	err := json.Unmarshal([]byte(u.Data), &data)
 	if err != nil {
-		return nil, AppError{
+		return nil, kit.AppError{
 			Code:     "json_marshal_error",
 			Message:  err.Error(),
 			Internal: true,
@@ -179,10 +188,10 @@ func (u *BaseUser) GetData() (interface{}, Error) {
 	return data, nil
 }
 
-func (u *BaseUser) SetData(x interface{}) Error {
+func (u *BaseUser) SetData(x interface{}) kit.Error {
 	js, err := json.Marshal(x)
 	if err != nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "json_marshal_error",
 			Message:  err.Error(),
 			Internal: true,
@@ -330,6 +339,54 @@ func (p *BaseUserProfileIntID) SetUserID(x string) {
 
 func (p *BaseUserProfileIntID) GetUserID() string {
 	return strconv.FormatUint(p.UserID, 10)
+}
+
+type Token struct {
+	UserModelIntID
+
+	Type      string `db:"notnull"`
+	Token     string `db:"primary-key;unique;notnull;omit-zero"`
+	ExpiresAt time.Time
+}
+
+// Ensure that Token implements Token interface.
+var _ kit.UserToken = (*Token)(nil)
+
+func (t *Token) Collection() string {
+	return "user_tokens"
+}
+
+func (t *Token) GetID() string {
+	return t.Token
+}
+
+func (t *Token) SetID(x string) error {
+	t.Token = x
+	return nil
+}
+
+func (t *Token) GetType() string {
+	return t.Type
+}
+
+func (t *Token) SetType(x string) {
+	t.Type = x
+}
+
+func (t *Token) GetToken() string {
+	return t.Token
+}
+
+func (t *Token) SetToken(x string) {
+	t.Token = x
+}
+
+func (t *Token) GetExpiresAt() time.Time {
+	return t.ExpiresAt
+}
+
+func (t *Token) SetExpiresAt(tm time.Time) {
+	t.ExpiresAt = tm
 }
 
 /**
@@ -508,56 +565,54 @@ func (p *Permission) SetID(n string) error {
  * Extendable models that are related to a user.
  */
 
-type BaseUserModelStrID struct {
+type UserModelStrID struct {
 	db.BaseModelStrID
 
-	user   *BaseUserStrID
-	userID string
+	User   *BaseUserStrID
+	UserID string
 }
 
-func (m *BaseUserModelStrID) User() kit.User {
-	return m.user
+func (m *UserModelStrID) GetUser() kit.User {
+	return m.User
 }
 
-func (m *BaseUserModelStrID) SetUser(x kit.User) {
-	m.user = x.(*BaseUserStrID)
+func (m *UserModelStrID) SetUser(x kit.User) {
+	m.User = x.(*BaseUserStrID)
 	m.SetUserID(x.GetID())
 }
 
-func (m *BaseUserModelStrID) UserID() string {
-	return m.userID
+func (m *UserModelStrID) GetUserID() string {
+	return m.UserID
 }
 
-func (m *BaseUserModelStrID) SetUserID(x string) error {
-	m.userID = x
+func (m *UserModelStrID) SetUserID(x string) error {
+	m.UserID = x
 	return nil
 }
 
-type BaseUserModelIntID struct {
-	db.BaseModelIntID
-
-	user   *BaseUserIntID
-	userID uint64
+type UserModelIntID struct {
+	User   *BaseUserIntID
+	UserID uint64
 }
 
-func (m *BaseUserModelIntID) User() kit.User {
-	return m.user
+func (m *UserModelIntID) GetUser() kit.User {
+	return m.User
 }
 
-func (m *BaseUserModelIntID) SetUser(x kit.User) {
-	m.user = x.(*BaseUserIntID)
+func (m *UserModelIntID) SetUser(x kit.User) {
+	m.User = x.(*BaseUserIntID)
 	m.SetUserID(x.GetID())
 }
 
-func (m *BaseUserModelIntID) UserID() string {
-	return strconv.FormatUint(m.userID, 10)
+func (m *UserModelIntID) GetUserID() string {
+	return strconv.FormatUint(m.UserID, 10)
 }
 
-func (m *BaseUserModelIntID) SetUserID(rawId string) error {
+func (m *UserModelIntID) SetUserID(rawId string) error {
 	id, err := strconv.ParseUint(rawId, 10, 64)
 	if err != nil {
 		return err
 	}
-	m.userID = id
+	m.UserID = id
 	return nil
 }

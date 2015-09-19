@@ -3,17 +3,28 @@ package users
 import (
 	"time"
 
-	"github.com/theduke/go-appkit/users/auth"
+	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/resources"
+	"github.com/theduke/go-appkit/users/auth"
 )
 
+type Config struct {
+	SendConfirmationMail bool
+	ConfirmationTemplate string
+}
+
 type Service struct {
+	debug bool
+	deps  kit.Dependencies
+
+	backend db.Backend
+
 	Users     kit.Resource
 	Sessions  kit.Resource
 	AuthItems kit.Resource
+	Tokens    kit.Resource
 
 	Roles       kit.Resource
 	Permissions kit.Resource
@@ -26,8 +37,9 @@ type Service struct {
 // Ensure UserService implements kit.UserService.
 var _ kit.UserService = (*Service)(nil)
 
-func NewService(profileModel kit.UserProfile) *Service {
+func NewService(deps kit.Dependencies, profileModel kit.UserProfile) *Service {
 	h := Service{
+		deps:         deps,
 		profileModel: profileModel,
 	}
 
@@ -42,6 +54,8 @@ func NewService(profileModel kit.UserProfile) *Service {
 	})
 	h.Users = users
 
+	h.Tokens = resources.NewResource(&Token{}, nil)
+
 	sessions := resources.NewResource(&BaseSessionIntID{}, SessionResourceHooks{})
 	h.Sessions = sessions
 
@@ -55,6 +69,54 @@ func NewService(profileModel kit.UserProfile) *Service {
 	h.Permissions = permissions
 
 	return &h
+}
+
+func (s *Service) Debug() bool {
+	return s.debug
+}
+
+func (s *Service) SetDebug(x bool) {
+	s.debug = x
+}
+
+func (s *Service) Dependencies() kit.Dependencies {
+	return s.deps
+}
+
+func (s *Service) SetDependencies(x kit.Dependencies) {
+	s.deps = x
+	if s.backend == nil && x.DefaultBackend() != nil {
+		s.SetBackend(x.DefaultBackend())
+	}
+}
+
+func (s *Service) Backend() db.Backend {
+	return s.backend
+}
+
+func (s *Service) SetBackend(b db.Backend) {
+	s.Users.SetBackend(b)
+	b.RegisterModel(s.Users.Model())
+
+	s.Sessions.SetBackend(b)
+	b.RegisterModel(s.Sessions.Model())
+
+	s.AuthItems.SetBackend(b)
+	b.RegisterModel(s.AuthItems.Model())
+
+	s.Tokens.SetBackend(b)
+	b.RegisterModel(s.Tokens.Model())
+
+	s.Roles.SetBackend(b)
+	b.RegisterModel(s.Roles.Model())
+
+	s.Permissions.SetBackend(b)
+	b.RegisterModel(s.Permissions.Model())
+
+	if s.profileModel != nil {
+		b.RegisterModel(s.profileModel)
+	}
+	s.backend = b
 }
 
 func (h *Service) AuthAdaptor(name string) kit.AuthAdaptor {
@@ -89,6 +151,14 @@ func (h *Service) SetAuthItemResource(x kit.Resource) {
 	h.AuthItems = x
 }
 
+func (h *Service) TokenResource() kit.Resource {
+	return h.Tokens
+}
+
+func (h *Service) SetTokenResource(x kit.Resource) {
+	h.Tokens = x
+}
+
 func (h *Service) ProfileModel() kit.UserProfile {
 	return h.profileModel
 }
@@ -113,15 +183,15 @@ func (u *Service) SetPermissionResource(x kit.Resource) {
 	u.Permissions = x
 }
 
-func (h *Service) CreateUser(user kit.User, adaptorName string, authData interface{}) Error {
+func (h *Service) CreateUser(user kit.User, adaptorName string, authData interface{}) kit.Error {
 	adaptor := h.AuthAdaptor(adaptorName)
 	if adaptor == nil {
-		return AppError{Code: "unknown_auth_adaptor"}
+		return kit.AppError{Code: "unknown_auth_adaptor"}
 	}
 
 	data, err := adaptor.BuildData(user, authData)
 	if err != nil {
-		return AppError{Code: "adaptor_error", Message: err.Error()}
+		return kit.AppError{Code: "adaptor_error", Message: err.Error()}
 	}
 
 	if user.GetUsername() == "" {
@@ -134,7 +204,7 @@ func (h *Service) CreateUser(user kit.User, adaptorName string, authData interfa
 	if err2 != nil {
 		return err2
 	} else if oldUser != nil {
-		return AppError{
+		return kit.AppError{
 			Code:    "user_exists",
 			Message: "A user with the username or email already exists",
 		}
@@ -160,7 +230,7 @@ func (h *Service) CreateUser(user kit.User, adaptorName string, authData interfa
 		}
 	}
 
-	rawAuth, _ := h.AuthItems.Backend().NewModel(h.AuthItems.Model().Collection())
+	rawAuth := h.AuthItems.NewModel()
 	auth := rawAuth.(kit.AuthItem)
 	auth.SetUserID(user.GetID())
 	auth.SetType(adaptorName)
@@ -168,20 +238,33 @@ func (h *Service) CreateUser(user kit.User, adaptorName string, authData interfa
 
 	if err := h.AuthItems.Create(auth, nil); err != nil {
 		h.Users.Delete(user, nil)
-		return AppError{Code: "auth_save_failed", Message: err.Error()}
+		return kit.AppError{Code: "auth_save_failed", Message: err.Error()}
 	}
+
+	h.SendConfirmationEmail(user)
 
 	return nil
 }
 
-func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data interface{}) Error {
+func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
+	engine := s.deps.TemplateEngine()
+	if engine == nil {
+		return kit.AppError{Code: "no_template_engine"}
+	}
+
+	//tpl := s.config.UString("confirmationMailTemplate")
+
+	return nil
+}
+
+func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data interface{}) kit.Error {
 	if !user.IsActive() {
-		return AppError{Code: "user_inactive"}
+		return kit.AppError{Code: "user_inactive"}
 	}
 
 	authAdaptor := h.AuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
-		return AppError{
+		return kit.AppError{
 			Code:    "unknown_auth_adaptor",
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
@@ -197,7 +280,7 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data i
 
 	cleanData, err2 := auth.GetData()
 	if err2 != nil {
-		return AppError{
+		return kit.AppError{
 			Code:    "invalid_auth_data",
 			Message: err.Error(),
 		}
@@ -205,22 +288,22 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data i
 
 	ok, err2 := authAdaptor.Authenticate(user, cleanData, data)
 	if err2 != nil {
-		return AppError{Code: "auth_error", Message: err.Error()}
+		return kit.AppError{Code: "auth_error", Message: err.Error()}
 	}
 	if !ok {
-		return AppError{Code: "invalid_credentials"}
+		return kit.AppError{Code: "invalid_credentials"}
 	}
 
 	return nil
 }
 
-func (h *Service) VerifySession(token string) (kit.User, kit.Session, Error) {
+func (h *Service) VerifySession(token string) (kit.User, kit.Session, kit.Error) {
 	rawSession, err := h.Sessions.FindOne(token)
 	if err != nil {
 		return nil, nil, err
 	}
 	if rawSession == nil {
-		return nil, nil, AppError{Code: "session_not_found"}
+		return nil, nil, kit.AppError{Code: "session_not_found"}
 	}
 	session := rawSession.(kit.Session)
 
@@ -232,11 +315,11 @@ func (h *Service) VerifySession(token string) (kit.User, kit.Session, Error) {
 	user := rawUser.(kit.User)
 
 	if !user.IsActive() {
-		return nil, nil, AppError{Code: "user_inactive"}
+		return nil, nil, kit.AppError{Code: "user_inactive"}
 	}
 
 	if session.GetValidUntil().Sub(time.Now()) < 1 {
-		return nil, nil, AppError{Code: "session_expired"}
+		return nil, nil, kit.AppError{Code: "session_expired"}
 	}
 
 	// Prolong session

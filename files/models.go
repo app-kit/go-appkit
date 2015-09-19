@@ -4,8 +4,9 @@ import (
 	"io"
 	"strings"
 
+	db "github.com/theduke/go-dukedb"
+
 	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/users"
 )
 
@@ -171,21 +172,21 @@ func (f *BaseFile) SetHeight(x int) {
  */
 
 type FileStrID struct {
-	users.BaseUserModelStrID
+	users.UserModelStrID
 	BaseFile
 }
 
 // Ensure FileStrID implements File interface.
 var _ kit.File = (*FileStrID)(nil)
 
-func (f *FileStrID) Reader() (io.ReadCloser, Error) {
+func (f *FileStrID) Reader() (io.ReadCloser, kit.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, Error) {
+func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}
@@ -197,21 +198,22 @@ func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, Error) {
  */
 
 type FileIntID struct {
-	users.BaseUserModelIntID
+	db.BaseModelIntID
+	users.UserModelIntID
 	BaseFile
 }
 
 // Ensure FileIntID implements File interface.
 var _ kit.File = (*FileIntID)(nil)
 
-func (f *FileIntID) Reader() (io.ReadCloser, Error) {
+func (f *FileIntID) Reader() (io.ReadCloser, kit.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, Error) {
+func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}

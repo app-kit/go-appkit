@@ -8,8 +8,6 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/olebedev/config"
 	db "github.com/theduke/go-dukedb"
-
-	. "github.com/theduke/go-appkit/error"
 )
 
 /**
@@ -65,6 +63,9 @@ type User interface {
 	SetEmail(string)
 	GetEmail() string
 
+	SetIsEmailConfirmed(bool)
+	IsEmailConfirmed() bool
+
 	SetLastLogin(time.Time)
 	GetLastLogin() time.Time
 
@@ -90,10 +91,10 @@ type User interface {
 
 type UserModel interface {
 	db.Model
-	User() User
+	GetUser() User
 	SetUser(User)
 
-	UserID() string
+	GetUserID() string
 	SetUserID(string) error
 }
 
@@ -106,8 +107,23 @@ type AuthItem interface {
 	SetType(string)
 	GetType() string
 
-	SetData(interface{}) error
-	GetData() (interface{}, error)
+	SetData(interface{}) Error
+	GetData() (interface{}, Error)
+}
+
+type UserToken interface {
+	db.Model
+	GetType() string
+	SetType(string)
+
+	GetToken() string
+	SetToken(string)
+
+	GetUserID() string
+	SetUserID(string) error
+
+	GetExpiresAt() time.Time
+	SetExpiresAt(time.Time)
 }
 
 type AuthAdaptor interface {
@@ -184,6 +200,9 @@ type CacheItem interface {
 }
 
 type Cache interface {
+	Name() string
+	SetName(string)
+
 	// Save a new item into the cache.
 	Set(CacheItem) Error
 	SetString(key string, value string, expiresAt *time.Time, tags []string) Error
@@ -263,14 +282,6 @@ type Email interface {
 	SetHeaders(map[string][]string)
 }
 
-type EmailService interface {
-	SetDefaultFrom(EmailRecipient)
-	SetLogger(*logrus.Logger)
-
-	Send(Email) Error
-	SendMultiple(...Email) (Error, []Error)
-}
-
 /**
  * TemplateEngine.
  */
@@ -306,34 +317,32 @@ type Method interface {
  */
 
 type Resource interface {
-	App() App
-	SetApp(App)
+	Debug() bool
+	SetDebug(bool)
+
+	Dependencies() Dependencies
+	SetDependencies(Dependencies)
 
 	Backend() db.Backend
 	SetBackend(db.Backend)
 
-	UserService() UserService
-	SetUserService(UserService)
-
-	Hooks() interface{}
-	SetHooks(interface{})
-
-	Debug() bool
-	SetDebug(bool)
-
+	Collection() string
 	Model() db.Model
 	SetModel(db.Model)
 	NewModel() db.Model
 
-	Q() *db.Query
+	Hooks() interface{}
+	SetHooks(interface{})
 
-	Find(*db.Query) ([]db.Model, Error)
+	Q() db.Query
+
+	Find(db.Query) ([]db.Model, Error)
 	FindOne(id string) (db.Model, Error)
 
 	ApiFindOne(string, Request) Response
-	ApiFind(*db.Query, Request) Response
+	ApiFind(db.Query, Request) Response
 	// Same as find, but response meta will contain a total count.
-	ApiFindPaginated(*db.Query, Request) Response
+	ApiFindPaginated(db.Query, Request) Response
 
 	Create(obj db.Model, user User) Error
 	ApiCreate(obj db.Model, r Request) Response
@@ -346,10 +355,94 @@ type Resource interface {
 }
 
 /**
+ * Generic service.
+ */
+
+type Service interface {
+	SetDebug(bool)
+	Debug() bool
+
+	Dependencies() Dependencies
+	SetDependencies(Dependencies)
+}
+
+/**
+ * ResourceService.
+ */
+
+type ResourceService interface {
+	Service
+
+	Q(modelType string) (db.Query, Error)
+	FindOne(modelType string, id string) (db.Model, Error)
+
+	Create(db.Model, User) Error
+	Update(db.Model, User) Error
+	Delete(db.Model, User) Error
+}
+
+/**
+ * FileService.
+ */
+
+type FileService interface {
+	Service
+
+	Resource() Resource
+	SetResource(Resource)
+
+	Backend(string) FileBackend
+	AddBackend(FileBackend)
+
+	DefaultBackend() FileBackend
+	SetDefaultBackend(string)
+
+	Model() interface{}
+	SetModel(interface{})
+
+	// Given a file instance with a specified bucket, read the file from filePath, upload it
+	// to the backend and then store it in the database.
+	// If no file.GetBackendName() is empty, the default backend will be used.
+	// The file will be deleted if everything succeeds. Otherwise,
+	// it will be left in the file system.
+	// If deleteDir is true, the directory holding the file will be deleted
+	// also.
+	BuildFile(file File, user User, filePath string, deleteDir bool) Error
+
+	// Resource callthroughs.
+	// The following methods map resource methods for convenience.
+
+	// Create a new file model.
+	New() File
+
+	FindOne(id string) (File, Error)
+	Find(db.Query) ([]File, Error)
+
+	Create(File, User) Error
+	Update(File, User) Error
+	Delete(File, User) Error
+}
+
+/**
+ * EmailService.
+ */
+
+type EmailService interface {
+	Service
+
+	SetDefaultFrom(EmailRecipient)
+
+	Send(Email) Error
+	SendMultiple(...Email) (Error, []Error)
+}
+
+/**
  * UserService.
  */
 
 type UserService interface {
+	Service
+
 	CreateUser(user User, adaptor string, data interface{}) Error
 	AuthenticateUser(user User, adaptor string, data interface{}) Error
 	VerifySession(token string) (User, Session, Error)
@@ -357,16 +450,13 @@ type UserService interface {
 	AuthAdaptor(name string) AuthAdaptor
 	AddAuthAdaptor(a AuthAdaptor)
 
-	SetUserResource(Resource)
 	UserResource() Resource
+	SetUserResource(Resource)
 
 	ProfileModel() UserProfile
 
-	SetSessionResource(Resource)
 	SessionResource() Resource
-
-	SetAuthItemResource(Resource)
-	AuthItemResource() Resource
+	SetSessionResource(Resource)
 
 	SetRoleResource(Resource)
 	RoleResource() Resource
@@ -495,42 +585,49 @@ type FileBackend interface {
 	WriterById(bucket, id string, create bool) (string, io.WriteCloser, Error)
 }
 
-type FileService interface {
-	SetApp(App)
+/**
+ * Deps.
+ */
 
-	Resource() Resource
-	SetResource(Resource)
+type Dependencies interface {
+	Logger() *logrus.Logger
+	SetLogger(*logrus.Logger)
 
-	Backend(string) FileBackend
-	AddBackend(FileBackend)
+	Config() *config.Config
+	SetConfig(*config.Config)
 
-	DefaultBackend() FileBackend
-	SetDefaultBackend(string)
+	Cache(name string) Cache
+	Caches() map[string]Cache
+	AddCache(cache Cache)
+	SetCaches(map[string]Cache)
 
-	Model() interface{}
-	SetModel(interface{})
+	DefaultBackend() db.Backend
+	SetDefaultBackend(db.Backend)
 
-	// Given a file instance with a specified bucket, read the file from filePath, upload it
-	// to the backend and then store it in the database.
-	// If no file.GetBackendName() is empty, the default backend will be used.
-	// The file will be deleted if everything succeeds. Otherwise,
-	// it will be left in the file system.
-	// If deleteDir is true, the directory holding the file will be deleted
-	// also.
-	BuildFile(file File, user User, filePath string, deleteDir bool) Error
+	Backend(name string) db.Backend
+	Backends() map[string]db.Backend
+	AddBackend(b db.Backend)
+	SetBackends(map[string]db.Backend)
 
-	// Resource callthroughs.
-	// The following methods map resource methods for convenience.
+	Resource(name string) Resource
+	Resources() map[string]Resource
+	AddResource(res Resource)
+	SetResources(map[string]Resource)
 
-	// Create a new file model.
-	New() File
+	EmailService() EmailService
+	SetEmailService(EmailService)
 
-	FindOne(id string) (File, Error)
-	Find(*db.Query) ([]File, Error)
+	FileService() FileService
+	SetFileService(FileService)
 
-	Create(File, User) Error
-	Update(File, User) Error
-	Delete(File, User) Error
+	ResourceService() ResourceService
+	SetResourceService(ResourceService)
+
+	UserService() UserService
+	SetUserService(UserService)
+
+	TemplateEngine() TemplateEngine
+	SetTemplateEngine(TemplateEngine)
 }
 
 /**
@@ -544,11 +641,13 @@ type App interface {
 	Debug() bool
 	SetDebug(bool)
 
+	Dependencies() Dependencies
+
 	Logger() *logrus.Logger
 	SetLogger(*logrus.Logger)
 
-	Config() *config.EnvConfig
-	SetConfig(*config.EnvConfig)
+	Config() *config.Config
+	SetConfig(*config.Config)
 	ReadConfig(path string)
 
 	TmpDir() string
@@ -560,7 +659,7 @@ type App interface {
 
 	ServeFiles(route, path string)
 
-	RegisterBackend(name string, backend db.Backend)
+	RegisterBackend(backend db.Backend)
 	Backend(name string) db.Backend
 	MigrateBackend(name string, version int, force bool) Error
 	MigrateAllBackends(force bool) Error
@@ -569,7 +668,7 @@ type App interface {
 	RebuildBackend(name string) Error
 	RebuildAllBackends() Error
 
-	RegisterCache(name string, c Cache)
+	RegisterCache(c Cache)
 	Cache(name string) Cache
 
 	RegisterEmailService(s EmailService)
@@ -581,8 +680,7 @@ type App interface {
 	RegisterMethod(Method)
 	RunMethod(name string, r Request, responder func(Response), withFinishedChannel bool) (chan bool, Error)
 
-	RegisterResource(model db.Model, hooks interface{})
-	RegisterCustomResource(Resource)
+	RegisterResource(Resource)
 	Resource(name string) Resource
 
 	RegisterUserService(h UserService)

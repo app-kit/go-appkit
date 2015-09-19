@@ -4,31 +4,46 @@ package log
 import (
 	log "github.com/Sirupsen/logrus"
 
-	. "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/error"
+	kit "github.com/theduke/go-appkit"
 )
 
 type Service struct {
-	logger        *log.Logger
-	defaultSender EmailRecipient
+	debug         bool
+	deps          kit.Dependencies
+	defaultSender kit.EmailRecipient
 }
 
-func New(logger *log.Logger, defaultSender EmailRecipient) *Service {
+// Ensure Service implements email.Service.
+var _ kit.EmailService = (*Service)(nil)
+
+func New(deps kit.Dependencies, defaultSender kit.EmailRecipient) *Service {
 	return &Service{
-		logger:        logger,
+		deps:          deps,
 		defaultSender: defaultSender,
 	}
 }
 
-func (s *Service) SetDefaultFrom(r EmailRecipient) {
+func (s *Service) Debug() bool {
+	return s.debug
+}
+
+func (s *Service) SetDebug(x bool) {
+	s.debug = x
+}
+
+func (s *Service) Dependencies() kit.Dependencies {
+	return s.deps
+}
+
+func (s *Service) SetDependencies(x kit.Dependencies) {
+	s.deps = x
+}
+
+func (s *Service) SetDefaultFrom(r kit.EmailRecipient) {
 	s.defaultSender = r
 }
 
-func (s *Service) SetLogger(l *log.Logger) {
-	s.logger = l
-}
-
-func (s Service) Send(e Email) Error {
+func (s Service) Send(e kit.Email) kit.Error {
 	err, errs := s.SendMultiple(e)
 	if err != nil {
 		return err
@@ -36,11 +51,11 @@ func (s Service) Send(e Email) Error {
 	return errs[0]
 }
 
-func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
+func (s Service) SendMultiple(emails ...kit.Email) (kit.Error, []kit.Error) {
 	for _, e := range emails {
 		from := e.GetFrom().GetEmail()
 		if from == "" {
-			s.defaultSender.GetEmail()
+			from = s.defaultSender.GetEmail()
 		}
 
 		var recipients []string
@@ -55,7 +70,7 @@ func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 			recipients = append(recipients, recp.GetEmail())
 		}
 
-		s.logger.WithFields(log.Fields{
+		s.deps.Logger().WithFields(log.Fields{
 			"action":  "send_email",
 			"from":    from,
 			"to":      recipients,
@@ -63,5 +78,5 @@ func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 		}).Debugf("Sending mail from %v to %v - subject %v", from, recipients, e.GetSubject())
 	}
 
-	return nil, make([]Error, len(emails))
+	return nil, make([]kit.Error, len(emails))
 }

@@ -4,27 +4,28 @@ import (
 	"fmt"
 	"os"
 
-	log "github.com/Sirupsen/logrus"
 	"gopkg.in/gomail.v2"
 
-	. "github.com/theduke/go-appkit"
+	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/email"
-	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/utils"
 )
 
 type Service struct {
-	defaultSender EmailRecipient
-	logger        *log.Logger
+	debug bool
+	deps  kit.Dependencies
+
+	defaultSender kit.EmailRecipient
 
 	dialer *gomail.Dialer
 }
 
 // Ensure Service implements email.Service.
-var _ EmailService = (*Service)(nil)
+var _ kit.EmailService = (*Service)(nil)
 
-func New(host string, port int, user, password, defaultSenderEmail, defaultSenderName string) *Service {
+func New(deps kit.Dependencies, host string, port int, user, password, defaultSenderEmail, defaultSenderName string) *Service {
 	s := &Service{
+		deps: deps,
 		defaultSender: email.Recipient{
 			Email: defaultSenderEmail,
 			Name:  defaultSenderName,
@@ -36,15 +37,27 @@ func New(host string, port int, user, password, defaultSenderEmail, defaultSende
 	return s
 }
 
-func (s *Service) SetLogger(l *log.Logger) {
-	s.logger = l
+func (s *Service) Debug() bool {
+	return s.debug
 }
 
-func (s *Service) SetDefaultFrom(r EmailRecipient) {
+func (s *Service) SetDebug(x bool) {
+	s.debug = x
+}
+
+func (s *Service) Dependencies() kit.Dependencies {
+	return s.deps
+}
+
+func (s *Service) SetDependencies(x kit.Dependencies) {
+	s.deps = x
+}
+
+func (s *Service) SetDefaultFrom(r kit.EmailRecipient) {
 	s.defaultSender = r
 }
 
-func setAddressHeader(msg *gomail.Message, name string, recipients []EmailRecipient) {
+func setAddressHeader(msg *gomail.Message, name string, recipients []kit.EmailRecipient) {
 	if len(recipients) < 1 {
 		return
 	}
@@ -57,7 +70,7 @@ func setAddressHeader(msg *gomail.Message, name string, recipients []EmailRecipi
 	msg.SetHeader(name, header...)
 }
 
-func (s Service) buildMessage(e Email) (*gomail.Message, []string, Error) {
+func (s Service) buildMessage(e kit.Email) (*gomail.Message, []string, kit.Error) {
 	msg := gomail.NewMessage()
 
 	msg.SetHeader("Subject", e.GetSubject())
@@ -103,7 +116,7 @@ func (s Service) buildMessage(e Email) (*gomail.Message, []string, Error) {
 	return msg, files, nil
 }
 
-func (s Service) Send(mail Email) Error {
+func (s Service) Send(mail kit.Email) kit.Error {
 	err, errs := s.SendMultiple(mail)
 	if err != nil {
 		return err
@@ -111,10 +124,10 @@ func (s Service) Send(mail Email) Error {
 	return errs[0]
 }
 
-func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
+func (s Service) SendMultiple(emails ...kit.Email) (kit.Error, []kit.Error) {
 	sender, err := s.dialer.Dial()
 	if err != nil {
-		return AppError{
+		return kit.AppError{
 			Code:     "smtp_dial_failed",
 			Message:  fmt.Sprintf("Could not connect to smtp server at %v:%v: %v", s.dialer.Host, s.dialer.Port, err),
 			Errors:   []error{err},
@@ -123,7 +136,7 @@ func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 	}
 	defer sender.Close()
 
-	errs := make([]Error, 0)
+	errs := make([]kit.Error, 0)
 
 	for _, email := range emails {
 		msg, files, err := s.buildMessage(email)
@@ -139,7 +152,7 @@ func (s Service) SendMultiple(emails ...Email) (Error, []Error) {
 		}(files)
 
 		if err := gomail.Send(sender, msg); err != nil {
-			errs = append(errs, AppError{
+			errs = append(errs, kit.AppError{
 				Code:     "smtp_send_error",
 				Message:  err.Error(),
 				Errors:   []error{err},

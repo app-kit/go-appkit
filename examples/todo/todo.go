@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"io/ioutil"
 	"log"
 	"strconv"
@@ -15,8 +16,8 @@ import (
 	kitapp "github.com/theduke/go-appkit/app"
 	"github.com/theduke/go-appkit/caches/fs"
 	"github.com/theduke/go-appkit/email"
-	. "github.com/theduke/go-appkit/error"
 	"github.com/theduke/go-appkit/files"
+	"github.com/theduke/go-appkit/resources"
 	"github.com/theduke/go-appkit/users"
 )
 
@@ -50,7 +51,7 @@ func (p Project) Collection() string {
 type ProjectHooks struct {
 }
 
-func (p ProjectHooks) BeforeCreate(res kit.Resource, obj db.Model, user kit.User) Error {
+func (p ProjectHooks) BeforeCreate(res kit.Resource, obj db.Model, user kit.User) kit.Error {
 	log.Printf("obj: %+v\n", obj)
 	return nil
 }
@@ -85,7 +86,7 @@ func (t Todo) Collection() string {
 }
 
 func InitMigrations(app kit.App) {
-	handler := app.Backend("gorm").(db.MigrationBackend).GetMigrationHandler()
+	handler := app.Backend("sql").(db.MigrationBackend).GetMigrationHandler()
 
 	userMigrations := users.GetUserMigrations(app)
 	handler.Add(userMigrations[0])
@@ -119,23 +120,24 @@ func start() error {
 		return err
 	}
 	backend.SetDebug(true)
-	app.RegisterBackend("gorm", backend)
+	app.RegisterBackend(backend)
+	fmt.Printf("deps: %+v\n", app.Dependencies())
 
 	// Build cache.
 	fsCache, err := fs.New("tmp/cache")
 	if err != nil {
 		return err
 	}
-	app.RegisterCache("fs", fsCache)
+	app.RegisterCache(fsCache)
 
-	userHandler := users.NewService(nil)
+	userHandler := users.NewService(nil, nil)
 	app.RegisterUserService(userHandler)
 
-	fileHandler := files.NewFileServiceWithFs("data")
+	fileHandler := files.NewFileServiceWithFs(nil, "data")
 	app.RegisterFileService(fileHandler)
 
-	app.RegisterResource(&Project{}, ProjectHooks{})
-	app.RegisterResource(&Todo{}, nil)
+	app.RegisterResource(resources.NewResource(&Project{}, ProjectHooks{}))
+	app.RegisterResource(resources.NewResource(&Todo{}, nil))
 
 	app.PrepareBackends()
 
