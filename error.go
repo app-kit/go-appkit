@@ -65,10 +65,16 @@ func (e AppError) Error() string {
 	return s
 }
 
-func WrapError(code string, err error) *AppError {
-	return &AppError{
+func WrapError(err error, code, msg string) *AppError {
+	wrap := &AppError{
 		Code:    code,
 		Message: err.Error(),
 		Errors:  []error{err},
 	}
+
+	if msg != "" {
+		wrap.Message = msg + ":" + wrap.Message
+	}
+
+	return wrap
 }

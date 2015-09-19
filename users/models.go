@@ -56,7 +56,7 @@ func (b *BaseAuthItem) GetType() string {
 func (b *BaseAuthItem) SetData(data interface{}) kit.Error {
 	json, err := json.Marshal(data)
 	if err != nil {
-		return kit.WrapError("auth_item_json_marshal_error", err)
+		return kit.WrapError(err, "auth_item_json_marshal_error", "")
 	}
 
 	b.Data = string(json)
@@ -66,7 +66,7 @@ func (b *BaseAuthItem) SetData(data interface{}) kit.Error {
 func (b *BaseAuthItem) GetData() (interface{}, kit.Error) {
 	var data interface{}
 	if err := json.Unmarshal([]byte(b.Data), &data); err != nil {
-		return nil, kit.WrapError("auth_item_json_unmarshal_error", err)
+		return nil, kit.WrapError(err, "auth_item_json_unmarshal_error", "")
 	}
 
 	return data, nil

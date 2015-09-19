@@ -12,6 +12,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
+	"github.com/Sirupsen/logrus"
 	"github.com/theduke/go-dukedb/backends/memory"
 
 	kit "github.com/theduke/go-appkit"
@@ -20,12 +21,35 @@ import (
 	"github.com/theduke/go-appkit/users"
 )
 
+var logMessages []*logrus.Entry
+
+type LoggerHook struct{}
+
+func (h LoggerHook) Levels() []logrus.Level {
+	return []logrus.Level{
+		logrus.PanicLevel,
+		logrus.FatalLevel,
+		logrus.ErrorLevel,
+		logrus.WarnLevel,
+		logrus.InfoLevel,
+		logrus.DebugLevel,
+	}
+}
+
+func (h LoggerHook) Fire(e *logrus.Entry) error {
+	logMessages = append(logMessages, e)
+	return nil
+}
+
 func buildApp() kit.App {
 	app := NewApp("")
 
 	conf := app.Config()
 	conf.Set("host", "localhost")
 	conf.Set("port", 10010)
+	conf.Set("url", "http://localhost:10010")
+
+	conf.Set("users.emailConfirmationPath", "?confirm-email={token}")
 
 	backend := memory.New()
 	app.RegisterBackend(backend)
@@ -35,6 +59,9 @@ func buildApp() kit.App {
 
 	fileHandler := files.NewFileServiceWithFs(nil, "data")
 	app.RegisterFileService(fileHandler)
+
+	// Persist log messages in logMessages.
+	app.Logger().Hooks.Add(LoggerHook{})
 
 	app.PrepareBackends()
 
@@ -119,6 +146,10 @@ var _ = Describe("App", func() {
 
 	client := NewClient("http://localhost:10010")
 
+	BeforeEach(func() {
+		logMessages = nil
+	})
+
 	Describe("Usersystem", func() {
 		It("Should create user with password auth", func() {
 			js := `{
@@ -130,9 +161,17 @@ var _ = Describe("App", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(201))
 
-			user, err := app.Backend("memory").FindOneBy("users", "email", "user1@appkit.com")
+			rawUser, err := app.Backend("memory").FindOneBy("users", "email", "user1@appkit.com")
 			Expect(err).ToNot(HaveOccurred())
-			Expect(user).ToNot(BeNil())
+			Expect(rawUser).ToNot(BeNil())
+
+			user := rawUser.(kit.User)
+
+			// Check that confirmation email was sent.
+			logEntry := logMessages[len(logMessages)-1]
+			Expect(logEntry.Data["action"]).To(Equal("send_email"))
+			Expect(logEntry.Data["subject"]).To(Equal("Confirm your Email"))
+			Expect(logEntry.Data["to"]).To(Equal([]string{user.GetEmail()}))
 		})
 	})
 

@@ -1,19 +1,18 @@
 package users
 
 import (
+	"fmt"
+	"strings"
 	"time"
 
 	db "github.com/theduke/go-dukedb"
+	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/email"
 	"github.com/theduke/go-appkit/resources"
 	"github.com/theduke/go-appkit/users/auth"
 )
-
-type Config struct {
-	SendConfirmationMail bool
-	ConfirmationTemplate string
-}
 
 type Service struct {
 	debug bool
@@ -183,8 +182,8 @@ func (u *Service) SetPermissionResource(x kit.Resource) {
 	u.Permissions = x
 }
 
-func (h *Service) CreateUser(user kit.User, adaptorName string, authData interface{}) kit.Error {
-	adaptor := h.AuthAdaptor(adaptorName)
+func (s *Service) CreateUser(user kit.User, adaptorName string, authData interface{}) kit.Error {
+	adaptor := s.AuthAdaptor(adaptorName)
 	if adaptor == nil {
 		return kit.AppError{Code: "unknown_auth_adaptor"}
 	}
@@ -199,7 +198,7 @@ func (h *Service) CreateUser(user kit.User, adaptorName string, authData interfa
 	}
 
 	// Check if user with same username or email exists.
-	oldUser, err2 := h.Users.Q().
+	oldUser, err2 := s.Users.Q().
 		Filter("email", user.GetEmail()).Or("username", user.GetUsername()).First()
 	if err2 != nil {
 		return err2
@@ -212,47 +211,243 @@ func (h *Service) CreateUser(user kit.User, adaptorName string, authData interfa
 
 	user.SetIsActive(true)
 
-	if h.profileModel != nil && user.GetProfile() == nil {
-		newProfile, _ := h.Users.Backend().NewModel(h.profileModel.Collection())
+	if s.profileModel != nil && user.GetProfile() == nil {
+		newProfile, _ := s.Users.Backend().NewModel(s.profileModel.Collection())
 		user.SetProfile(newProfile.(kit.UserProfile))
 	}
 
-	if err := h.Users.Create(user, nil); err != nil {
+	if err := s.Users.Create(user, nil); err != nil {
 		return err
 	}
 
 	// Create profile if one exists.
 	if profile := user.GetProfile(); profile != nil {
 		profile.SetID(user.GetID())
-		if err := h.Users.Backend().Create(profile); err != nil {
-			h.Users.Backend().Delete(user)
+		if err := s.Users.Backend().Create(profile); err != nil {
+			s.Users.Backend().Delete(user)
 			return err
 		}
 	}
 
-	rawAuth := h.AuthItems.NewModel()
+	rawAuth := s.AuthItems.NewModel()
 	auth := rawAuth.(kit.AuthItem)
 	auth.SetUserID(user.GetID())
 	auth.SetType(adaptorName)
 	auth.SetData(data)
 
-	if err := h.AuthItems.Create(auth, nil); err != nil {
-		h.Users.Delete(user, nil)
+	if err := s.AuthItems.Create(auth, nil); err != nil {
+		s.Users.Delete(user, nil)
 		return kit.AppError{Code: "auth_save_failed", Message: err.Error()}
 	}
 
-	h.SendConfirmationEmail(user)
+	if err := s.SendConfirmationEmail(user); err != nil {
+		s.deps.Logger().Errorf("Could not send confirmation email: %v", err)
+	}
 
 	return nil
 }
 
 func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
-	engine := s.deps.TemplateEngine()
-	if engine == nil {
-		return kit.AppError{Code: "no_template_engine"}
+	// Check that an email service is configured.
+
+	mailService := s.deps.EmailService()
+	if mailService == nil {
+		return kit.AppError{Code: "no_email_service"}
 	}
 
-	//tpl := s.config.UString("confirmationMailTemplate")
+	conf := s.deps.Config()
+
+	// Check that sending is enabled.
+	if !conf.UBool("users.sendEmailConfirmationEmail", true) {
+		return nil
+	}
+
+	// Generate a token.
+	token := uuid.NewV4().String()
+
+	// Build the confirmation url.
+
+	confirmationPath := conf.UString("users.emailConfirmationPath")
+	if confirmationPath == "" {
+		return kit.AppError{
+			Code:     "no_email_confirmation_path",
+			Message:  "Config must specify users.emailConfirmationPath",
+			Internal: true,
+		}
+	}
+
+	if !strings.Contains(confirmationPath, "{token}") {
+		return kit.AppError{
+			Code:    "invalid_email_confirmation_path",
+			Message: "users.emailConfirmationPath does not contain {token} placeholder",
+		}
+	}
+	confirmationUrl := conf.UString("url") + "/" + strings.Replace(confirmationPath, "{token}", token, -1)
+
+	// Save token to database.
+
+	tokenItem := s.Tokens.Model().(kit.UserToken)
+	tokenItem.SetType("email_confirmation")
+	tokenItem.SetToken(token)
+	tokenItem.SetUserID(user.GetID())
+	if err := s.Tokens.Create(tokenItem, user); err != nil {
+		return kit.WrapError(err, "token_create_error", "Could not save token to database")
+	}
+
+	// Render email.
+
+	subject := conf.UString("users.emailConfirmationSubject", "Confirm your Email")
+
+	var txtContent, htmlContent []byte
+
+	txtTpl := conf.UString("users.emailConfirmationEmailTextTpl")
+	htmlTpl := conf.UString("users.emailConfirmationEmailHtmlTpl")
+	if txtTpl != "" && htmlTpl != "" {
+		// Check that a template engine is configured.
+		engine := s.deps.TemplateEngine()
+		if engine == nil {
+			return kit.AppError{Code: "no_template_engine"}
+		}
+
+		data := map[string]interface{}{
+			"user":  user,
+			"token": token,
+		}
+		var err kit.Error
+
+		txtContent, err = s.deps.TemplateEngine().BuildFileAndRender(txtTpl, data)
+		if err != nil {
+			return kit.WrapError(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
+		}
+
+		htmlContent, err = s.deps.TemplateEngine().BuildFileAndRender(htmlTpl, data)
+		if err != nil {
+			return kit.WrapError(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
+		}
+	} else {
+		tpl := `Welcome to Appkit
+
+To confirm your email address, please visit %v.
+`
+
+		htmlTpl := `Welcome to Appkit<br><br>
+
+To confirm your email address, please visit <a href="%v">this link</a>.
+`
+		txtContent = []byte(fmt.Sprintf(tpl, confirmationUrl))
+		htmlContent = []byte(fmt.Sprintf(htmlTpl, confirmationUrl))
+	}
+
+	// Now build the email and send it.
+	email := email.NewMail()
+	email.SetSubject(subject)
+	email.AddBody("text/plain", txtContent)
+	email.AddBody("text/html", htmlContent)
+	email.AddTo(user.GetEmail(), "")
+
+	if err := mailService.Send(email); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
+	// Check that an email service is configured.
+
+	mailService := s.deps.EmailService()
+	if mailService == nil {
+		return kit.AppError{Code: "no_email_service"}
+	}
+
+	// Generate a token.
+	token := uuid.NewV4().String()
+
+	conf := s.deps.Config()
+
+	// Build the confirmation url.
+
+	resetPath := conf.UString("users.passwordResetPath")
+	if resetPath == "" {
+		return kit.AppError{
+			Code:     "no_password_reset_path",
+			Message:  "Config must specify users.passwordResetPath",
+			Internal: true,
+		}
+	}
+
+	if !strings.Contains(resetPath, "{token}") {
+		return kit.AppError{
+			Code:    "invalid_password_reset_path",
+			Message: "users.passwordResetPath does not contain {token} placeholder",
+		}
+	}
+	resetUrl := conf.UString("url") + "/" + strings.Replace(resetPath, "{token}", token, -1)
+
+	// Save token to database.
+
+	tokenItem := s.Tokens.Model().(kit.UserToken)
+	tokenItem.SetType("password_reset")
+	tokenItem.SetToken(token)
+	tokenItem.SetUserID(user.GetID())
+	if err := s.Tokens.Create(tokenItem, user); err != nil {
+		return kit.WrapError(err, "token_create_error", "Could not save token to database")
+	}
+
+	// Render email.
+
+	subject := conf.UString("users.passwordResetSubject", "Password reset")
+
+	var txtContent, htmlContent []byte
+
+	txtTpl := conf.UString("users.passwordResetTextTpl")
+	htmlTpl := conf.UString("users.passwordResetHtmlTpl")
+	if txtTpl != "" && htmlTpl != "" {
+		// Check that a template engine is configured.
+		engine := s.deps.TemplateEngine()
+		if engine == nil {
+			return kit.AppError{Code: "no_template_engine"}
+		}
+
+		data := map[string]interface{}{
+			"user":  user,
+			"token": token,
+		}
+		var err kit.Error
+
+		txtContent, err = s.deps.TemplateEngine().BuildFileAndRender(txtTpl, data)
+		if err != nil {
+			return kit.WrapError(err, "password_reset_tpl_error", "Could not render password reset tpl")
+		}
+
+		htmlContent, err = s.deps.TemplateEngine().BuildFileAndRender(htmlTpl, data)
+		if err != nil {
+			return kit.WrapError(err, "password_reset_tpl_error", "Could not render password reset tpl")
+		}
+	} else {
+		tpl := `Password reset
+
+To reset your password, please visit %v.
+`
+
+		htmlTpl := `Password Reset<br><br>
+
+To reset your password, please visit <a href="%v">this link</a>.
+`
+		txtContent = []byte(fmt.Sprintf(tpl, resetUrl))
+		htmlContent = []byte(fmt.Sprintf(htmlTpl, resetUrl))
+	}
+
+	// Now build the email and send it.
+	email := email.NewMail()
+	email.SetSubject(subject)
+	email.AddBody("text/plain", txtContent)
+	email.AddBody("text/html", htmlContent)
+	email.AddTo(user.GetEmail(), "")
+
+	if err := mailService.Send(email); err != nil {
+		return err
+	}
 
 	return nil
 }
