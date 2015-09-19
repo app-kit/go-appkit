@@ -9,37 +9,8 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
+	. "github.com/theduke/go-appkit/app/methods"
 )
-
-type Method struct {
-	name         string
-	isBlocking   bool
-	requiresUser bool
-	run          func(a kit.App, r kit.Request, unblock func()) kit.Response
-}
-
-func NewMethod(name string, run func(a kit.App, r kit.Request, unblock func()) kit.Response) *Method {
-	return &Method{
-		name: name,
-		run:  run,
-	}
-}
-
-func (m Method) Name() string {
-	return m.name
-}
-
-func (m Method) IsBlocking() bool {
-	return m.isBlocking
-}
-
-func (m Method) RequiresUser() bool {
-	return m.requiresUser
-}
-
-func (m Method) Run(a kit.App, r kit.Request, unblock func()) kit.Response {
-	return m.run(a, r, unblock)
-}
 
 type methodInstance struct {
 	method kit.Method
@@ -463,90 +434,78 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 }
 
 func createMethod() kit.Method {
-	return &Method{
-		name: "create",
-		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
+	return NewMethod("create", true, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		methodData, err := buildResourceMethodData(a, r.GetData())
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
 			}
+		}
 
-			if methodData.Objects == nil || len(methodData.Objects) < 1 {
-				return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
-			}
-			if len(methodData.Objects) != 1 {
-				return kit.NewErrorResponse("only_one_object_allowed", "")
-			}
+		if methodData.Objects == nil || len(methodData.Objects) < 1 {
+			return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
+		}
+		if len(methodData.Objects) != 1 {
+			return kit.NewErrorResponse("only_one_object_allowed", "")
+		}
 
-			return methodData.Resource.ApiCreate(methodData.Objects[0], r)
-		},
-	}
+		return methodData.Resource.ApiCreate(methodData.Objects[0], r)
+	})
 }
 
 func updateMethod() kit.Method {
-	return &Method{
-		name: "update",
-		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
+	return NewMethod("update", true, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		methodData, err := buildResourceMethodData(a, r.GetData())
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
 			}
+		}
 
-			if methodData.Objects == nil || len(methodData.Objects) < 1 {
-				return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
-			}
-			if len(methodData.Objects) != 1 {
-				return kit.NewErrorResponse("only_one_object_allowed", "")
-			}
+		if methodData.Objects == nil || len(methodData.Objects) < 1 {
+			return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
+		}
+		if len(methodData.Objects) != 1 {
+			return kit.NewErrorResponse("only_one_object_allowed", "")
+		}
 
-			return methodData.Resource.ApiUpdate(methodData.Objects[0], r)
-		},
-	}
+		return methodData.Resource.ApiUpdate(methodData.Objects[0], r)
+	})
 }
 
 func deleteMethod() kit.Method {
-	return &Method{
-		name: "delete",
-		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
+	return NewMethod("delete", true, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		methodData, err := buildResourceMethodData(a, r.GetData())
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
 			}
+		}
 
-			if methodData.IDs == nil || len(methodData.IDs) < 1 {
-				return kit.NewErrorResponse("no_ids", "No ids sent in data.ids")
-			}
-			if len(methodData.IDs) != 1 {
-				return kit.NewErrorResponse("only_one_object_allowed", "")
-			}
+		if methodData.IDs == nil || len(methodData.IDs) < 1 {
+			return kit.NewErrorResponse("no_ids", "No ids sent in data.ids")
+		}
+		if len(methodData.IDs) != 1 {
+			return kit.NewErrorResponse("only_one_object_allowed", "")
+		}
 
-			return methodData.Resource.ApiDelete(methodData.IDs[0], r)
-		},
-	}
+		return methodData.Resource.ApiDelete(methodData.IDs[0], r)
+	})
 }
 
 func queryMethod() kit.Method {
-	return &Method{
-		name: "query",
-		run: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
+	return NewMethod("query", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		methodData, err := buildResourceMethodData(a, r.GetData())
+		if err != nil {
+			return &kit.AppResponse{
+				Error: err,
 			}
+		}
 
-			if methodData.Query == nil {
-				return kit.NewErrorResponse("no_query", "No query sent")
-			}
+		if methodData.Query == nil {
+			return kit.NewErrorResponse("no_query", "No query sent")
+		}
 
-			return methodData.Resource.ApiFind(methodData.Query, r)
-		},
-	}
+		return methodData.Resource.ApiFind(methodData.Query, r)
+	})
 }

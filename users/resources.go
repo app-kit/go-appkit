@@ -8,6 +8,7 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/app/methods"
 )
 
 func randomToken() string {
@@ -116,6 +117,14 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r ki
 
 type UserResourceHooks struct {
 	ProfileModel kit.UserProfile
+}
+
+func (UserResourceHooks) Methods() []kit.Method {
+	resetPw := methods.NewMethod("users.reset-password", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		return nil
+	})
+
+	return []kit.Method{resetPw}
 }
 
 func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {

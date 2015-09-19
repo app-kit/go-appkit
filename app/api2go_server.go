@@ -17,7 +17,7 @@ import (
 	kit "github.com/theduke/go-appkit"
 )
 
-func JsonHandler(r *http.Request, app kit.App, method *Method) (interface{}, kit.Error) {
+func JsonHandler(r *http.Request, app kit.App, method kit.Method) (interface{}, kit.Error) {
 	// Read request body.
 	defer r.Body.Close()
 	body, err := ioutil.ReadAll(r.Body)
@@ -65,7 +65,7 @@ func JsonHandler(r *http.Request, app kit.App, method *Method) (interface{}, kit
 	return nil, nil
 }
 
-func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app kit.App, method *Method) {
+func JsonWrapHandler(w http.ResponseWriter, r *http.Request, app kit.App, method kit.Method) {
 	header := w.Header()
 	header.Set("Access-Control-Allow-Origin", "*")
 	header.Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
