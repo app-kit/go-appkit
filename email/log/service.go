@@ -2,6 +2,8 @@
 package log
 
 import (
+	"fmt"
+
 	log "github.com/Sirupsen/logrus"
 
 	kit "github.com/theduke/go-appkit"
@@ -70,12 +72,19 @@ func (s Service) SendMultiple(emails ...kit.Email) (kit.Error, []kit.Error) {
 			recipients = append(recipients, recp.GetEmail())
 		}
 
+		msg := fmt.Sprintf("Sending mail from %v to %v - subject %v", from, recipients, e.GetSubject())
+		for _, part := range e.GetBodyParts() {
+			msg += "\n####################\n"
+			msg += string(part.GetContent())
+		}
+		msg += "\n####################\n\n"
+
 		s.deps.Logger().WithFields(log.Fields{
 			"action":  "send_email",
 			"from":    from,
 			"to":      recipients,
 			"subject": e.GetSubject(),
-		}).Debugf("Sending mail from %v to %v - subject %v", from, recipients, e.GetSubject())
+		}).Debug(msg)
 	}
 
 	return nil, make([]kit.Error, len(emails))
