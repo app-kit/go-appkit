@@ -392,10 +392,28 @@ func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
 	}
 
 	user := rawUser.(kit.User)
+	userId, _ := db.GetStructFieldValue(user, "ID")
+
+	if user.IsEmailConfirmed() {
+		// Email already confirmed.
+		// Delete tokens and return.
+		q := s.Tokens.Q().Filter("user_id", userId).Filter("type", "email_confirmation")
+		s.Tokens.Backend().DeleteMany(q)
+
+		return nil, kit.AppError{
+			Code:    "email_already_confirmed",
+			Message: "The email is already confirmed",
+		}
+	}
+
 	user.SetIsEmailConfirmed(true)
 	if err := s.Users.Backend().Update(user); err != nil {
 		return nil, kit.WrapError(err, "user_persist_error", "")
 	}
+
+	// Delete tokens.
+	q := s.Tokens.Q().Filter("user_id", userId).Filter("type", "email_confirmation")
+	s.Tokens.Backend().DeleteMany(q)
 
 	s.deps.Logger().WithFields(logrus.Fields{
 		"action":  "users.email_confirmed",

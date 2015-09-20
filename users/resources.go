@@ -129,6 +129,10 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			return kit.NewErrorResponse("not_authenticated", "")
 		}
 
+		if user.IsEmailConfirmed() {
+			return kit.NewErrorResponse("email_already_confirmed", "The users email address is already confirmed")
+		}
+
 		err := deps.UserService().SendConfirmationEmail(user)
 		if err != nil {
 			return kit.NewErrorResponse("confirm_failed", "Could not confirm email")

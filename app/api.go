@@ -344,7 +344,9 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	request := kit.NewRequest()
 
 	if r.Body != nil {
-		request.BuildFromJsonBody(r)
+		if err := request.BuildFromJsonBody(r); err != nil {
+
+		}
 	}
 
 	request.Context.Set("httpRequest", r)
