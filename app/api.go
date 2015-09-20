@@ -343,6 +343,10 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, app kit.App, handler kit.RequestHandler) {
 	request := kit.NewRequest()
 
+	if r.Body != nil {
+		request.BuildFromJsonBody(r)
+	}
+
 	request.Context.Set("httpRequest", r)
 	request.Context.Set("responseWriter", w)
 

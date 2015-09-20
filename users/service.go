@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Sirupsen/logrus"
 	db "github.com/theduke/go-dukedb"
 	"github.com/twinj/uuid"
 
@@ -358,7 +359,51 @@ To confirm your email address, please visit <a href="%v">this link</a>.
 		return err
 	}
 
+	s.deps.Logger().WithFields(logrus.Fields{
+		"action":  "users.email_confirmation_mail_sent",
+		"email":   user.GetEmail(),
+		"user_id": user.GetID(),
+		"token":   token,
+	}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetID())
+
 	return nil
+}
+
+func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
+	rawToken, err := s.Tokens.FindOne(token)
+	if err != nil {
+		return nil, kit.WrapError(err, "token_query_error", "")
+	}
+	if rawToken == nil {
+		return nil, kit.AppError{Code: "invalid_token"}
+	}
+
+	tokenItem := rawToken.(kit.UserToken)
+	if !tokenItem.IsValid() {
+		return nil, kit.AppError{Code: "expired_token"}
+	}
+
+	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
+	if err != nil {
+		return nil, kit.WrapError(err, "user_query_error", "")
+	}
+	if rawUser == nil {
+		return nil, kit.AppError{Code: "invalid_user"}
+	}
+
+	user := rawUser.(kit.User)
+	user.SetIsEmailConfirmed(true)
+	if err := s.Users.Backend().Update(user); err != nil {
+		return nil, kit.WrapError(err, "user_persist_error", "")
+	}
+
+	s.deps.Logger().WithFields(logrus.Fields{
+		"action":  "users.email_confirmed",
+		"email":   user.GetEmail(),
+		"user_id": user.GetID(),
+	}).Debugf("Confirmed email %v for user %v", user.GetEmail(), user.GetID())
+
+	return user, nil
 }
 
 func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
@@ -458,38 +503,14 @@ The link will be valid for %v hours.
 		return err
 	}
 
+	s.deps.Logger().WithFields(logrus.Fields{
+		"action":  "users.password_reset_requested",
+		"email":   user.GetEmail(),
+		"user_id": user.GetID(),
+		"token":   token,
+	}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetID())
+
 	return nil
-}
-
-func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
-	rawToken, err := s.Tokens.FindOne(token)
-	if err != nil {
-		return nil, kit.WrapError(err, "token_query_error", "")
-	}
-	if rawToken == nil {
-		return nil, kit.AppError{Code: "invalid_token"}
-	}
-
-	tokenItem := rawToken.(kit.UserToken)
-	if !tokenItem.IsValid() {
-		return nil, kit.AppError{Code: "expired_token"}
-	}
-
-	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
-	if err != nil {
-		return nil, kit.WrapError(err, "user_query_error", "")
-	}
-	if rawUser == nil {
-		return nil, kit.AppError{Code: "invalid_user"}
-	}
-
-	user := rawUser.(kit.User)
-	user.SetIsEmailConfirmed(true)
-	if err := s.Users.Backend().Update(user); err != nil {
-		return nil, kit.WrapError(err, "user_persist_error", "")
-	}
-
-	return user, nil
 }
 
 func (s *Service) ChangePassword(user kit.User, newPassword string) kit.Error {
@@ -545,6 +566,11 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, kit.Error)
 	if err := s.ChangePassword(user, newPassword); err != nil {
 		return nil, err
 	}
+
+	s.deps.Logger().WithFields(logrus.Fields{
+		"action":  "users.password_reset",
+		"user_id": user.GetID(),
+	}).Debugf("Password for user %v was reset", user.GetID())
 
 	return user, nil
 }

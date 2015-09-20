@@ -6,7 +6,6 @@ import (
 	"math/big"
 	"time"
 
-	"github.com/Sirupsen/logrus"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -124,7 +123,24 @@ type UserResourceHooks struct {
 func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	deps := res.Dependencies()
 
+	sendConfirmationEmail := methods.NewMethod("users.send-confirmation-email", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		user := r.GetUser()
+		if user == nil {
+			return kit.NewErrorResponse("not_authenticated", "")
+		}
+
+		err := deps.UserService().SendConfirmationEmail(user)
+		if err != nil {
+			return kit.NewErrorResponse("confirm_failed", "Could not confirm email")
+		}
+
+		return &kit.AppResponse{
+			Data: map[string]interface{}{"success": true},
+		}
+	})
+
 	confirmEmail := methods.NewMethod("users.confirm-email", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		deps.Logger().Infof("data: %+v\n", r.GetData())
 		data, ok := r.GetData().(map[string]interface{})
 		if !ok {
 			return kit.NewErrorResponse("invalid_data", "Expected data dict with 'token' key")
@@ -176,11 +192,6 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			return kit.NewErrorResponse("reset_email_send_failed", "Could not send the reset password mail.")
 		}
 
-		deps.Logger().WithFields(logrus.Fields{
-			"action":  "password_reset_request",
-			"user_id": user.GetID(),
-		}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetID())
-
 		return &kit.AppResponse{
 			Data: map[string]interface{}{"success": true},
 		}
@@ -216,11 +227,6 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			return kit.NewErrorResponse("password_reset_failed", "Could not reset the password.")
 		}
 
-		deps.Logger().WithFields(logrus.Fields{
-			"action":  "password_reset",
-			"user_id": user.GetID(),
-		}).Debugf("Password for user %v was reset", user.GetID())
-
 		return &kit.AppResponse{
 			Data: map[string]interface{}{
 				"success":   true,
@@ -230,7 +236,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 		}
 	})
 
-	return []kit.Method{confirmEmail, requestPwReset, pwReset}
+	return []kit.Method{sendConfirmationEmail, confirmEmail, requestPwReset, pwReset}
 }
 
 func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {

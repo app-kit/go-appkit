@@ -490,6 +490,10 @@ func (s *BaseSessionIntID) IsGuest() bool {
 	return s.UserID == 0
 }
 
+func (s *BaseSessionIntID) MarshalJSON() ([]byte, error) {
+	return db.ModelToJson(nil, s)
+}
+
 /**
  * Role.
  */

@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"strings"
 	"time"
 
 	. "github.com/onsi/ginkgo"
@@ -20,6 +21,25 @@ import (
 	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/users"
 )
+
+func GetNested(rawData interface{}, key string) interface{} {
+	data, ok := rawData.(map[string]interface{})
+	if !ok {
+		return nil
+	}
+
+	parts := strings.Split(key, ".")
+	if len(parts) > 1 {
+		nested := data[parts[0]]
+		if nested == nil {
+			return nil
+		}
+
+		return GetNested(nested, strings.Join(parts[1:], "."))
+	} else {
+		return data[key]
+	}
+}
 
 var logMessages []*logrus.Entry
 
@@ -50,6 +70,7 @@ func buildApp() kit.App {
 	conf.Set("url", "http://localhost:10010")
 
 	conf.Set("users.emailConfirmationPath", "?confirm-email={token}")
+	conf.Set("users.passwordResetPath", "?reset-password={token}")
 
 	backend := memory.New()
 	app.RegisterBackend(backend)
@@ -77,6 +98,7 @@ type Data struct {
 type Client struct {
 	Client *http.Client
 	Host   string
+	Token  string
 }
 
 func NewClient(host string) *Client {
@@ -84,6 +106,10 @@ func NewClient(host string) *Client {
 		Client: &http.Client{},
 		Host:   host,
 	}
+}
+
+func (c *Client) SetToken(t string) {
+	c.Token = t
 }
 
 func (c *Client) DoJson(method, path string, data string) (int, *Data, error) {
@@ -104,6 +130,10 @@ func (c *Client) DoJson(method, path string, data string) (int, *Data, error) {
 		req.Header.Add("Content-Type", "application/json")
 	}
 	req.Header.Add("Accept-Encoding", "application/json")
+
+	if c.Token != "" {
+		req.Header.Add("Authentication", c.Token)
+	}
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
@@ -145,6 +175,8 @@ var _ = Describe("App", func() {
 	time.Sleep(time.Millisecond * 500)
 
 	client := NewClient("http://localhost:10010")
+	var currentUser kit.User
+	var currentToken string
 
 	BeforeEach(func() {
 		logMessages = nil
@@ -168,10 +200,15 @@ var _ = Describe("App", func() {
 			user := rawUser.(kit.User)
 
 			// Check that confirmation email was sent.
-			logEntry := logMessages[len(logMessages)-1]
+			logEntry := logMessages[len(logMessages)-2]
 			Expect(logEntry.Data["action"]).To(Equal("send_email"))
 			Expect(logEntry.Data["subject"]).To(Equal("Confirm your Email"))
 			Expect(logEntry.Data["to"]).To(Equal([]string{user.GetEmail()}))
+
+			logEntry = logMessages[len(logMessages)-1]
+			Expect(logEntry.Data["action"]).To(Equal("users.email_confirmation_mail_sent"))
+			Expect(logEntry.Data["user_id"]).To(Equal(user.GetID()))
+			Expect(logEntry.Data["email"]).To(Equal(user.GetEmail()))
 		})
 	})
 
@@ -181,12 +218,14 @@ var _ = Describe("App", func() {
 				"meta": {"user": "user1@appkit.com", "adaptor": "password", "auth-data": {"password": "test"}}
 			}
 			`
-		status, rawData, err := client.PostJson("/api/sessions", js)
+		status, data, err := client.PostJson("/api/sessions", js)
 		Expect(err).ToNot(HaveOccurred())
 		Expect(status).To(Equal(201))
 
-		data := rawData.Data.(map[string]interface{})
-		id := data["id"].(string)
+		id := GetNested(data.Data, "id").(string)
+
+		token := GetNested(data.Data, "attributes.baseSession.Token").(string)
+		Expect(token).ToNot(Equal(""))
 
 		rawSession, err := app.Backend("memory").FindOne("sessions", id)
 		Expect(err).ToNot(HaveOccurred())
@@ -201,5 +240,67 @@ var _ = Describe("App", func() {
 
 		user := rawUser.(kit.User)
 		Expect(user.GetEmail()).To(Equal("user1@appkit.com"))
+
+		client.SetToken(token)
+		currentUser = user
+	})
+
+	It("Should send resend confirmation email", func() {
+		js := `{"data": {}}`
+		status, _, err := client.PostJson("/api/method/users.send-confirmation-email", js)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(status).To(Equal(200))
+
+		// Check that confirmation email was sent.
+		logEntry := logMessages[len(logMessages)-2]
+		Expect(logEntry.Data["action"]).To(Equal("users.email_confirmation_mail_sent"))
+		Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+		Expect(logEntry.Data["email"]).To(Equal(currentUser.GetEmail()))
+
+		currentToken = logEntry.Data["token"].(string)
+	})
+
+	It("Should confirm email", func() {
+		js := fmt.Sprintf(`{"data": {"token": "%v"}}`, currentToken)
+		status, _, err := client.PostJson("/api/method/users.confirm-email", js)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(status).To(Equal(200))
+
+		logEntry := logMessages[len(logMessages)-2]
+		Expect(logEntry.Data["action"]).To(Equal("users.email_confirmed"))
+		Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+
+		rawUser, err := app.Backend("memory").FindOne("users", currentUser.GetID())
+		Expect(rawUser.(kit.User).IsEmailConfirmed()).To(BeTrue())
+	})
+
+	It("Should send password reset email", func() {
+		js := fmt.Sprintf(`{"data": {"user": "%v"}}`, currentUser.GetEmail())
+		status, _, err := client.PostJson("/api/method/users.request-password-reset", js)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(status).To(Equal(200))
+
+		// Check that confirmation email was sent.
+		logEntry := logMessages[len(logMessages)-2]
+		Expect(logEntry.Data["action"]).To(Equal("users.password_reset_requested"))
+		Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+		Expect(logEntry.Data["email"]).To(Equal(currentUser.GetEmail()))
+
+		currentToken = logEntry.Data["token"].(string)
+	})
+
+	It("Should reset password", func() {
+		js := fmt.Sprintf(`{"data": {"token": "%v", "password": "newpassword"}}`, currentToken)
+		status, _, err := client.PostJson("/api/method/users.password-reset", js)
+		Expect(err).ToNot(HaveOccurred())
+		Expect(status).To(Equal(200))
+
+		logEntry := logMessages[len(logMessages)-2]
+		Expect(logEntry.Data["action"]).To(Equal("users.password_reset"))
+		Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+
+		// Try to authenticate user with new password.
+		err = app.Dependencies().UserService().AuthenticateUser(currentUser, "password", map[string]interface{}{"password": "newpassword"})
+		Expect(err).ToNot(HaveOccurred())
 	})
 })
