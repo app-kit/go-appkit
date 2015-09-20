@@ -585,6 +585,9 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, kit.Error)
 		return nil, err
 	}
 
+	// Delete token.
+	s.Tokens.Backend().Delete(tokenItem)
+
 	s.deps.Logger().WithFields(logrus.Fields{
 		"action":  "users.password_reset",
 		"user_id": user.GetID(),
