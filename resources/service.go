@@ -55,16 +55,14 @@ func (s *Service) Resource(name string) kit.Resource {
 func (s *Service) RegisterResource(res kit.Resource) {
 	if res.Backend() == nil {
 		if s.defaultBackend == nil {
-			panic("Registering resource without backend, but no default backend set on resources.Service")
+			s.deps.Logger().Panic("Registering resource without backend, but no default backend set on resources.Service")
 		}
-		if err := s.defaultBackend.RegisterModel(res.Model()); err != nil {
-			panic("Could not register model with backend: " + err.Error())
-		}
+		s.defaultBackend.RegisterModel(res.Model())
 		res.SetBackend(s.defaultBackend)
 	}
 
 	if res.Collection() == "" {
-		panic("Registering resource without a model type")
+		s.deps.Logger().Panic("Registering resource without a model type")
 	}
 
 	s.resources[res.Collection()] = res

@@ -37,7 +37,7 @@ func (h *HttpHandlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func serverRenderer(app kit.App, r kit.Request) kit.Response {
-	url := r.GetContext().MustGet("httpRequest").(*http.Request).URL
+	url := r.GetHttpRequest().URL
 
 	// Build the url to query.
 	if url.Scheme == "" {
@@ -252,7 +252,7 @@ func getIndexTpl(app kit.App) ([]byte, kit.Error) {
 }
 
 func notFoundHandler(app kit.App, r kit.Request) (kit.Response, bool) {
-	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+	httpRequest := r.GetHttpRequest()
 	apiPrefix := "/" + app.Config().UString("api.prefix", "api")
 	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
 
@@ -343,17 +343,23 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, app kit.App, handler kit.RequestHandler) {
 	request := kit.NewRequest()
 
-	if r.Body != nil {
-		if err := request.BuildFromJsonBody(r); err != nil {
+	request.SetHttpRequest(r)
+	request.SetHttpResponseWriter(w)
 
-		}
-	}
-
-	request.Context.Set("httpRequest", r)
-	request.Context.Set("responseWriter", w)
+	request.ReadHtmlBody()
 
 	for _, param := range params {
 		request.Context.Set(param.Key, param.Value)
+	}
+
+	queryVals := r.URL.Query()
+	for key := range queryVals {
+		vals := queryVals[key]
+		if len(vals) == 1 {
+			request.Context.Set(key, vals[0])
+		} else {
+			request.Context.Set(key, vals)
+		}
 	}
 
 	var response kit.Response
@@ -458,7 +464,7 @@ func RequestTraceAfterMiddleware(app kit.App, r kit.Request, response kit.Respon
 
 func AuthenticationMiddleware(a kit.App, r kit.Request) (kit.Response, bool) {
 	// Handle authentication.
-	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+	httpRequest := r.GetHttpRequest()
 	if token := httpRequest.Header.Get("Authentication"); token != "" {
 		if a.UserService() != nil {
 			user, session, err := a.UserService().VerifySession(token)
@@ -485,7 +491,11 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 		return false
 	}
 
-	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+	if response.GetRawData() != nil {
+		return false
+	}
+
+	httpRequest := r.GetHttpRequest()
 	apiPrefix := "/" + app.Config().UString("api.prefix", "api")
 	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
 
@@ -532,7 +542,7 @@ func RequestLoggerMiddleware(app kit.App, r kit.Request, response kit.Response) 
 		timeTaken = int64(finished.Sub(started) / time.Millisecond)
 	}
 
-	httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+	httpRequest := r.GetHttpRequest()
 	method := httpRequest.Method
 	url := httpRequest.URL
 

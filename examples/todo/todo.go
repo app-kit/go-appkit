@@ -130,14 +130,14 @@ func start() error {
 	}
 	app.RegisterCache(fsCache)
 
-	userHandler := users.NewService(nil, nil)
+	userHandler := users.NewService(nil, backend, nil)
 	app.RegisterUserService(userHandler)
 
 	fileHandler := files.NewFileServiceWithFs(nil, "data")
 	app.RegisterFileService(fileHandler)
 
-	app.RegisterResource(resources.NewResource(&Project{}, ProjectHooks{}))
-	app.RegisterResource(resources.NewResource(&Todo{}, nil))
+	app.RegisterResource(resources.NewResource(&Project{}, ProjectHooks{}, true))
+	app.RegisterResource(resources.NewResource(&Todo{}, nil, true))
 
 	app.PrepareBackends()
 

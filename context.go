@@ -1,5 +1,9 @@
 package appkit
 
+import (
+	"fmt"
+)
+
 type Context struct {
 	Data map[string]interface{}
 }
@@ -39,6 +43,16 @@ func (c Context) String(key string) string {
 	if !ok {
 		return ""
 	}
+	return str
+}
+
+func (c Context) MustString(key string) string {
+	val := c.MustGet(key)
+	str, ok := val.(string)
+	if !ok {
+		panic(fmt.Sprintf("Context key %v is not a string", key))
+	}
+
 	return str
 }
 

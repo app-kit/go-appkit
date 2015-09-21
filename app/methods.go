@@ -195,22 +195,25 @@ func (m *methodQueue) Process() {
 	go func(method *methodInstance) {
 
 		// Recover from panic.
-		defer func() {
-			rawErr := recover()
-			if rawErr != nil {
-				// Panic occurred, finish with error response.
-				resp := &kit.AppResponse{
-					Error: kit.AppError{
-						Code: "method_panic",
-					},
-				}
-				if err, ok := rawErr.(error); ok {
-					resp.Error.AddError(err)
-				}
+		/*
+			defer func() {
+				rawErr := recover()
+				if rawErr != nil {
+					// Panic occurred, finish with error response.
+					resp := &kit.AppResponse{
+						Error: kit.AppError{
+							Code: "method_panic",
+							Data: rawErr,
+						},
+					}
+					if err, ok := rawErr.(error); ok {
+						resp.Error.AddError(err)
+					}
 
-				m.Finish(method, resp)
-			}
-		}()
+					m.Finish(method, resp)
+				}
+			}()
+		*/
 
 		// Run method.
 		resp := method.method.Run(m.app, method.request, func() {

@@ -78,3 +78,7 @@ func WrapError(err error, code, msg string) *AppError {
 
 	return wrap
 }
+
+func IsError(err Error, code string) bool {
+	return err.GetCode() == code
+}

@@ -2,6 +2,7 @@ package appkit
 
 import (
 	"io"
+	"net/http"
 	"time"
 
 	"github.com/Sirupsen/logrus"
@@ -23,7 +24,7 @@ type Session interface {
 	SetToken(string)
 	GetToken() string
 
-	SetUserID(string)
+	SetUserID(string) error
 	GetUserID() string
 
 	SetStartedAt(time.Time)
@@ -100,15 +101,6 @@ type UserModel interface {
 
 type AuthItem interface {
 	db.Model
-
-	SetUserID(string)
-	GetUserID() string
-
-	SetType(string)
-	GetType() string
-
-	SetData(interface{}) Error
-	GetData() (interface{}, Error)
 }
 
 type UserToken interface {
@@ -129,10 +121,17 @@ type UserToken interface {
 }
 
 type AuthAdaptor interface {
-	GetName() string
+	Name() string
 
-	BuildData(User, interface{}) (interface{}, Error)
-	Authenticate(user User, authData interface{}, suppliedData interface{}) (bool, Error)
+	Backend() db.Backend
+	SetBackend(db.Backend)
+
+	RegisterUser(user User, data map[string]interface{}) (AuthItem, Error)
+
+	// Authenticate  a user based on data map, and return userID or an error.
+	// The userID argument may be an empty string if the adaptor has to
+	// map the userID.
+	Authenticate(userID string, data map[string]interface{}) (string, Error)
 }
 
 /**
@@ -142,13 +141,26 @@ type AuthAdaptor interface {
 type Request interface {
 	GetContext() *Context
 	GetMeta() Context
+
 	GetData() interface{}
+	GetRawData() []byte
+
+	// Parse json contained in RawData and extract data and meta.
+	ParseJsonData() Error
 
 	GetUser() User
 	SetUser(User)
 
 	GetSession() Session
 	SetSession(Session)
+
+	GetHttpRequest() *http.Request
+	SetHttpRequest(request *http.Request)
+
+	ReadHtmlBody() Error
+
+	GetHttpResponseWriter() http.ResponseWriter
+	SetHttpResponseWriter(writer http.ResponseWriter)
 }
 
 type Response interface {
@@ -292,7 +304,7 @@ type TemplateEngine interface {
 	Build(name string, tpl string) (interface{}, Error)
 	BuildFile(name string, paths ...string) (interface{}, Error)
 
-	Get(name string) interface{}
+	GetTemplate(name string) interface{}
 
 	BuildAndRender(name string, tpl string, data interface{}) ([]byte, Error)
 	BuildFileAndRender(name string, data interface{}, paths ...string) ([]byte, Error)
@@ -328,6 +340,8 @@ type Resource interface {
 	Backend() db.Backend
 	SetBackend(db.Backend)
 
+	IsPublic() bool
+
 	Collection() string
 	Model() db.Model
 	SetModel(db.Model)
@@ -343,8 +357,6 @@ type Resource interface {
 
 	ApiFindOne(string, Request) Response
 	ApiFind(db.Query, Request) Response
-	// Same as find, but response meta will contain a total count.
-	ApiFindPaginated(db.Query, Request) Response
 
 	Create(obj db.Model, user User) Error
 	ApiCreate(obj db.Model, r Request) Response
@@ -465,8 +477,8 @@ type UserService interface {
 	// Build a token, persist it and return it.
 	BuildToken(typ, userId string, expiresAt time.Time) (UserToken, Error)
 
-	CreateUser(user User, adaptor string, data interface{}) Error
-	AuthenticateUser(user User, adaptor string, data interface{}) Error
+	CreateUser(user User, adaptor string, data map[string]interface{}) Error
+	AuthenticateUser(user User, adaptor string, data map[string]interface{}) (User, Error)
 	VerifySession(token string) (User, Session, Error)
 
 	SendConfirmationEmail(User) Error
@@ -642,6 +654,25 @@ type Dependencies interface {
 }
 
 /**
+ * Frontend interfaces.
+ */
+
+type Frontend interface {
+	Name() string
+
+	App() App
+	SetApp(App)
+
+	Debug() bool
+	SetDebug(bool)
+
+	Logger() *logrus.Logger
+
+	Init() Error
+	Start() Error
+}
+
+/**
  * App interfaces.
  */
 
@@ -670,6 +701,8 @@ type App interface {
 
 	ServeFiles(route, path string)
 
+	// Backend methods.
+
 	RegisterBackend(backend db.Backend)
 	Backend(name string) db.Backend
 	MigrateBackend(name string, version int, force bool) Error
@@ -679,26 +712,42 @@ type App interface {
 	RebuildBackend(name string) Error
 	RebuildAllBackends() Error
 
+	// Cache methods.
+
 	RegisterCache(c Cache)
 	Cache(name string) Cache
 
-	RegisterEmailService(s EmailService)
-	EmailService() EmailService
-
-	RegisterTemplateEngine(e TemplateEngine)
-	TemplateEngine() TemplateEngine
-
-	RegisterMethod(Method)
-	RunMethod(name string, r Request, responder func(Response), withFinishedChannel bool) (chan bool, Error)
-
-	RegisterResource(Resource)
-	Resource(name string) Resource
+	// UserService methods.
 
 	RegisterUserService(h UserService)
 	UserService() UserService
 
+	// FileService methods.
+
 	RegisterFileService(f FileService)
 	FileService() FileService
+
+	// Email methods.
+
+	RegisterEmailService(s EmailService)
+	EmailService() EmailService
+
+	// TemplateEngine methods.
+
+	RegisterTemplateEngine(e TemplateEngine)
+	TemplateEngine() TemplateEngine
+
+	// Method methods.
+
+	RegisterMethod(Method)
+	RunMethod(name string, r Request, responder func(Response), withFinishedChannel bool) (chan bool, Error)
+
+	// Resource methodds.
+
+	RegisterResource(Resource)
+	Resource(name string) Resource
+
+	// Middleware methods.
 
 	RegisterBeforeMiddleware(handler RequestHandler)
 	ClearBeforeMiddlewares()
@@ -707,6 +756,13 @@ type App interface {
 	RegisterAfterMiddleware(middleware AfterRequestMiddleware)
 	ClearAfterMiddlewares()
 	AfterMiddlewares() []AfterRequestMiddleware
+
+	// Frontend methods.
+
+	RegisterFrontend(Frontend)
+	Frontend(name string) Frontend
+
+	// HTTP related methods.
 
 	NotFoundHandler() RequestHandler
 	SetNotFoundHandler(x RequestHandler)

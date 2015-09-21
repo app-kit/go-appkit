@@ -5,6 +5,33 @@ import (
 	"strings"
 )
 
+func GetMapKey(rawData interface{}, key string) (interface{}, bool) {
+	data, ok := rawData.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+
+	val, ok := data[key]
+	if !ok {
+		return nil, false
+	}
+	return val, true
+}
+
+func GetMapStringKey(rawData interface{}, key string) string {
+	val, ok := GetMapKey(rawData, key)
+	if !ok {
+		return ""
+	}
+
+	str, ok := val.(string)
+	if !ok {
+		return ""
+	}
+
+	return str
+}
+
 func StrIn(haystack []string, needle string) bool {
 	if haystack == nil {
 		return false

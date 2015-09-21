@@ -13,14 +13,19 @@ type Resource struct {
 	backend db.Backend
 	hooks   interface{}
 
+	isPublic bool
+
 	model db.Model
 }
 
 // Ensure Resource implements Resource interface.
 var _ kit.Resource = (*Resource)(nil)
 
-func NewResource(model db.Model, hooks interface{}) *Resource {
-	r := Resource{}
+func NewResource(model db.Model, hooks interface{}, isPublic bool) *Resource {
+	r := Resource{
+		isPublic: isPublic,
+	}
+
 	r.SetModel(model)
 	r.SetHooks(hooks)
 	return &r
@@ -48,6 +53,10 @@ func (res *Resource) Backend() db.Backend {
 
 func (res *Resource) SetBackend(x db.Backend) {
 	res.backend = x
+}
+
+func (res *Resource) IsPublic() bool {
+	return res.isPublic
 }
 
 func (res *Resource) Collection() string {
@@ -133,6 +142,11 @@ func (res *Resource) ApiFindOne(rawId string, r kit.Request) kit.Response {
 }
 
 func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
+	// If query is empty, query for all records.
+	if query == nil {
+		query = res.Q()
+	}
+
 	apiFindHook, ok := res.hooks.(ApiFindHook)
 	if ok {
 		return apiFindHook.ApiFind(res, query, r)
@@ -156,19 +170,25 @@ func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
 		}
 	}
 
-	return &kit.AppResponse{
+	response := &kit.AppResponse{
 		Data: result,
 	}
-}
 
-func (res *Resource) ApiFindPaginated(query db.Query, r kit.Request) kit.Response {
-	resp := res.ApiFind(query, r)
-	if resp.GetError() == nil {
-		count, _ := res.backend.Count(query)
-		resp.SetMeta(map[string]interface{}{"count": count})
+	// If a limit was set, count the total number of results
+	// and set count parameter in metadata.
+	if query.GetLimit() > 0 {
+		query.Limit(0).Offset(0)
+		count, err := res.backend.Count(query)
+		if err != nil {
+			return &kit.AppResponse{
+				Error: kit.WrapError(err, "count_error", ""),
+			}
+		}
+
+		response.SetMeta(map[string]interface{}{"count": count})
 	}
 
-	return resp
+	return response
 }
 
 /**

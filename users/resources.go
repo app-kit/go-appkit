@@ -66,38 +66,43 @@ func StartSession(res kit.Resource, user kit.User) (kit.Session, kit.Error) {
 }
 
 func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {
+	userService := res.Dependencies().UserService()
+	userResource := userService.UserResource()
+
 	meta := r.GetMeta()
 
-	userIdentifier := meta.String("user")
-	if userIdentifier == "" {
-		return kit.NewErrorResponse("user_missing", "Expected 'user' in metadata.")
-	}
-
 	// Find user.
-	userResource := res.Dependencies().UserService().UserResource()
+	userIdentifier := meta.String("user")
+	var user kit.User
 
-	rawUser, err := userResource.Q().
-		Filter("username", userIdentifier).Or("email", userIdentifier).First()
+	if userIdentifier != "" {
+		rawUser, err := userResource.Q().
+			Filter("username", userIdentifier).Or("email", userIdentifier).First()
 
-	if err != nil {
-		return &kit.AppResponse{Error: err}
-	} else if rawUser == nil {
-		return kit.NewErrorResponse("user_not_found", "User not found for identifier: "+userIdentifier)
+		if err != nil {
+			return &kit.AppResponse{Error: kit.WrapError(err, "user_query_error", "")}
+		} else if rawUser == nil {
+			return kit.NewErrorResponse("user_not_found", "User not found for identifier: "+userIdentifier)
+		}
+
+		user = rawUser.(kit.User)
 	}
-
-	user := rawUser.(kit.User)
 
 	adaptor := meta.String("adaptor")
 	if adaptor == "" {
 		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
 	}
 
-	data, ok := meta.Get("auth-data")
+	rawData, ok := meta.Get("auth-data")
 	if !ok {
 		kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
 	}
+	data, ok := rawData.(map[string]interface{})
+	if !ok {
+		kit.NewErrorResponse("invalid_auth_data", "Invalid auth data: expected dict")
+	}
 
-	err = res.Dependencies().UserService().AuthenticateUser(user, adaptor, data)
+	user, err := userService.AuthenticateUser(user, adaptor, data)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
@@ -251,9 +256,14 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.R
 		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
 	}
 
-	data, ok := meta.Get("auth-data")
+	rawData, ok := meta.Get("auth-data")
 	if !ok {
 		return kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
+	}
+
+	data, ok := rawData.(map[string]interface{})
+	if !ok {
+		return kit.NewErrorResponse("invalid_auth_data", "Invalid auth data: expected dictionary")
 	}
 
 	user := obj.(kit.User)

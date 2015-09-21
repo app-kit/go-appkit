@@ -9,7 +9,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
-	"github.com/manyminds/api2go"
 	"github.com/olebedev/config"
 	"github.com/spf13/cobra"
 
@@ -19,6 +18,8 @@ import (
 	//"github.com/theduke/go-appkit/caches"
 	"github.com/theduke/go-appkit/crawler"
 	"github.com/theduke/go-appkit/resources"
+
+	"github.com/theduke/go-appkit/frontends/jsonapi"
 
 	"github.com/theduke/go-appkit/email"
 	"github.com/theduke/go-appkit/email/gomail"
@@ -31,7 +32,8 @@ type App struct {
 
 	logger *logrus.Logger
 
-	deps kit.Dependencies
+	deps      kit.Dependencies
+	frontends map[string]kit.Frontend
 
 	methods map[string]kit.Method
 
@@ -43,10 +45,11 @@ type App struct {
 
 	sessionManager *SessionManager
 
-	api2go *api2go.API
 	router *httprouter.Router
 
 	Cli *cobra.Command
+
+	shutDownChannel chan bool
 }
 
 // Ensure App implements App interface.
@@ -55,13 +58,15 @@ var _ kit.App = (*App)(nil)
 func NewApp(cfgPath string) *App {
 	app := App{
 		deps:              NewDependencies(),
+		frontends:         make(map[string]kit.Frontend),
 		methods:           make(map[string]kit.Method),
 		beforeMiddlewares: make([]kit.RequestHandler, 0),
 		afterMiddlewares:  make([]kit.AfterRequestMiddleware, 0),
-	}
 
-	app.api2go = api2go.NewAPI("api")
-	app.router = app.api2go.Router()
+		router: httprouter.New(),
+
+		shutDownChannel: make(chan bool),
+	}
 
 	// Configure logger.
 	app.SetLogger(&logrus.Logger{
@@ -94,6 +99,8 @@ func (a *App) Defaults() {
 	a.RegisterAfterMiddleware(ServerErrorMiddleware)
 	a.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
 	a.RegisterAfterMiddleware(RequestLoggerMiddleware)
+
+	a.RegisterFrontend(jsonapi.New(a))
 }
 
 func (a *App) ENV() string {
@@ -158,11 +165,11 @@ func (a *App) ReadConfig(path string) {
 		defer f.Close()
 		content, err := ioutil.ReadAll(f)
 		if err != nil {
-			panic(fmt.Sprintf("Could not read config at '%v': %v\n", path, err))
+			a.Logger().Panicf("Could not read config at '%v': %v\n", path, err)
 		} else {
 			cfg, err = config.ParseYaml(string(content))
 			if err != nil {
-				panic(fmt.Sprintf("YAML error while parsing config at '%v': %v\n", path, err))
+				a.Logger().Panicf("YAML error while parsing config at '%v': %v\n", path, err)
 			}
 		}
 	}
@@ -189,7 +196,7 @@ func (a *App) ReadConfig(path string) {
 	// Ensure a tmp directory exists and is readable.
 	tmpDir := cfg.UString("tmpDir", "tmp")
 	if err := os.MkdirAll(tmpDir, 0777); err != nil {
-		panic(fmt.Sprintf("Could not read or create tmp dir at '%v': %v", tmpDir, err))
+		a.Logger().Panicf("Could not read or create tmp dir at '%v': %v", tmpDir, err)
 	}
 
 	a.deps.SetConfig(cfg)
@@ -211,6 +218,13 @@ func (a *App) PrepareForRun() {
 			a.Logger().Errorf("Migration FAILED: %v\n", err)
 		}
 	}
+
+	// Initialize frontends.
+	for name := range a.frontends {
+		if err := a.frontends[name].Init(); err != nil {
+			a.Logger().Panicf("Error while initializing frontend %v: %v", name, err)
+		}
+	}
 }
 
 func (a *App) Run() {
@@ -229,7 +243,7 @@ func (a *App) Run() {
 	// Install handler for index.
 	indexTpl, err := getIndexTpl(a)
 	if err != nil {
-		panic(err.Error())
+		a.Logger().Panic(err)
 	}
 
 	a.router.GET("/", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
@@ -253,6 +267,8 @@ func (a *App) Run() {
 
 	// Register route for method calls.
 	methodHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
+		r.ParseJsonData()
+
 		var response kit.Response
 
 		responder := func(r kit.Response) {
@@ -276,33 +292,33 @@ func (a *App) Run() {
 		httpHandler(w, r, params, a, methodHandler)
 	})
 
-	// Register api2json resources.
-	resources := a.deps.Resources()
-	for key := range resources {
-		res := resources[key]
-		a.api2go.AddResource(res.Model(), Api2GoResource{
-			AppResource: res,
-			App:         a,
-		})
-	}
-
 	// Run the session manager.
 	a.sessionManager = NewSessionManager(a)
 	a.sessionManager.Run()
+
+	// Run frontends.
+	for name := range a.frontends {
+		if err := a.frontends[name].Start(); err != nil {
+			a.Logger().Panicf("Could not start frontend %v: %v", name, err)
+		}
+	}
+
+	url := a.Config().UString("host", "localhost") + ":" + a.Config().UString("port", "8000")
+	a.Logger().Infof("Serving on %v", url)
+
+	go func() {
+		err2 := http.ListenAndServe(url, a.router)
+		if err2 != nil {
+			a.Logger().Panicf("Could not start server: %v\n", err)
+		}
+	}()
 
 	// Crawl on startup if enabled.
 	if a.Config().UBool("crawler.onRun", false) {
 		a.RunCrawler()
 	}
 
-	url := a.Config().UString("host", "localhost") + ":" + a.Config().UString("port", "8000")
-	a.Logger().Infof("Serving on %v", url)
-
-	handler := a.api2go.Handler()
-	err2 := http.ListenAndServe(url, handler)
-	if err2 != nil {
-		a.Logger().Panicf("Could not start server: %v\n", err)
-	}
+	<-a.shutDownChannel
 }
 
 /**
@@ -442,7 +458,7 @@ func (a *App) TemplateEngine() kit.TemplateEngine {
 
 func (a *App) RegisterMethod(method kit.Method) {
 	if _, exists := a.methods[method.Name()]; exists {
-		panic(fmt.Sprintf("Method name '%v' already registered.", method.Name()))
+		a.Logger().Panicf("Method name '%v' already registered.", method.Name())
 	}
 
 	a.methods[method.Name()] = method
@@ -482,7 +498,7 @@ func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response)
 func (a *App) RegisterResource(res kit.Resource) {
 	if res.Backend() == nil {
 		if a.deps.DefaultBackend() == nil {
-			panic("Registering resource without backend, but no default backend set.")
+			a.Logger().Panic("Registering resource without backend, but no default backend set.")
 		}
 
 		// Set backend.
@@ -538,6 +554,8 @@ func (a *App) RegisterUserService(s kit.UserService) {
 
 	a.RegisterResource(s.UserResource())
 	a.RegisterResource(s.SessionResource())
+	a.RegisterResource(s.RoleResource())
+	a.RegisterResource(s.PermissionResource())
 
 	a.deps.SetUserService(s)
 }
@@ -553,7 +571,7 @@ func (a *App) UserService() kit.UserService {
 func (a *App) RegisterFileService(f kit.FileService) {
 	r := f.Resource()
 	if r == nil {
-		panic("Trying to register file handler without resource")
+		a.Logger().Panic("Trying to register file handler without resource")
 	}
 
 	if f.Dependencies() == nil {
@@ -661,7 +679,7 @@ func (a *App) MigrateAllBackends(force bool) kit.Error {
 func (a *App) DropBackend(name string) kit.Error {
 	b := a.Backend(name)
 	if b == nil {
-		panic("Unknown backend " + name)
+		a.Logger().Panicf("Unknown backend %v", name)
 	}
 
 	a.Logger().Infof("Dropping all collections on backend " + name)
@@ -688,7 +706,7 @@ func (a *App) DropAllBackends() kit.Error {
 func (a *App) RebuildBackend(name string) kit.Error {
 	b := a.Backend(name)
 	if b == nil {
-		panic("Unknown backend " + name)
+		a.Logger().Panicf("Unknown backend %v", name)
 	}
 
 	a.Logger().Infof("Rebuilding backend " + name)
@@ -721,6 +739,14 @@ func (a *App) RebuildAllBackends() kit.Error {
 	return nil
 }
 
-func (a App) UserHandler() kit.UserService {
-	return a.UserService()
+/**
+ * Frontends.
+ */
+
+func (a *App) Frontend(name string) kit.Frontend {
+	return a.frontends[name]
+}
+
+func (a *App) RegisterFrontend(f kit.Frontend) {
+	a.frontends[f.Name()] = f
 }

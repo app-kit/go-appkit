@@ -386,7 +386,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 
 	// Upload route.
 	uploadOptionsHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
-		header := r.GetContext().MustGet("ResponseWriter").(http.ResponseWriter).Header()
+		header := r.GetHttpResponseWriter().Header()
 
 		allowedOrigins := a.Config().UString("fileHandler.allowedOrigins", "*")
 		header.Set("Access-Control-Allow-Origin", allowedOrigins)
@@ -426,7 +426,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		var err kit.Error
 
 		if err == nil {
-			files, err = handleUpload(a, tmpPath, r.GetContext().MustGet("httpRequest").(*http.Request))
+			files, err = handleUpload(a, tmpPath, r.GetHttpRequest())
 			if err != nil {
 				return &kit.AppResponse{Error: err}, false
 			}
@@ -465,7 +465,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		}
 		defer reader.Close()
 
-		w := r.GetContext().MustGet("responseWriter").(http.ResponseWriter)
+		w := r.GetHttpResponseWriter()
 		serveFile(w, file, reader)
 		return nil, true
 	}
@@ -496,7 +496,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 			}, false
 		}
 
-		httpRequest := r.GetContext().MustGet("httpRequest").(*http.Request)
+		httpRequest := r.GetHttpRequest()
 
 		query := httpRequest.URL.Query()
 		rawWidth := query.Get("width")
@@ -528,7 +528,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 			}, false
 		}
 
-		w := r.GetContext().MustGet("responseWriter").(http.ResponseWriter)
+		w := r.GetHttpResponseWriter()
 		serveFile(w, file, reader)
 
 		return nil, true

@@ -41,7 +41,7 @@ func NewFileServiceWithFs(deps kit.Dependencies, dataPath string) *FileService {
 
 	service := NewFileService(deps)
 
-	res := resources.NewResource(&FileIntID{}, FilesResource{})
+	res := resources.NewResource(&FileIntID{}, FilesResource{}, true)
 	service.SetResource(res)
 
 	fs, err := fs.New(dataPath)

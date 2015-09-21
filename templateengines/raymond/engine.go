@@ -49,7 +49,7 @@ func (e *Engine) BuildFile(name string, paths ...string) (interface{}, Error) {
 	return e.Build(name, string(tpl))
 }
 
-func (e *Engine) Get(name string) interface{} {
+func (e *Engine) GetTemplate(name string) interface{} {
 	return e.templates[name]
 }
 

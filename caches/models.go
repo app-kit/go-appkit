@@ -8,14 +8,23 @@ import (
 )
 
 type StrItem struct {
-	Key       string
-	Value     string
-	ExpiresAt time.Time
-	Tags      []string
+	Key       string    `db:"primary-key;max:10000"`
+	Value     string    `db:"not-null;max:-1"`
+	ExpiresAt time.Time `db:"ignore-zero"`
+	Tags      []string  `db:"ignore-zero;marshal"`
 }
 
 // Ensure Item implements CacheItem
 var _ kit.CacheItem = (*StrItem)(nil)
+
+func (i *StrItem) GetID() string {
+	return i.Key
+}
+
+func (i *StrItem) SetID(key string) error {
+	i.Key = key
+	return nil
+}
 
 func (i *StrItem) GetKey() string {
 	return i.Key
@@ -71,7 +80,7 @@ func (i *StrItem) SetTags(x []string) {
 
 type MapItem struct {
 	StrItem
-	Value map[string]interface{}
+	Value map[string]interface{} `db:"not-null;max:-1;marshal"`
 }
 
 func (i *MapItem) GetValue() interface{} {
@@ -118,7 +127,7 @@ func (i *MapItem) FromString(x string) kit.Error {
 
 type Item struct {
 	StrItem
-	Value interface{}
+	Value interface{} `db:"not-null;max:-1;marshal"`
 }
 
 func (i *Item) GetValue() interface{} {

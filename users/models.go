@@ -10,169 +10,150 @@ import (
 	kit "github.com/theduke/go-appkit"
 )
 
-type BaseAuthItem struct {
-	UserID string `sql:"-" db:"primary-key"`
-	Typ    string `sql:"size: 100; not null"`
+/**
+ * Extendable models that are related to a user.
+ */
 
-	Data string `sql:type:text; not null`
+type UserModel struct {
+	User   *User
+	UserID string
 }
 
-func (a *BaseAuthItem) Collection() string {
-	return "auth_items"
+func (m *UserModel) GetUserID() string {
+	return m.UserID
 }
 
-func (a *BaseAuthItem) GetName() string {
-	return "auth_items"
-}
-
-func (a BaseAuthItem) TableName() string {
-	return "auth_items"
-}
-
-func (a *BaseAuthItem) GetID() string {
-	return ""
-}
-
-func (a *BaseAuthItem) SetID(x string) error {
+func (m *UserModel) SetUserID(x string) error {
+	m.UserID = x
 	return nil
 }
 
-func (b *BaseAuthItem) SetUserID(rawId string) {
-	b.UserID = rawId
+func (m *UserModel) GetUser() kit.User {
+	return m.User
 }
 
-func (b *BaseAuthItem) GetUserID() string {
-	return b.UserID
+func (m *UserModel) SetUser(u kit.User) {
+	m.User = u.(*User)
+	m.SetUserID(u.GetID())
 }
 
-func (b *BaseAuthItem) SetType(x string) {
-	b.Typ = x
+type IntUserModel struct {
+	User   *IntUser
+	UserID uint64
 }
 
-func (b *BaseAuthItem) GetType() string {
-	return b.Typ
+func (m *IntUserModel) GetUserID() string {
+	if m.UserID == 0 {
+		return ""
+	}
+	return strconv.FormatUint(m.UserID, 10)
 }
 
-func (b *BaseAuthItem) SetData(data interface{}) kit.Error {
-	json, err := json.Marshal(data)
-	if err != nil {
-		return kit.WrapError(err, "auth_item_json_marshal_error", "")
+func (m *IntUserModel) SetUserID(rawId string) error {
+	if rawId == "" {
+		m.UserID = 0
+		return nil
 	}
 
-	b.Data = string(json)
+	id, err := strconv.ParseUint(rawId, 10, 64)
+	if err != nil {
+		return err
+	}
+	m.UserID = id
 	return nil
 }
 
-func (b *BaseAuthItem) GetData() (interface{}, kit.Error) {
-	var data interface{}
-	if err := json.Unmarshal([]byte(b.Data), &data); err != nil {
-		return nil, kit.WrapError(err, "auth_item_json_unmarshal_error", "")
-	}
-
-	return data, nil
+func (m *IntUserModel) GetUser() kit.User {
+	return m.User
 }
 
-type BaseAuthItemIntID struct {
-	BaseAuthItem
-	ID     uint64
-	UserID uint64 `gorm:"primary-key" sql:"not null;"`
+func (m *IntUserModel) SetUser(x kit.User) {
+	m.User = x.(*IntUser)
+	m.SetUserID(x.GetID())
 }
 
-func (u *BaseAuthItemIntID) SetUserID(x string) {
-	i, err := strconv.ParseUint(x, 10, 64)
-	if err != nil {
-		return
-	}
+/**
+ * User.
+ */
 
-	u.UserID = i
-}
+type User struct {
+	db.BaseModel
 
-func (u *BaseAuthItemIntID) GetUserID() string {
-	return strconv.FormatUint(u.UserID, 10)
-}
-
-type BaseUser struct {
-	Active bool `sql:"not null"`
+	Active bool
 
 	Username string `db:"unique;not-null"`
 	Email    string `db:"unique;not-null"`
 
 	EmailConfirmed bool
 
-	LastLogin time.Time `jsonapi:"name=last-login"`
+	LastLogin time.Time `db:"ignore-zero"`
 
 	Data string `db:"ignore-zero;max:10000"`
 
-	CreatedAt time.Time `jsonapi:"name=created-at"`
-	UpdatedAt time.Time `jsonapi:"name=updated-at"`
+	CreatedAt time.Time `db:"ignore-zero"`
+	UpdatedAt time.Time `db:"ignore-zero"`
 
-	Roles []*Role `gorm:"many2many:user_roles;" db:"m2m;"`
+	Roles []*Role `db:"m2m;"`
 }
 
-func (u BaseUser) Collection() string {
+// Ensure User implements kit.User interface.
+var _ kit.User = (*User)(nil)
+
+func (u User) Collection() string {
 	return "users"
-}
-
-// For api2go!
-func (a *BaseUser) GetName() string {
-	return "users"
-}
-
-func (a BaseUser) TableName() string {
-	return "users"
-}
-
-func (a BaseUser) GetProfile() kit.UserProfile {
-	return nil
-}
-
-func (a BaseUser) SetProfile(p kit.UserProfile) {
-
 }
 
 // Implement User interface.
 
-func (u *BaseUser) SetIsActive(x bool) {
+func (a User) GetProfile() kit.UserProfile {
+	return nil
+}
+
+func (a User) SetProfile(p kit.UserProfile) {
+
+}
+
+func (u *User) SetIsActive(x bool) {
 	u.Active = x
 }
 
-func (u *BaseUser) IsActive() bool {
+func (u *User) IsActive() bool {
 	return u.Active
 }
 
-func (u *BaseUser) SetEmail(x string) {
+func (u *User) SetEmail(x string) {
 	u.Email = x
 }
 
-func (u *BaseUser) GetEmail() string {
+func (u *User) GetEmail() string {
 	return u.Email
 }
 
-func (u *BaseUser) IsEmailConfirmed() bool {
+func (u *User) IsEmailConfirmed() bool {
 	return u.EmailConfirmed
 }
 
-func (u *BaseUser) SetIsEmailConfirmed(x bool) {
+func (u *User) SetIsEmailConfirmed(x bool) {
 	u.EmailConfirmed = x
 }
 
-func (u *BaseUser) SetUsername(x string) {
+func (u *User) SetUsername(x string) {
 	u.Username = x
 }
 
-func (u *BaseUser) GetUsername() string {
+func (u *User) GetUsername() string {
 	return u.Username
 }
 
-func (u *BaseUser) SetLastLogin(x time.Time) {
+func (u *User) SetLastLogin(x time.Time) {
 	u.LastLogin = x
 }
 
-func (u *BaseUser) GetLastLogin() time.Time {
+func (u *User) GetLastLogin() time.Time {
 	return u.LastLogin
 }
 
-func (u *BaseUser) GetData() (interface{}, kit.Error) {
+func (u *User) GetData() (interface{}, kit.Error) {
 	if u.Data == "" {
 		return nil, nil
 	}
@@ -188,7 +169,7 @@ func (u *BaseUser) GetData() (interface{}, kit.Error) {
 	return data, nil
 }
 
-func (u *BaseUser) SetData(x interface{}) kit.Error {
+func (u *User) SetData(x interface{}) kit.Error {
 	js, err := json.Marshal(x)
 	if err != nil {
 		return kit.AppError{
@@ -201,19 +182,19 @@ func (u *BaseUser) SetData(x interface{}) kit.Error {
 	return nil
 }
 
-func (u *BaseUser) SetCreatedAt(x time.Time) {
+func (u *User) SetCreatedAt(x time.Time) {
 	u.CreatedAt = x
 }
 
-func (u *BaseUser) GetCreatedAt() time.Time {
+func (u *User) GetCreatedAt() time.Time {
 	return u.CreatedAt
 }
 
-func (u *BaseUser) SetUpdatedAt(x time.Time) {
+func (u *User) SetUpdatedAt(x time.Time) {
 	u.UpdatedAt = x
 }
 
-func (u *BaseUser) GetUpdatedAt() time.Time {
+func (u *User) GetUpdatedAt() time.Time {
 	return u.UpdatedAt
 }
 
@@ -221,7 +202,7 @@ func (u *BaseUser) GetUpdatedAt() time.Time {
  * RBAC methods.
  */
 
-func (u *BaseUser) GetRoles() []kit.Role {
+func (u *User) GetRoles() []kit.Role {
 	slice := make([]kit.Role, 0)
 	for _, r := range u.Roles {
 		slice = append(slice, r)
@@ -229,7 +210,7 @@ func (u *BaseUser) GetRoles() []kit.Role {
 	return slice
 }
 
-func (u *BaseUser) AddRole(r kit.Role) {
+func (u *User) AddRole(r kit.Role) {
 	if u.Roles == nil {
 		u.Roles = make([]*Role, 0)
 	}
@@ -238,7 +219,7 @@ func (u *BaseUser) AddRole(r kit.Role) {
 	}
 }
 
-func (u *BaseUser) RemoveRole(r kit.Role) {
+func (u *User) RemoveRole(r kit.Role) {
 	if u.Roles == nil {
 		return
 	}
@@ -250,15 +231,15 @@ func (u *BaseUser) RemoveRole(r kit.Role) {
 	}
 }
 
-func (u *BaseUser) ClearRoles() {
+func (u *User) ClearRoles() {
 	u.Roles = make([]*Role, 0)
 }
 
-func (u *BaseUser) HasRole(r kit.Role) bool {
+func (u *User) HasRole(r kit.Role) bool {
 	return u.HasRoleStr(r.GetName())
 }
 
-func (u *BaseUser) HasRoleStr(role string) bool {
+func (u *User) HasRoleStr(role string) bool {
 	if u.Roles == nil {
 		return false
 	}
@@ -272,81 +253,54 @@ func (u *BaseUser) HasRoleStr(role string) bool {
 	return false
 }
 
-type BaseUserStrID struct {
-	BaseUser
-	ID string
-}
-
-func (u *BaseUserStrID) SetID(x string) error {
-	u.ID = x
-	return nil
-}
-
-func (u *BaseUserStrID) GetID() string {
-	return u.ID
-}
-
-type BaseUserIntID struct {
-	BaseUser
-
-	ID uint64 `gorm:"primary-key" sql:"not null"`
-}
-
-// For api2go!
-func (u BaseUserIntID) GetName() string {
-	return "users"
-}
-
-func (u *BaseUserIntID) SetID(x string) error {
-	i, err := strconv.ParseUint(x, 10, 64)
-	if err != nil {
-		return err
-	}
-
-	u.ID = i
-	return nil
-}
-
-func (u *BaseUserIntID) GetID() string {
-	return strconv.FormatUint(u.ID, 10)
+type IntUser struct {
+	db.BaseIntModel
+	User
 }
 
 /**
- * Base UserProfile.
+ * UserProfile.
  */
 
-type BaseUserProfile struct {
-	UserID string `sql:"-"`
+type UserProfile struct {
+	UserModel
 }
 
-// TODO: fix.
-func (p *BaseUserProfile) SetUserID(x string) {
-	p.UserID = x
+func (p UserProfile) Collection() string {
+	return "user_profiles"
 }
 
-func (p BaseUserProfile) GetUserID() string {
-	return p.UserID
+func (p *UserProfile) GetID() string {
+	return p.GetUserID()
 }
 
-type BaseUserProfileIntID struct {
-	UserID uint64 `gorm:"primary-key" sql:"not null"`
+func (p *UserProfile) SetID(rawId string) error {
+	return p.SetUserID(rawId)
 }
 
-func (p *BaseUserProfileIntID) SetUserID(x string) {
-	id, _ := strconv.ParseUint(x, 10, 64)
-	p.UserID = id
+type IntUserProfile struct {
+	UserProfile
+	IntUserModel
 }
 
-func (p *BaseUserProfileIntID) GetUserID() string {
-	return strconv.FormatUint(p.UserID, 10)
+func (p *IntUserProfile) GetID() string {
+	return p.GetUserID()
 }
+
+func (p *IntUserProfile) SetID(rawId string) error {
+	return p.SetUserID(rawId)
+}
+
+/**
+ * Token.
+ */
 
 type Token struct {
-	UserModelIntID
+	UserModel
 
-	Type      string `db:"notnull"`
-	Token     string `db:"primary-key;unique;notnull;omit-zero"`
-	ExpiresAt time.Time
+	Token     string    `db:"primary-key"`
+	Type      string    `db:"not-null"`
+	ExpiresAt time.Time `db:"ignore-zero"`
 }
 
 // Ensure that Token implements Token interface.
@@ -394,104 +348,75 @@ func (t *Token) IsValid() bool {
 }
 
 /**
- * BaseSession
+ * Session
  */
 
-type BaseSession struct {
-	Token      string    `gorm:"primary-key" db:"primary-key" sql:"size:100"`
-	UserID     string    `sql:"-"`
-	StartedAt  time.Time `sql:"not null" jsonapi:"name=started-at"`
-	ValidUntil time.Time `sql:"not null" jsonapi:"name=valid-until"`
+type Session struct {
+	UserModel
 
-	Typ string `sql:"size:100; not null"`
+	Token string `db:"primary-key;max:150"`
+	Typ   string `db:"not-null;max:100"`
+
+	StartedAt  time.Time `db:"not-null"`
+	ValidUntil time.Time `db:"not-null"`
 }
 
-func (b BaseSession) Collection() string {
+func (b Session) Collection() string {
 	return "sessions"
 }
 
-// For api2go.
-func (b BaseSession) GetName() string {
-	return "sessions"
-}
-
-func (b BaseSession) TableName() string {
-	return "sessions"
-}
-
-func (s BaseSession) GetID() string {
+func (s Session) GetID() string {
 	return s.Token
 }
 
-func (s *BaseSession) SetID(x string) error {
+func (s *Session) SetID(x string) error {
 	s.Token = x
 	return nil
 }
 
-func (s *BaseSession) GetType() string {
+func (s *Session) GetType() string {
 	return s.Typ
 }
 
-func (s *BaseSession) SetType(x string) {
+func (s *Session) SetType(x string) {
 	s.Typ = x
 }
 
-func (s *BaseSession) SetToken(x string) {
+func (s *Session) SetToken(x string) {
 	s.Token = x
 }
 
-func (s *BaseSession) GetToken() string {
+func (s *Session) GetToken() string {
 	return s.Token
 }
 
-func (s *BaseSession) SetUserID(x string) {
-	s.UserID = x
-}
-
-func (s *BaseSession) GetUserID() string {
-	return s.UserID
-}
-
-func (s *BaseSession) SetStartedAt(x time.Time) {
+func (s *Session) SetStartedAt(x time.Time) {
 	s.StartedAt = x
 }
 
-func (s *BaseSession) GetStartedAt() time.Time {
+func (s *Session) GetStartedAt() time.Time {
 	return s.StartedAt
 }
 
-func (s *BaseSession) SetValidUntil(x time.Time) {
+func (s *Session) SetValidUntil(x time.Time) {
 	s.ValidUntil = x
 }
 
-func (s *BaseSession) GetValidUntil() time.Time {
+func (s *Session) GetValidUntil() time.Time {
 	return s.ValidUntil
 }
 
-func (s *BaseSession) IsGuest() bool {
+func (s *Session) IsGuest() bool {
 	return s.UserID == ""
 }
 
-type BaseSessionIntID struct {
-	BaseSession
-	UserID uint64 `gorm:"primary-key" sql:"not null;"`
+type IntUserSession struct {
+	IntUserModel
+	Session
 }
 
-func (u *BaseSessionIntID) SetUserID(x string) {
-	i, _ := strconv.ParseUint(x, 10, 64)
-	u.UserID = i
-}
-
-func (u *BaseSessionIntID) GetUserID() string {
-	return strconv.FormatUint(u.UserID, 10)
-}
-
-func (s *BaseSessionIntID) IsGuest() bool {
+func (s *IntUserSession) IsGuest() bool {
 	return s.UserID == 0
-}
-
-func (s *BaseSessionIntID) MarshalJSON() ([]byte, error) {
-	return db.ModelToJson(nil, s)
 }
 
 /**
@@ -499,16 +424,12 @@ func (s *BaseSessionIntID) MarshalJSON() ([]byte, error) {
  */
 
 type Role struct {
-	Name        string        `gorm:"primary-key" db:"primary-key" sql:"type: varchar(200)"`
-	Permissions []*Permission `gorm:"many2many:role_permissions;" db:"m2m"`
+	Name        string        `db:"primary-key;max:200"`
+	Permissions []*Permission `db:"m2m"`
 }
 
 func (r Role) Collection() string {
-	return "roles"
-}
-
-func (r Role) GetTableName() string {
-	return "roles"
+	return "user_roles"
 }
 
 func (r *Role) SetName(n string) {
@@ -541,15 +462,11 @@ func (r *Role) GetPermissions() []kit.Permission {
  */
 
 type Permission struct {
-	Name string `gorm:"primary-key" db:"primary-key" sql:"type: varchar(200)"`
+	Name string `db:"primary-key;max:200"`
 }
 
 func (r Permission) Collection() string {
-	return "permissions"
-}
-
-func (r Permission) GetTableName() string {
-	return "permissions"
+	return "user_permissions"
 }
 
 func (r *Permission) SetName(n string) {
@@ -566,61 +483,5 @@ func (p Permission) GetID() string {
 
 func (p *Permission) SetID(n string) error {
 	p.Name = n
-	return nil
-}
-
-/**
- * Extendable models that are related to a user.
- */
-
-type UserModelStrID struct {
-	db.BaseModelStrID
-
-	User   *BaseUserStrID
-	UserID string
-}
-
-func (m *UserModelStrID) GetUser() kit.User {
-	return m.User
-}
-
-func (m *UserModelStrID) SetUser(x kit.User) {
-	m.User = x.(*BaseUserStrID)
-	m.SetUserID(x.GetID())
-}
-
-func (m *UserModelStrID) GetUserID() string {
-	return m.UserID
-}
-
-func (m *UserModelStrID) SetUserID(x string) error {
-	m.UserID = x
-	return nil
-}
-
-type UserModelIntID struct {
-	User   *BaseUserIntID
-	UserID uint64
-}
-
-func (m *UserModelIntID) GetUser() kit.User {
-	return m.User
-}
-
-func (m *UserModelIntID) SetUser(x kit.User) {
-	m.User = x.(*BaseUserIntID)
-	m.SetUserID(x.GetID())
-}
-
-func (m *UserModelIntID) GetUserID() string {
-	return strconv.FormatUint(m.UserID, 10)
-}
-
-func (m *UserModelIntID) SetUserID(rawId string) error {
-	id, err := strconv.ParseUint(rawId, 10, 64)
-	if err != nil {
-		return err
-	}
-	m.UserID = id
 	return nil
 }

@@ -2,7 +2,6 @@ package appkit
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
@@ -11,10 +10,15 @@ import (
 type AppRequest struct {
 	Context Context
 	Meta    Context
+
+	RawData []byte
 	Data    interface{}
 
 	User    User
 	Session Session
+
+	HttpRequest        *http.Request
+	HttpResponseWriter http.ResponseWriter
 }
 
 func NewRequest() *AppRequest {
@@ -23,43 +27,6 @@ func NewRequest() *AppRequest {
 	r.Meta = NewContext()
 
 	return &r
-}
-
-func (r *AppRequest) BuildFromJsonBody(request *http.Request) Error {
-	// Read request body.
-	defer request.Body.Close()
-	body, err := ioutil.ReadAll(request.Body)
-	if err != nil {
-		return AppError{
-			Code:    "read_post_error",
-			Message: fmt.Sprintf("Request body could not be read: %v", err),
-		}
-	}
-
-	// Find data and meta.
-	allData := make(map[string]interface{})
-
-	if string(body) != "" {
-		err = json.Unmarshal(body, &allData)
-		if err != nil {
-			return AppError{
-				Code:    "invalid_json_body",
-				Message: fmt.Sprintf("Json body could not be unmarshaled: %v", err),
-			}
-		}
-	}
-
-	if rawData, ok := allData["data"]; ok {
-		r.Data = rawData
-	}
-
-	if rawMeta, ok := allData["meta"]; ok {
-		if meta, ok := rawMeta.(map[string]interface{}); ok {
-			r.Meta.Data = meta
-		}
-	}
-
-	return nil
 }
 
 func (r *AppRequest) GetUser() User {
@@ -100,6 +67,76 @@ func (r *AppRequest) GetData() interface{} {
 
 func (r *AppRequest) SetData(x interface{}) {
 	r.Data = x
+}
+
+func (r *AppRequest) GetRawData() []byte {
+	return r.RawData
+}
+
+func (r *AppRequest) GetHttpRequest() *http.Request {
+	return r.HttpRequest
+}
+
+func (r *AppRequest) SetHttpRequest(request *http.Request) {
+	r.HttpRequest = request
+}
+
+func (r *AppRequest) GetHttpResponseWriter() http.ResponseWriter {
+	return r.HttpResponseWriter
+}
+
+func (r *AppRequest) SetHttpResponseWriter(writer http.ResponseWriter) {
+	r.HttpResponseWriter = writer
+}
+
+func (r *AppRequest) ReadHtmlBody() Error {
+	if r.HttpRequest == nil {
+		return AppError{Code: "no_http_request"}
+	}
+
+	if r.HttpRequest.Body == nil {
+		return nil
+	}
+
+	// Read request body.
+	defer r.HttpRequest.Body.Close()
+	body, err := ioutil.ReadAll(r.HttpRequest.Body)
+	if err != nil {
+		return WrapError(err, "http_body_read_error", "Could not read http body")
+	}
+
+	r.RawData = body
+	return nil
+}
+
+func (r *AppRequest) ParseJsonData() Error {
+	if r.RawData == nil {
+		return AppError{Code: "no_raw_data"}
+	}
+
+	if string(r.RawData) == "" {
+		// Skip with empty body.
+		return nil
+	}
+
+	// Find data and meta.
+	allData := make(map[string]interface{})
+
+	if err := json.Unmarshal(r.RawData, &allData); err != nil {
+		return WrapError(err, "invalid_json_body", "JSON in body could not be unmarshalled")
+	}
+
+	if rawData, ok := allData["data"]; ok {
+		r.Data = rawData
+	}
+
+	if rawMeta, ok := allData["meta"]; ok {
+		if meta, ok := rawMeta.(map[string]interface{}); ok {
+			r.Meta.Data = meta
+		}
+	}
+
+	return nil
 }
 
 type AppResponse struct {

@@ -14,21 +14,24 @@ import (
  * Base file.
  */
 
-// BaseFile that can be extended.
-// You can use BaseFileIntID or BaseFileStrID in almost all cases.
-type BaseFile struct {
+// File that can be extended.
+// You can use FileIntID or FileStrID in almost all cases.
+type File struct {
+	db.BaseModel
+	users.UserModel
+
 	Backend kit.FileBackend `db:"-"`
 
-	BackendName string
-	BackendID   string
-	Bucket      string
+	BackendName string `db:"not-null;max:100"`
+	BackendID   string `db:"not-null;max:150"`
+	Bucket      string `db:"not-null;max:150"`
 
-	Name      string
-	Extension string
-	FullName  string
+	Name      string `db:"not-null;max:1000"`
+	Extension string `db:"max:100"`
+	FullName  string `db:"not-null;max:1100"`
 
-	Title       string
-	Description string
+	Title       string `db:"max:100"`
+	Description string `db:"max:-1"`
 
 	Size int64
 	Mime string
@@ -39,65 +42,68 @@ type BaseFile struct {
 	Height int
 }
 
-func (f *BaseFile) Collection() string {
+// Ensure File implements File interface.
+var _ kit.File = (*File)(nil)
+
+func (f *File) Collection() string {
 	return "files"
 }
 
-func (f *BaseFile) GetBackend() kit.FileBackend {
+func (f *File) GetBackend() kit.FileBackend {
 	return f.Backend
 }
 
-func (f *BaseFile) SetBackend(x kit.FileBackend) {
+func (f *File) SetBackend(x kit.FileBackend) {
 	f.Backend = x
 	f.BackendName = x.Name()
 }
 
-func (f *BaseFile) GetBackendName() string {
+func (f *File) GetBackendName() string {
 	return f.BackendName
 }
 
-func (f *BaseFile) SetBackendName(x string) {
+func (f *File) SetBackendName(x string) {
 	f.BackendName = x
 }
 
-func (f *BaseFile) GetBackendID() string {
+func (f *File) GetBackendID() string {
 	return f.BackendID
 }
 
-func (f *BaseFile) SetBackendID(x string) error {
+func (f *File) SetBackendID(x string) error {
 	f.BackendID = x
 	return nil
 }
 
-func (f *BaseFile) GetBucket() string {
+func (f *File) GetBucket() string {
 	return f.Bucket
 }
 
-func (f *BaseFile) SetBucket(x string) {
+func (f *File) SetBucket(x string) {
 	f.Bucket = x
 }
 
-func (f *BaseFile) GetName() string {
+func (f *File) GetName() string {
 	return f.Name
 }
 
-func (f *BaseFile) SetName(x string) {
+func (f *File) SetName(x string) {
 	f.Name = x
 }
 
-func (f *BaseFile) GetExtension() string {
+func (f *File) GetExtension() string {
 	return f.Extension
 }
 
-func (f *BaseFile) SetExtension(x string) {
+func (f *File) SetExtension(x string) {
 	f.Extension = x
 }
 
-func (f *BaseFile) GetFullName() string {
+func (f *File) GetFullName() string {
 	return f.FullName
 }
 
-func (f *BaseFile) SetFullName(x string) {
+func (f *File) SetFullName(x string) {
 	parts := strings.Split(x, ".")
 
 	if len(parts) > 1 {
@@ -111,82 +117,70 @@ func (f *BaseFile) SetFullName(x string) {
 	f.FullName = x
 }
 
-func (f *BaseFile) GetTitle() string {
+func (f *File) GetTitle() string {
 	return f.Title
 }
 
-func (f *BaseFile) SetTitle(x string) {
+func (f *File) SetTitle(x string) {
 	f.Title = x
 }
 
-func (f *BaseFile) GetDescription() string {
+func (f *File) GetDescription() string {
 	return f.Description
 }
 
-func (f *BaseFile) SetDescription(x string) {
+func (f *File) SetDescription(x string) {
 	f.Description = x
 }
 
-func (f *BaseFile) GetSize() int64 {
+func (f *File) GetSize() int64 {
 	return f.Size
 }
 
-func (f *BaseFile) SetSize(x int64) {
+func (f *File) SetSize(x int64) {
 	f.Size = x
 }
 
-func (f *BaseFile) GetMime() string {
+func (f *File) GetMime() string {
 	return f.Mime
 }
 
-func (f *BaseFile) SetMime(x string) {
+func (f *File) SetMime(x string) {
 	f.Mime = x
 }
 
-func (f *BaseFile) GetIsImage() bool {
+func (f *File) GetIsImage() bool {
 	return f.IsImage
 }
 
-func (f *BaseFile) SetIsImage(x bool) {
+func (f *File) SetIsImage(x bool) {
 	f.IsImage = x
 }
 
-func (f *BaseFile) GetWidth() int {
+func (f *File) GetWidth() int {
 	return f.Width
 }
 
-func (f *BaseFile) SetWidth(x int) {
+func (f *File) SetWidth(x int) {
 	f.Width = x
 }
 
-func (f *BaseFile) GetHeight() int {
+func (f *File) GetHeight() int {
 	return f.Height
 }
 
-func (f *BaseFile) SetHeight(x int) {
+func (f *File) SetHeight(x int) {
 	f.Height = x
 }
 
-/**
- * File with string id.
- */
-
-type FileStrID struct {
-	users.UserModelStrID
-	BaseFile
-}
-
-// Ensure FileStrID implements File interface.
-var _ kit.File = (*FileStrID)(nil)
-
-func (f *FileStrID) Reader() (io.ReadCloser, kit.Error) {
+func (f *File) Reader() (io.ReadCloser, kit.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
+func (f *File) Writer(create bool) (string, io.WriteCloser, kit.Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}
@@ -198,24 +192,7 @@ func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
  */
 
 type FileIntID struct {
-	db.BaseModelIntID
-	users.UserModelIntID
-	BaseFile
-}
-
-// Ensure FileIntID implements File interface.
-var _ kit.File = (*FileIntID)(nil)
-
-func (f *FileIntID) Reader() (io.ReadCloser, kit.Error) {
-	if f.Backend == nil {
-		return nil, nil
-	}
-	return f.Backend.Reader(f)
-}
-
-func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
-	if f.Backend == nil {
-		return "", nil, nil
-	}
-	return f.Backend.Writer(f, create)
+	db.BaseIntModel
+	users.IntUserModel
+	File
 }

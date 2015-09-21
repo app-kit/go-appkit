@@ -22,9 +22,9 @@ var _ = Describe("Engine", func() {
 		Expect(t).ToNot(BeNil())
 	})
 
-	It("Should .Get()", func() {
+	It("Should .GetTemplate()", func() {
 		t, _ := engine.Build("tpl1", tpl1)
-		Expect(engine.Get("tpl1")).To(Equal(t))
+		Expect(engine.GetTemplate("tpl1")).To(Equal(t))
 	})
 
 	It("Should .BuildAndRender()", func() {

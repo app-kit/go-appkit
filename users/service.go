@@ -12,7 +12,8 @@ import (
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/email"
 	"github.com/theduke/go-appkit/resources"
-	"github.com/theduke/go-appkit/users/auth"
+	"github.com/theduke/go-appkit/users/auth/oauth"
+	"github.com/theduke/go-appkit/users/auth/password"
 )
 
 type Service struct {
@@ -21,10 +22,9 @@ type Service struct {
 
 	backend db.Backend
 
-	Users     kit.Resource
-	Sessions  kit.Resource
-	AuthItems kit.Resource
-	Tokens    kit.Resource
+	Users    kit.Resource
+	Sessions kit.Resource
+	Tokens   kit.Resource
 
 	Roles       kit.Resource
 	Permissions kit.Resource
@@ -37,7 +37,7 @@ type Service struct {
 // Ensure UserService implements kit.UserService.
 var _ kit.UserService = (*Service)(nil)
 
-func NewService(deps kit.Dependencies, profileModel kit.UserProfile) *Service {
+func NewService(deps kit.Dependencies, backend db.Backend, profileModel kit.UserProfile) *Service {
 	h := Service{
 		deps:         deps,
 		profileModel: profileModel,
@@ -46,27 +46,40 @@ func NewService(deps kit.Dependencies, profileModel kit.UserProfile) *Service {
 	h.AuthAdaptors = make(map[string]kit.AuthAdaptor)
 
 	// Register auth adaptors.
-	h.AddAuthAdaptor(auth.AuthAdaptorPassword{})
+	h.AddAuthAdaptor(&password.AuthAdaptorPassword{})
+	h.AddAuthAdaptor(oauth.NewAdaptor())
 
 	// Build resources.
-	users := resources.NewResource(&BaseUserIntID{}, UserResourceHooks{
+	var userModel db.Model
+	if backend.HasStringIDs() {
+		userModel = &User{}
+	} else {
+		userModel = &IntUser{}
+	}
+	users := resources.NewResource(userModel, UserResourceHooks{
 		ProfileModel: profileModel,
-	})
+	}, true)
 	h.Users = users
 
-	h.Tokens = resources.NewResource(&Token{}, nil)
-
-	sessions := resources.NewResource(&BaseSessionIntID{}, SessionResourceHooks{})
+	var sessionModel db.Model
+	if backend.HasStringIDs() {
+		sessionModel = &Session{}
+	} else {
+		sessionModel = &IntUserSession{}
+	}
+	sessions := resources.NewResource(sessionModel, SessionResourceHooks{}, true)
 	h.Sessions = sessions
 
-	auths := resources.NewResource(&BaseAuthItemIntID{}, nil)
-	h.AuthItems = auths
+	h.Tokens = resources.NewResource(&Token{}, nil, false)
 
-	roles := resources.NewResource(&Role{}, RoleResourceHooks{})
+	roles := resources.NewResource(&Role{}, RoleResourceHooks{}, true)
 	h.Roles = roles
 
-	permissions := resources.NewResource(&Permission{}, PermissionResourceHooks{})
+	permissions := resources.NewResource(&Permission{}, PermissionResourceHooks{}, true)
 	h.Permissions = permissions
+
+	// Ensure proper backend setup.
+	h.SetBackend(backend)
 
 	return &h
 }
@@ -101,9 +114,6 @@ func (s *Service) SetBackend(b db.Backend) {
 	s.Sessions.SetBackend(b)
 	b.RegisterModel(s.Sessions.Model())
 
-	s.AuthItems.SetBackend(b)
-	b.RegisterModel(s.AuthItems.Model())
-
 	s.Tokens.SetBackend(b)
 	b.RegisterModel(s.Tokens.Model())
 
@@ -116,6 +126,11 @@ func (s *Service) SetBackend(b db.Backend) {
 	if s.profileModel != nil {
 		b.RegisterModel(s.profileModel)
 	}
+
+	for name := range s.AuthAdaptors {
+		s.AuthAdaptors[name].SetBackend(b)
+	}
+
 	s.backend = b
 }
 
@@ -124,7 +139,7 @@ func (h *Service) AuthAdaptor(name string) kit.AuthAdaptor {
 }
 
 func (h *Service) AddAuthAdaptor(a kit.AuthAdaptor) {
-	h.AuthAdaptors[a.GetName()] = a
+	h.AuthAdaptors[a.Name()] = a
 }
 
 func (h *Service) UserResource() kit.Resource {
@@ -141,14 +156,6 @@ func (h *Service) SessionResource() kit.Resource {
 
 func (h *Service) SetSessionResource(x kit.Resource) {
 	h.Sessions = x
-}
-
-func (h *Service) AuthItemResource() kit.Resource {
-	return h.AuthItems
-}
-
-func (h *Service) SetAuthItemResource(x kit.Resource) {
-	h.AuthItems = x
 }
 
 func (h *Service) TokenResource() kit.Resource {
@@ -198,15 +205,18 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 	return tokenItem, nil
 }
 
-func (s *Service) CreateUser(user kit.User, adaptorName string, authData interface{}) kit.Error {
+func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[string]interface{}) kit.Error {
 	adaptor := s.AuthAdaptor(adaptorName)
 	if adaptor == nil {
-		return kit.AppError{Code: "unknown_auth_adaptor"}
+		return kit.AppError{
+			Code:    "unknown_auth_adaptor",
+			Message: fmt.Sprintf("Auth adaptor %v was not registered with user service", adaptorName),
+		}
 	}
 
-	data, err := adaptor.BuildData(user, authData)
+	authItem, err := adaptor.RegisterUser(user, authData)
 	if err != nil {
-		return kit.AppError{Code: "adaptor_error", Message: err.Error()}
+		return kit.WrapError(err, "adaptor_error", "")
 	}
 
 	if user.GetUsername() == "" {
@@ -245,15 +255,12 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData interfa
 		}
 	}
 
-	rawAuth := s.AuthItems.NewModel()
-	auth := rawAuth.(kit.AuthItem)
-	auth.SetUserID(user.GetID())
-	auth.SetType(adaptorName)
-	auth.SetData(data)
-
-	if err := s.AuthItems.Create(auth, nil); err != nil {
-		s.Users.Delete(user, nil)
-		return kit.AppError{Code: "auth_save_failed", Message: err.Error()}
+	// Persist auth item.
+	if authItemUserId, ok := authItem.(kit.UserModel); ok {
+		authItemUserId.SetUserID(user.GetID())
+	}
+	if err := s.Users.Backend().Create(authItem); err != nil {
+		return kit.WrapError(err, "auth_item_create_error", "")
 	}
 
 	if err := s.SendConfirmationEmail(user); err != nil {
@@ -392,7 +399,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
 	}
 
 	user := rawUser.(kit.User)
-	userId, _ := db.GetStructFieldValue(user, "ID")
+	userId := user.GetID()
 
 	if user.IsEmailConfirmed() {
 		// Email already confirmed.
@@ -532,26 +539,17 @@ The link will be valid for %v hours.
 }
 
 func (s *Service) ChangePassword(user kit.User, newPassword string) kit.Error {
-	rawAuth, err := s.AuthItems.Q().
-		Filter("typ", "password").And("user_id", user.GetID()).First()
-
-	if err != nil {
-		return kit.WrapError(err, "auth_item_query_error", "")
-	}
-	if rawAuth == nil {
-		return kit.AppError{Code: "no_password_auth", Message: "User is not configured for password authentication"}
-	}
-
-	auth := rawAuth.(kit.AuthItem)
-
 	adaptor := s.AuthAdaptor("password")
-	data, err := adaptor.BuildData(user, map[string]interface{}{"password": newPassword})
-	if err != nil {
-		return err
+	if adaptor == nil {
+		return kit.AppError{
+			Code:    "no_password_adaptor",
+			Message: "The UserService does not have the password auth adaptor",
+		}
 	}
 
-	auth.SetData(data)
-	if err := s.AuthItems.Backend().Update(auth); err != nil {
+	passwordAdaptor := adaptor.(*password.AuthAdaptorPassword)
+
+	if err := passwordAdaptor.ChangePassword(user.GetID(), newPassword); err != nil {
 		return err
 	}
 
@@ -596,44 +594,43 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, kit.Error)
 	return user, nil
 }
 
-func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data interface{}) kit.Error {
-	if !user.IsActive() {
-		return kit.AppError{Code: "user_inactive"}
-	}
-
+func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data map[string]interface{}) (kit.User, kit.Error) {
 	authAdaptor := h.AuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
-		return kit.AppError{
+		return nil, kit.AppError{
 			Code:    "unknown_auth_adaptor",
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
 
-	rawAuth, err := h.AuthItems.Q().
-		Filter("typ", authAdaptorName).And("user_id", user.GetID()).First()
+	userId := ""
+	if user != nil {
+		userId = user.GetID()
+	}
 
+	var err kit.Error
+	userId, err = authAdaptor.Authenticate(userId, data)
 	if err != nil {
-		return err
+		return nil, kit.WrapError(err, "adaptor_error", "")
 	}
 
-	auth := rawAuth.(kit.AuthItem)
-
-	cleanData, err2 := auth.GetData()
-	if err2 != nil {
-		return kit.AppError{
-			Code:    "invalid_auth_data",
-			Message: err.Error(),
+	if user == nil {
+		rawUser, err := h.Users.FindOne(userId)
+		if err != nil {
+			return nil, kit.WrapError(err, "user_query_error", "")
+		} else if rawUser == nil {
+			return nil, kit.AppError{
+				Code:    "user_not_found",
+				Message: fmt.Sprintf("User with id %v could not be found", userId),
+			}
 		}
+		user = rawUser.(kit.User)
 	}
 
-	ok, err2 := authAdaptor.Authenticate(user, cleanData, data)
-	if err2 != nil {
-		return kit.AppError{Code: "auth_error", Message: err.Error()}
-	}
-	if !ok {
-		return kit.AppError{Code: "invalid_credentials"}
+	if !user.IsActive() {
+		return nil, kit.AppError{Code: "user_inactive"}
 	}
 
-	return nil
+	return user, nil
 }
 
 func (h *Service) VerifySession(token string) (kit.User, kit.Session, kit.Error) {
