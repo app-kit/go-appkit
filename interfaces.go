@@ -11,21 +11,27 @@ import (
 	db "github.com/theduke/go-dukedb"
 )
 
+type Model interface {
+	Collection() string
+	GetID() interface{}
+	SetID(id interface{}) error
+	GetStrID() string
+	SetStrID(id string) error
+}
+
 /**
  * User interfaces.
  */
 
 type Session interface {
-	db.Model
+	Model
+	UserModel
 
 	SetType(string)
 	GetType() string
 
 	SetToken(string)
 	GetToken() string
-
-	SetUserID(string) error
-	GetUserID() string
 
 	SetStartedAt(time.Time)
 	GetStartedAt() time.Time
@@ -37,6 +43,8 @@ type Session interface {
 }
 
 type Role interface {
+	Model
+
 	GetName() string
 	SetName(string)
 
@@ -44,16 +52,14 @@ type Role interface {
 }
 
 type Permission interface {
+	Model
+
 	GetName() string
 	SetName(string)
 }
 
-type UserProfile interface {
-	db.Model
-}
-
 type User interface {
-	db.Model
+	Model
 
 	SetIsActive(bool)
 	IsActive() bool
@@ -91,28 +97,32 @@ type User interface {
 }
 
 type UserModel interface {
-	db.Model
 	GetUser() User
 	SetUser(User)
 
-	GetUserID() string
-	SetUserID(string) error
+	GetUserID() interface{}
+	SetUserID(id interface{}) error
+}
+
+type UserProfile interface {
+	Model
+	UserModel
 }
 
 type AuthItem interface {
-	db.Model
+	Model
+	UserModel
 }
 
 type UserToken interface {
-	db.Model
+	Model
+	UserModel
+
 	GetType() string
 	SetType(string)
 
 	GetToken() string
 	SetToken(string)
-
-	GetUserID() string
-	SetUserID(string) error
 
 	GetExpiresAt() time.Time
 	SetExpiresAt(time.Time)
@@ -196,6 +206,8 @@ type HttpRoute interface {
  */
 
 type CacheItem interface {
+	Model
+
 	GetKey() string
 	SetKey(string)
 
@@ -343,28 +355,28 @@ type Resource interface {
 	IsPublic() bool
 
 	Collection() string
-	Model() db.Model
-	SetModel(db.Model)
-	NewModel() db.Model
+	Model() Model
+	SetModel(Model)
+	CreateModel() Model
 
 	Hooks() interface{}
 	SetHooks(interface{})
 
 	Q() db.Query
 
-	Find(db.Query) ([]db.Model, Error)
-	FindOne(id string) (db.Model, Error)
+	Query(db.Query) ([]Model, Error)
+	FindOne(id interface{}) (Model, Error)
 
 	ApiFindOne(string, Request) Response
 	ApiFind(db.Query, Request) Response
 
-	Create(obj db.Model, user User) Error
-	ApiCreate(obj db.Model, r Request) Response
+	Create(obj Model, user User) Error
+	ApiCreate(obj Model, r Request) Response
 
-	Update(obj db.Model, user User) Error
-	ApiUpdate(obj db.Model, r Request) Response
+	Update(obj Model, user User) Error
+	ApiUpdate(obj Model, r Request) Response
 
-	Delete(obj db.Model, user User) Error
+	Delete(obj Model, user User) Error
 	ApiDelete(id string, r Request) Response
 }
 
@@ -388,11 +400,11 @@ type ResourceService interface {
 	Service
 
 	Q(modelType string) (db.Query, Error)
-	FindOne(modelType string, id string) (db.Model, Error)
+	FindOne(modelType string, id string) (Model, Error)
 
-	Create(db.Model, User) Error
-	Update(db.Model, User) Error
-	Delete(db.Model, User) Error
+	Create(Model, User) Error
+	Update(Model, User) Error
+	Delete(Model, User) Error
 }
 
 /**
@@ -497,6 +509,7 @@ type BucketConfig interface {
 
 // Interface for a File stored in a database backend.
 type File interface {
+	Model
 	// File can belong to a user.
 	UserModel
 

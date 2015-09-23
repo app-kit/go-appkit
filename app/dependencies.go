@@ -82,7 +82,7 @@ func (d *Dependencies) Backends() map[string]db.Backend {
 }
 
 func (d *Dependencies) AddBackend(b db.Backend) {
-	d.backends[b.GetName()] = b
+	d.backends[b.Name()] = b
 	if d.defaultBackend == nil {
 		d.defaultBackend = b
 	}

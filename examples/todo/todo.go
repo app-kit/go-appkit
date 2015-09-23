@@ -51,7 +51,7 @@ func (p Project) Collection() string {
 type ProjectHooks struct {
 }
 
-func (p ProjectHooks) BeforeCreate(res kit.Resource, obj db.Model, user kit.User) kit.Error {
+func (p ProjectHooks) BeforeCreate(res kit.Resource, obj kit.Model, user kit.User) kit.Error {
 	log.Printf("obj: %+v\n", obj)
 	return nil
 }

@@ -17,11 +17,24 @@ type StrItem struct {
 // Ensure Item implements CacheItem
 var _ kit.CacheItem = (*StrItem)(nil)
 
-func (i *StrItem) GetID() string {
+func (i *StrItem) Collection() string {
+	return "caches"
+}
+
+func (i *StrItem) GetID() interface{} {
 	return i.Key
 }
 
-func (i *StrItem) SetID(key string) error {
+func (i *StrItem) SetID(key interface{}) error {
+	i.Key = key.(string)
+	return nil
+}
+
+func (i *StrItem) GetStrID() string {
+	return i.Key
+}
+
+func (i *StrItem) SetStrID(key string) error {
 	i.Key = key
 	return nil
 }

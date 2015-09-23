@@ -140,7 +140,7 @@ var _ = Describe("Json", func() {
 		}
 
 		resp := &kit.AppResponse{
-			Data: []db.Model{model1, model2},
+			Data: []kit.Model{model1, model2},
 		}
 
 		newResp := ConvertResponse(backend, resp)

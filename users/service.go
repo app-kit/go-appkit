@@ -50,18 +50,18 @@ func NewService(deps kit.Dependencies, backend db.Backend, profileModel kit.User
 	h.AddAuthAdaptor(oauth.NewAdaptor())
 
 	// Build resources.
-	var userModel db.Model
+	var userModel kit.Model
 	if backend.HasStringIDs() {
-		userModel = &User{}
+		userModel = &UserStrID{}
 	} else {
-		userModel = &IntUser{}
+		userModel = &UserIntID{}
 	}
 	users := resources.NewResource(userModel, UserResourceHooks{
 		ProfileModel: profileModel,
 	}, true)
 	h.Users = users
 
-	var sessionModel db.Model
+	var sessionModel kit.Model
 	if backend.HasStringIDs() {
 		sessionModel = &Session{}
 	} else {
@@ -193,7 +193,7 @@ func (u *Service) SetPermissionResource(x kit.Resource) {
 func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserToken, kit.Error) {
 	token := uuid.NewV4().String()
 
-	tokenItem := s.Tokens.NewModel().(kit.UserToken)
+	tokenItem := s.Tokens.CreateModel().(kit.UserToken)
 	tokenItem.SetType(typ)
 	tokenItem.SetToken(token)
 	tokenItem.SetUserID(userId)
@@ -238,7 +238,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 	user.SetIsActive(true)
 
 	if s.profileModel != nil && user.GetProfile() == nil {
-		newProfile, _ := s.Users.Backend().NewModel(s.profileModel.Collection())
+		newProfile, _ := s.Users.Backend().CreateModel(s.profileModel.Collection())
 		user.SetProfile(newProfile.(kit.UserProfile))
 	}
 
@@ -286,7 +286,7 @@ func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
 	}
 
 	// Generate a token.
-	tokenItem, err := s.BuildToken("email_confirmation", user.GetID(), time.Time{})
+	tokenItem, err := s.BuildToken("email_confirmation", user.GetStrID(), time.Time{})
 	if err != nil {
 		return err
 	}
@@ -399,7 +399,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
 	}
 
 	user := rawUser.(kit.User)
-	userId := user.GetID()
+	userId := user.GetStrID()
 
 	if user.IsEmailConfirmed() {
 		// Email already confirmed.
@@ -443,7 +443,7 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 
 	// Generate a token.
 	expiresAt := time.Now().Add(time.Hour * time.Duration(hoursValid))
-	tokenItem, err := s.BuildToken("password_reset", user.GetID(), expiresAt)
+	tokenItem, err := s.BuildToken("password_reset", user.GetStrID(), expiresAt)
 	if err != nil {
 		return err
 	}
@@ -549,7 +549,7 @@ func (s *Service) ChangePassword(user kit.User, newPassword string) kit.Error {
 
 	passwordAdaptor := adaptor.(*password.AuthAdaptorPassword)
 
-	if err := passwordAdaptor.ChangePassword(user.GetID(), newPassword); err != nil {
+	if err := passwordAdaptor.ChangePassword(user.GetStrID(), newPassword); err != nil {
 		return err
 	}
 
@@ -604,7 +604,7 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 
 	userId := ""
 	if user != nil {
-		userId = user.GetID()
+		userId = user.GetStrID()
 	}
 
 	var err kit.Error

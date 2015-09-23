@@ -17,9 +17,6 @@ import (
 // File that can be extended.
 // You can use FileIntID or FileStrID in almost all cases.
 type File struct {
-	db.BaseModel
-	users.UserModel
-
 	Backend kit.FileBackend `db:"-"`
 
 	BackendName string `db:"not-null;max:100"`
@@ -41,9 +38,6 @@ type File struct {
 	Width  int
 	Height int
 }
-
-// Ensure File implements File interface.
-var _ kit.File = (*File)(nil)
 
 func (f *File) Collection() string {
 	return "files"
@@ -173,14 +167,23 @@ func (f *File) SetHeight(x int) {
 	f.Height = x
 }
 
-func (f *File) Reader() (io.ReadCloser, kit.Error) {
+type FileStrID struct {
+	File
+	db.BaseStrIDModel
+	users.StrUserModel
+}
+
+// Ensure FileStrID implements File interface.
+var _ kit.File = (*FileStrID)(nil)
+
+func (f *FileStrID) Reader() (io.ReadCloser, kit.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *File) Writer(create bool) (string, io.WriteCloser, kit.Error) {
+func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}
@@ -192,7 +195,24 @@ func (f *File) Writer(create bool) (string, io.WriteCloser, kit.Error) {
  */
 
 type FileIntID struct {
-	db.BaseIntModel
-	users.IntUserModel
 	File
+	db.BaseIntIDModel
+	users.IntUserModel
+}
+
+// Ensure FileIntID implements File interface.
+var _ kit.File = (*FileIntID)(nil)
+
+func (f *FileIntID) Reader() (io.ReadCloser, kit.Error) {
+	if f.Backend == nil {
+		return nil, nil
+	}
+	return f.Backend.Reader(f)
+}
+
+func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
+	if f.Backend == nil {
+		return "", nil, nil
+	}
+	return f.Backend.Writer(f, create)
 }

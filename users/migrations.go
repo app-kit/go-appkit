@@ -52,7 +52,7 @@ func GetUserMigrations(app kit.App) []db.Migration {
 				return err
 			}
 
-			user := userService.UserResource().NewModel().(kit.User)
+			user := userService.UserResource().CreateModel().(kit.User)
 			user.SetUsername("admin")
 			user.SetEmail("admin@admin.com")
 			user.AddRole(adminRole)

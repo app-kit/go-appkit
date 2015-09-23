@@ -238,7 +238,7 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 }
 
 func (h *FileService) New() kit.File {
-	f := h.resource.NewModel().(kit.File)
+	f := h.resource.CreateModel().(kit.File)
 	f.SetBackend(h.defaultBackend)
 	return f
 }
@@ -264,7 +264,7 @@ func (h *FileService) FindOne(id string) (kit.File, kit.Error) {
 }
 
 func (h *FileService) Find(q db.Query) ([]kit.File, kit.Error) {
-	rawFiles, err := h.resource.Find(q)
+	rawFiles, err := h.resource.Query(q)
 	if err != nil {
 		return nil, err
 	}

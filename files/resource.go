@@ -16,7 +16,6 @@ import (
 	_ "image/png"
 
 	"github.com/disintegration/gift"
-	db "github.com/theduke/go-dukedb"
 	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
@@ -141,7 +140,7 @@ func getTmpPath(res kit.Resource) string {
 	return tmpPath
 }
 
-func (_ FilesResource) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {
+func (_ FilesResource) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response {
 	tmpPath := getTmpPath(res)
 	if tmpPath == "" {
 		return &kit.AppResponse{

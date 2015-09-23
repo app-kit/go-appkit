@@ -6,8 +6,6 @@ import (
 	"math/big"
 	"time"
 
-	db "github.com/theduke/go-dukedb"
-
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/app/methods"
 )
@@ -46,7 +44,7 @@ func StartSession(res kit.Resource, user kit.User) (kit.Session, kit.Error) {
 		return nil, kit.AppError{Code: "token_creation_failed"}
 	}
 
-	rawSession, err := res.Backend().NewModel(res.Model().Collection())
+	rawSession, err := res.Backend().CreateModel(res.Model().Collection())
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +63,7 @@ func StartSession(res kit.Resource, user kit.User) (kit.Session, kit.Error) {
 	return session, nil
 }
 
-func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {
+func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response {
 	userService := res.Dependencies().UserService()
 	userResource := userService.UserResource()
 
@@ -149,7 +147,6 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	})
 
 	confirmEmail := methods.NewMethod("users.confirm-email", false, func(a kit.App, r kit.Request, unblock func()) kit.Response {
-		deps.Logger().Infof("data: %+v\n", r.GetData())
 		data, ok := r.GetData().(map[string]interface{})
 		if !ok {
 			return kit.NewErrorResponse("invalid_data", "Expected data dict with 'token' key")
@@ -248,7 +245,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	return []kit.Method{sendConfirmationEmail, confirmEmail, requestPwReset, pwReset}
 }
 
-func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response {
+func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response {
 	meta := r.GetMeta()
 
 	adaptor := meta.String("adaptor")
@@ -276,16 +273,16 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj db.Model, r kit.R
 	}
 }
 
-func (hooks UserResourceHooks) AllowFind(res kit.Resource, obj db.Model, user kit.User) bool {
+func (hooks UserResourceHooks) AllowFind(res kit.Resource, obj kit.Model, user kit.User) bool {
 	u := obj.(kit.User)
 	return u.GetID() == user.GetID()
 }
 
-func (hooks UserResourceHooks) AllowUpdate(res kit.Resource, obj db.Model, old db.Model, user kit.User) bool {
+func (hooks UserResourceHooks) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
 	return user != nil && obj.GetID() == user.GetID()
 }
 
-func (hooks UserResourceHooks) AllowDelete(res kit.Resource, obj db.Model, old db.Model, user kit.User) bool {
+func (hooks UserResourceHooks) AllowDelete(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
 	return false
 }
 

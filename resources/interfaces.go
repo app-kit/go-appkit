@@ -25,7 +25,7 @@ type MethodsHook interface {
  */
 
 type AllowFindHook interface {
-	AllowFind(res kit.Resource, model db.Model, user kit.User) bool
+	AllowFind(res kit.Resource, model kit.Model, user kit.User) bool
 }
 
 type ApiFindHook interface {
@@ -37,7 +37,7 @@ type ApiAlterQueryHook interface {
 }
 
 type ApiAfterFindHook interface {
-	ApiAfterFind(res kit.Resource, obj []db.Model, user kit.User) kit.Error
+	ApiAfterFind(res kit.Resource, obj []kit.Model, user kit.User) kit.Error
 }
 
 /**
@@ -45,23 +45,23 @@ type ApiAfterFindHook interface {
  */
 
 type ApiCreateHook interface {
-	ApiCreate(res kit.Resource, obj db.Model, r kit.Request) kit.Response
+	ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
 }
 
 type CreateHook interface {
-	Create(res kit.Resource, obj db.Model, user kit.User) kit.Error
+	Create(res kit.Resource, obj kit.Model, user kit.User) kit.Error
 }
 
 type BeforeCreateHook interface {
-	BeforeCreate(res kit.Resource, obj db.Model, user kit.User) kit.Error
+	BeforeCreate(res kit.Resource, obj kit.Model, user kit.User) kit.Error
 }
 
 type AllowCreateHook interface {
-	AllowCreate(res kit.Resource, obj db.Model, user kit.User) bool
+	AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool
 }
 
 type AfterCreateHook interface {
-	AfterCreate(res kit.Resource, obj db.Model, user kit.User) kit.Error
+	AfterCreate(res kit.Resource, obj kit.Model, user kit.User) kit.Error
 }
 
 /**
@@ -69,23 +69,23 @@ type AfterCreateHook interface {
  */
 
 type ApiUpdateHook interface {
-	ApiUpdate(res kit.Resource, obj db.Model, r kit.Request) kit.Response
+	ApiUpdate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
 }
 
 type UpdateHook interface {
-	Update(res kit.Resource, obj db.Model, r kit.Request) kit.Error
+	Update(res kit.Resource, obj kit.Model, r kit.Request) kit.Error
 }
 
 type BeforeUpdateHook interface {
-	BeforeUpdate(res kit.Resource, obj, oldobj db.Model, user kit.User) kit.Error
+	BeforeUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) kit.Error
 }
 
 type AllowUpdateHook interface {
-	AllowUpdate(res kit.Resource, obj db.Model, old db.Model, user kit.User) bool
+	AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool
 }
 
 type AfterUpdateHook interface {
-	AfterUpdate(res kit.Resource, obj, oldobj db.Model, user kit.User) kit.Error
+	AfterUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) kit.Error
 }
 
 /**
@@ -97,17 +97,17 @@ type ApiDeleteHook interface {
 }
 
 type DeleteHook interface {
-	Delete(res kit.Resource, obj db.Model, user kit.User) kit.Error
+	Delete(res kit.Resource, obj kit.Model, user kit.User) kit.Error
 }
 
 type BeforeDeleteHook interface {
-	BeforeDelete(res kit.Resource, obj db.Model, user kit.User) kit.Error
+	BeforeDelete(res kit.Resource, obj kit.Model, user kit.User) kit.Error
 }
 
 type AllowDeleteHook interface {
-	AllowDelete(res kit.Resource, obj db.Model, user kit.User) bool
+	AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool
 }
 
 type AfterDeleteHook interface {
-	AfterDelete(res kit.Resource, obj db.Model, user kit.User) kit.Error
+	AfterDelete(res kit.Resource, obj kit.Model, user kit.User) kit.Error
 }

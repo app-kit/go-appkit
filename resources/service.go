@@ -80,7 +80,7 @@ func (s *Service) Q(modelType string) (db.Query, kit.Error) {
 	return res.Q(), nil
 }
 
-func (s *Service) FindOne(modelType string, id string) (db.Model, kit.Error) {
+func (s *Service) FindOne(modelType string, id string) (kit.Model, kit.Error) {
 	res := s.resources[modelType]
 	if res == nil {
 		return nil, kit.AppError{
@@ -92,7 +92,7 @@ func (s *Service) FindOne(modelType string, id string) (db.Model, kit.Error) {
 	return res.FindOne(id)
 }
 
-func (s *Service) Create(m db.Model, user kit.User) kit.Error {
+func (s *Service) Create(m kit.Model, user kit.User) kit.Error {
 	res := s.resources[m.Collection()]
 	if res == nil {
 		return kit.AppError{
@@ -104,7 +104,7 @@ func (s *Service) Create(m db.Model, user kit.User) kit.Error {
 	return res.Create(m, user)
 }
 
-func (s *Service) Update(m db.Model, user kit.User) kit.Error {
+func (s *Service) Update(m kit.Model, user kit.User) kit.Error {
 	res := s.resources[m.Collection()]
 	if res == nil {
 		return kit.AppError{
@@ -116,7 +116,7 @@ func (s *Service) Update(m db.Model, user kit.User) kit.Error {
 	return res.Update(m, user)
 }
 
-func (s *Service) Delete(m db.Model, user kit.User) kit.Error {
+func (s *Service) Delete(m kit.Model, user kit.User) kit.Error {
 	res := s.resources[m.Collection()]
 	if res == nil {
 		return kit.AppError{

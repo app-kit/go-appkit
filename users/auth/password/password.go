@@ -23,8 +23,10 @@ func GetStringFromMap(data map[string]interface{}, field string) (string, bool) 
 }
 
 type AuthItemPassword struct {
-	UserID string `db:"primary-key;min:1;max:100"`
-	Hash   string `db:"not-null;max:150"`
+	// ID serves as UserID.
+	db.BaseStrIDModel
+
+	Hash string `db:"not-null;max:150"`
 }
 
 // Ensure AuthItemPassword implements kit.AuthItem.
@@ -34,13 +36,20 @@ func (item *AuthItemPassword) Collection() string {
 	return "users_auth_passwords"
 }
 
-func (item *AuthItemPassword) GetID() string {
-	return item.UserID
+func (item *AuthItemPassword) GetUserID() interface{} {
+	return item.ID
 }
 
-func (item *AuthItemPassword) SetID(x string) error {
-	item.UserID = x
+func (item *AuthItemPassword) SetUserID(id interface{}) error {
+	return item.SetID(id)
+}
+
+func (item *AuthItemPassword) GetUser() kit.User {
 	return nil
+}
+
+func (item *AuthItemPassword) SetUser(u kit.User) {
+	item.SetUserID(u.GetID())
 }
 
 type AuthAdaptorPassword struct {
@@ -78,9 +87,9 @@ func (a *AuthAdaptorPassword) RegisterUser(user kit.User, data map[string]interf
 	}
 
 	item := &AuthItemPassword{
-		UserID: user.GetID(),
-		Hash:   string(hash),
+		Hash: string(hash),
 	}
+	item.SetID(user.GetID())
 
 	return item, nil
 }

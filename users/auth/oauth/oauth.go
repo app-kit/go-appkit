@@ -10,10 +10,9 @@ import (
 )
 
 type AuthItemOauth struct {
-	ID      string `db:"primary-key"`
-	Service string `db:"not-null;max:100;"`
-
-	UserID         string `db:"not-null;max:100;"`
+	db.BaseStrIDModel
+	Service        string `db:"not-null;max:100;"`
+	UserID         string `db:"not-null;max:150;"`
 	ExternalUserID string `db:"not-null;max:100;"`
 	Token          string `db:"not-null;max:500;"`
 }
@@ -26,23 +25,18 @@ func (item *AuthItemOauth) Collection() string {
 	return "users_auth_oauth"
 }
 
-func (item *AuthItemOauth) GetID() string {
-	return item.ID
-}
-
-func (item *AuthItemOauth) SetID(id string) error {
-	item.ID = id
-	return nil
-}
-
 // Implement kit.UserModel interface.
 
-func (item *AuthItemOauth) GetUserID() string {
+func (item *AuthItemOauth) GetUserID() interface{} {
 	return item.UserID
 }
 
-func (item *AuthItemOauth) SetUserID(id string) error {
-	item.UserID = id
+func (item *AuthItemOauth) SetUserID(id interface{}) error {
+	convertedId, err := db.Convert(id, "")
+	if err != nil {
+		return err
+	}
+	item.UserID = convertedId.(string)
 	return nil
 }
 
@@ -51,7 +45,7 @@ func (item *AuthItemOauth) GetUser() kit.User {
 }
 
 func (item *AuthItemOauth) SetUser(u kit.User) {
-	item.UserID = u.GetID()
+	item.SetUserID(u.GetID())
 }
 
 func GetStringFromMap(rawData interface{}, field string) (string, bool) {
@@ -145,12 +139,12 @@ func (a *AuthAdaptorOauth) RegisterUser(user kit.User, data map[string]interface
 	}
 
 	item := &AuthItemOauth{
-		ID:             serviceName + "_" + userData.ID,
 		Service:        serviceName,
-		UserID:         user.GetID(),
+		UserID:         user.GetStrID(),
 		ExternalUserID: userData.ID,
 		Token:          appToken,
 	}
+	item.ID = serviceName + "_" + userData.ID
 
 	// Fill in user information.
 

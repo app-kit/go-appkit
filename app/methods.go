@@ -326,7 +326,7 @@ func (m *SessionManager) Run() {
 
 type ResourceMethodData struct {
 	Resource kit.Resource
-	Objects  []db.Model
+	Objects  []kit.Model
 	IDs      []string
 	Query    db.Query
 }
@@ -383,7 +383,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 	if objectData, ok := data["objects"]; ok {
 		// Objects key exists, try to parse it.
 
-		if objects, ok := objectData.([]db.Model); ok {
+		if objects, ok := objectData.([]kit.Model); ok {
 			// Objects are already a model slice.
 			methodData.Objects = objects
 		} else {
@@ -406,7 +406,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 					}
 				}
 
-				model := resource.NewModel()
+				model := resource.CreateModel()
 				if err := json.Unmarshal(js, model); err != nil {
 					return nil, kit.AppError{
 						Code:    "json_unmarshal_error",

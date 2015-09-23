@@ -2,7 +2,6 @@ package users
 
 import (
 	"encoding/json"
-	"strconv"
 	"time"
 
 	db "github.com/theduke/go-dukedb"
@@ -14,52 +13,60 @@ import (
  * Extendable models that are related to a user.
  */
 
-type UserModel struct {
-	User   *User
+type StrUserModel struct {
+	User   *UserStrID
 	UserID string
 }
 
-func (m *UserModel) GetUserID() string {
+func (m *StrUserModel) GetUserID() interface{} {
 	return m.UserID
 }
 
-func (m *UserModel) SetUserID(x string) error {
-	m.UserID = x
+func (m *StrUserModel) SetUserID(id interface{}) error {
+	if strId, ok := id.(string); ok {
+		m.UserID = strId
+		return nil
+	}
+
+	convertedId, err := db.Convert(id, "")
+	if err != nil {
+		return err
+	}
+
+	m.UserID = convertedId.(string)
 	return nil
 }
 
-func (m *UserModel) GetUser() kit.User {
+func (m *StrUserModel) GetUser() kit.User {
 	return m.User
 }
 
-func (m *UserModel) SetUser(u kit.User) {
-	m.User = u.(*User)
+func (m *StrUserModel) SetUser(u kit.User) {
+	m.User = u.(*UserStrID)
 	m.SetUserID(u.GetID())
 }
 
 type IntUserModel struct {
-	User   *IntUser
+	User   *UserIntID
 	UserID uint64
 }
 
-func (m *IntUserModel) GetUserID() string {
-	if m.UserID == 0 {
-		return ""
-	}
-	return strconv.FormatUint(m.UserID, 10)
+func (m *IntUserModel) GetUserID() interface{} {
+	return m.UserID
 }
 
-func (m *IntUserModel) SetUserID(rawId string) error {
-	if rawId == "" {
-		m.UserID = 0
+func (m *IntUserModel) SetUserID(id interface{}) error {
+	if intId, ok := id.(uint64); ok {
+		m.UserID = intId
 		return nil
 	}
 
-	id, err := strconv.ParseUint(rawId, 10, 64)
+	convertedId, err := db.Convert(id, uint64(0))
 	if err != nil {
 		return err
 	}
-	m.UserID = id
+
+	m.UserID = convertedId.(uint64)
 	return nil
 }
 
@@ -68,7 +75,7 @@ func (m *IntUserModel) GetUser() kit.User {
 }
 
 func (m *IntUserModel) SetUser(x kit.User) {
-	m.User = x.(*IntUser)
+	m.User = x.(*UserIntID)
 	m.SetUserID(x.GetID())
 }
 
@@ -77,8 +84,6 @@ func (m *IntUserModel) SetUser(x kit.User) {
  */
 
 type User struct {
-	db.BaseModel
-
 	Active bool
 
 	Username string `db:"unique;not-null"`
@@ -95,9 +100,6 @@ type User struct {
 
 	Roles []*Role `db:"m2m;"`
 }
-
-// Ensure User implements kit.User interface.
-var _ kit.User = (*User)(nil)
 
 func (u User) Collection() string {
 	return "users"
@@ -253,41 +255,51 @@ func (u *User) HasRoleStr(role string) bool {
 	return false
 }
 
-type IntUser struct {
-	db.BaseIntModel
+type UserStrID struct {
 	User
+	db.BaseStrIDModel
 }
+
+// Ensure UserStrID implements kit.User interface.
+var _ kit.User = (*UserStrID)(nil)
+
+type UserIntID struct {
+	User
+	db.BaseIntIDModel
+}
+
+// Ensure UserIntID implements kit.User interface.
+var _ kit.User = (*UserStrID)(nil)
 
 /**
  * UserProfile.
  */
 
 type UserProfile struct {
-	UserModel
+	StrUserModel
 }
 
 func (p UserProfile) Collection() string {
 	return "user_profiles"
 }
 
-func (p *UserProfile) GetID() string {
-	return p.GetUserID()
+func (p *UserProfile) GetID() interface{} {
+	return p.UserID
 }
 
-func (p *UserProfile) SetID(rawId string) error {
-	return p.SetUserID(rawId)
+func (p *UserProfile) SetID(id interface{}) error {
+	return p.SetUserID(id)
 }
 
 type IntUserProfile struct {
-	UserProfile
 	IntUserModel
 }
 
-func (p *IntUserProfile) GetID() string {
-	return p.GetUserID()
+func (p *IntUserProfile) GetID() interface{} {
+	return p.UserID
 }
 
-func (p *IntUserProfile) SetID(rawId string) error {
+func (p *IntUserProfile) SetID(rawId interface{}) error {
 	return p.SetUserID(rawId)
 }
 
@@ -296,7 +308,7 @@ func (p *IntUserProfile) SetID(rawId string) error {
  */
 
 type Token struct {
-	UserModel
+	StrUserModel
 
 	Token     string    `db:"primary-key"`
 	Type      string    `db:"not-null"`
@@ -310,12 +322,21 @@ func (t *Token) Collection() string {
 	return "user_tokens"
 }
 
-func (t *Token) GetID() string {
+func (t *Token) GetID() interface{} {
 	return t.Token
 }
 
-func (t *Token) SetID(x string) error {
-	t.Token = x
+func (t *Token) GetStrID() string {
+	return t.Token
+}
+
+func (t *Token) SetID(id interface{}) error {
+	t.Token = id.(string)
+	return nil
+}
+
+func (t *Token) SetStrID(id string) error {
+	t.Token = id
 	return nil
 }
 
@@ -352,7 +373,7 @@ func (t *Token) IsValid() bool {
  */
 
 type Session struct {
-	UserModel
+	StrUserModel
 
 	Token string `db:"primary-key;max:150"`
 	Typ   string `db:"not-null;max:100"`
@@ -365,11 +386,20 @@ func (b Session) Collection() string {
 	return "sessions"
 }
 
-func (s Session) GetID() string {
+func (s Session) GetID() interface{} {
 	return s.Token
 }
 
-func (s *Session) SetID(x string) error {
+func (s *Session) SetID(x interface{}) error {
+	s.Token = x.(string)
+	return nil
+}
+
+func (s Session) GetStrID() string {
+	return s.Token
+}
+
+func (s *Session) SetStrID(x string) error {
 	s.Token = x
 	return nil
 }
@@ -411,8 +441,8 @@ func (s *Session) IsGuest() bool {
 }
 
 type IntUserSession struct {
-	IntUserModel
 	Session
+	IntUserModel
 }
 
 func (s *IntUserSession) IsGuest() bool {
@@ -440,11 +470,20 @@ func (r Role) GetName() string {
 	return r.Name
 }
 
-func (r Role) GetID() string {
+func (r Role) GetID() interface{} {
 	return r.Name
 }
 
-func (r *Role) SetID(n string) error {
+func (r *Role) SetID(n interface{}) error {
+	r.Name = n.(string)
+	return nil
+}
+
+func (r Role) GetStrID() string {
+	return r.Name
+}
+
+func (r *Role) SetStrID(n string) error {
 	r.Name = n
 	return nil
 }
@@ -477,11 +516,20 @@ func (r Permission) GetName() string {
 	return r.Name
 }
 
-func (p Permission) GetID() string {
+func (p Permission) GetID() interface{} {
 	return p.Name
 }
 
-func (p *Permission) SetID(n string) error {
+func (p *Permission) SetID(n interface{}) error {
+	p.Name = n.(string)
+	return nil
+}
+
+func (p Permission) GetStrID() string {
+	return p.Name
+}
+
+func (p *Permission) SetStrID(n string) error {
 	p.Name = n
 	return nil
 }

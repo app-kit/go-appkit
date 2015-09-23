@@ -59,7 +59,7 @@ func (d *ApiModel) GetRelation(name string) []*ApiModel {
 	return d.Relationships[name]["data"]
 }
 
-func BuildModel(backend db.Backend, collection string, rawData []byte) (db.Model, kit.Error) {
+func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Model, kit.Error) {
 	var request ApiModelData
 	if err := json.Unmarshal(rawData, &request); err != nil {
 		return nil, kit.WrapError(err, "invalid_json_body", "")
@@ -78,16 +78,17 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (db.Model
 		return nil, kit.AppError{Code: "missing_model_type"}
 	}
 
-	if !backend.HasModel(data.Type) {
+	if !backend.HasCollection(data.Type) {
 		return nil, kit.AppError{
 			Code:    "unknown_model_type",
 			Message: fmt.Sprintf("The model type %v is not supported", data.Type),
 		}
 	}
 
-	info := backend.GetModelInfo(data.Type)
+	info := backend.ModelInfo(data.Type)
 
-	model, _ := backend.NewModel(data.Type)
+	rawModel, _ := backend.CreateModel(data.Type)
+	model := rawModel.(kit.Model)
 
 	if data.Id != "" {
 		model.SetID(data.Id)
@@ -113,17 +114,17 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (db.Model
 	return model, nil
 }
 
-func ConvertModel(backend db.Backend, m db.Model) (*ApiModel, []*ApiModel, kit.Error) {
+func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, kit.Error) {
 	modelData, err := backend.ModelToMap(m, true)
 	if err != nil {
 		return nil, nil, kit.WrapError(err, "model_convert_error", "")
 	}
 
-	info := backend.GetModelInfo(m.Collection())
+	info := backend.ModelInfo(m.Collection())
 
 	data := &ApiModel{
 		Type:       m.Collection(),
-		Id:         m.GetID(),
+		Id:         m.GetStrID(),
 		Attributes: modelData,
 	}
 
@@ -150,7 +151,7 @@ func ConvertModel(backend db.Backend, m db.Model) (*ApiModel, []*ApiModel, kit.E
 			continue
 		}
 
-		related := make([]db.Model, 0)
+		related := make([]kit.Model, 0)
 
 		if !field.RelationIsMany {
 			// Make sure that we have a pointer.
@@ -158,7 +159,7 @@ func ConvertModel(backend db.Backend, m db.Model) (*ApiModel, []*ApiModel, kit.E
 				fieldVal = fieldVal.Addr()
 			}
 
-			related = append(related, fieldVal.Interface().(db.Model))
+			related = append(related, fieldVal.Interface().(kit.Model))
 		} else {
 			for i := 0; i < fieldVal.Len(); i++ {
 				item := fieldVal.Index(i)
@@ -166,7 +167,7 @@ func ConvertModel(backend db.Backend, m db.Model) (*ApiModel, []*ApiModel, kit.E
 					item = item.Addr()
 				}
 
-				related = append(related, item.Interface().(db.Model))
+				related = append(related, item.Interface().(kit.Model))
 			}
 		}
 
@@ -180,7 +181,7 @@ func ConvertModel(backend db.Backend, m db.Model) (*ApiModel, []*ApiModel, kit.E
 			// Build relation info and set in in relationships map.
 			relation := &ApiModel{
 				Type: relatedModel.Collection(),
-				Id:   relatedModel.GetID(),
+				Id:   relatedModel.GetStrID(),
 			}
 
 			data.AddRelation(field.MarshalName, relation)
@@ -196,7 +197,7 @@ func ConvertModel(backend db.Backend, m db.Model) (*ApiModel, []*ApiModel, kit.E
 	return data, includedModels, nil
 }
 
-func ConvertModels(backend db.Backend, models []db.Model) ([]*ApiModel, []*ApiModel, kit.Error) {
+func ConvertModels(backend db.Backend, models []kit.Model) ([]*ApiModel, []*ApiModel, kit.Error) {
 	modelsData := make([]*ApiModel, 0)
 	includedModels := make([]*ApiModel, 0)
 
@@ -247,7 +248,7 @@ func ConvertResponse(backend db.Backend, resp kit.Response) kit.Response {
 	}
 
 	if data := resp.GetData(); data != nil {
-		if model, ok := data.(db.Model); ok {
+		if model, ok := data.(kit.Model); ok {
 			modelData, included, err := ConvertModel(backend, model)
 			if err != nil {
 				return ConvertResponse(backend, &kit.AppResponse{
@@ -257,7 +258,7 @@ func ConvertResponse(backend db.Backend, resp kit.Response) kit.Response {
 
 			apiResponse.Data = modelData
 			apiResponse.Included = included
-		} else if models, ok := data.([]db.Model); ok {
+		} else if models, ok := data.([]kit.Model); ok {
 			modelData, included, err := ConvertModels(backend, models)
 			if err != nil {
 				return ConvertResponse(backend, &kit.AppResponse{
