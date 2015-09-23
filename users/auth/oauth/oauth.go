@@ -3,6 +3,7 @@ package oauth
 import (
 	"fmt"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -100,15 +101,15 @@ func (a *AuthAdaptorOauth) RegisterService(service Service) {
 	a.services[service.Name()] = service
 }
 
-func (a *AuthAdaptorOauth) RegisterUser(user kit.User, data map[string]interface{}) (kit.AuthItem, kit.Error) {
+func (a *AuthAdaptorOauth) RegisterUser(user kit.User, data map[string]interface{}) (kit.AuthItem, apperror.Error) {
 	serviceName, _ := GetStringFromMap(data, "service")
 	if serviceName == "" {
-		return nil, kit.AppError{Code: "invalid_data_missing_service"}
+		return nil, apperror.New("invalid_data_missing_service")
 	}
 
 	service := a.services[serviceName]
 	if service == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unconfigured_service",
 			Message: fmt.Sprintf("The oauth service '%v' was not configured in oauth auth adaptor", serviceName),
 		}
@@ -116,23 +117,23 @@ func (a *AuthAdaptorOauth) RegisterUser(user kit.User, data map[string]interface
 
 	accessToken, _ := GetStringFromMap(data, "access_token")
 	if accessToken == "" {
-		return nil, kit.AppError{Code: "invalid_data_missing_access_token"}
+		return nil, apperror.New("invalid_data_missing_access_token")
 	}
 
 	// Exchange access token for long lived token.
 	// This also verifies that the supplied token is valid.
 	appToken, err := service.Exchange(accessToken)
 	if err != nil {
-		return nil, kit.WrapError(err, "oauth_exchange_token_error", "")
+		return nil, apperror.Wrap(err, "oauth_exchange_token_error", "")
 	}
 
 	userData, err := service.GetUserData(appToken)
 	if err != nil {
-		return nil, kit.WrapError(err, "fetch_user_data_failed", "")
+		return nil, apperror.Wrap(err, "fetch_user_data_failed", "")
 	}
 
 	if userData.ID == "" {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "fetched_userdata_missing_user_id",
 			Message: "The userData fetched from the service does not contain a userID",
 		}
@@ -160,15 +161,15 @@ func (a *AuthAdaptorOauth) RegisterUser(user kit.User, data map[string]interface
 	return item, nil
 }
 
-func (a AuthAdaptorOauth) Authenticate(_ string, data map[string]interface{}) (string, kit.Error) {
+func (a AuthAdaptorOauth) Authenticate(_ string, data map[string]interface{}) (string, apperror.Error) {
 	serviceName, _ := GetStringFromMap(data, "service")
 	if serviceName == "" {
-		return "", kit.AppError{Code: "invalid_data_missing_service"}
+		return "", apperror.New("invalid_data_missing_service")
 	}
 
 	service := a.services[serviceName]
 	if service == nil {
-		return "", kit.AppError{
+		return "", &apperror.Err{
 			Code:    "unconfigured_service",
 			Message: fmt.Sprintf("The oauth service '%v' was not configured in oauth auth adaptor", serviceName),
 		}
@@ -176,23 +177,23 @@ func (a AuthAdaptorOauth) Authenticate(_ string, data map[string]interface{}) (s
 
 	accessToken, _ := GetStringFromMap(data, "access_token")
 	if accessToken == "" {
-		return "", kit.AppError{Code: "invalid_data_missing_access_token"}
+		return "", apperror.New("invalid_data_missing_access_token")
 	}
 
 	// Exchange access token for long lived token.
 	// This also verifies that the supplied token is valid.
 	appToken, err := service.Exchange(accessToken)
 	if err != nil {
-		return "", kit.WrapError(err, "oauth_exchange_token_error", "")
+		return "", apperror.Wrap(err, "oauth_exchange_token_error", "")
 	}
 
 	userData, err := service.GetUserData(appToken)
 	if err != nil {
-		return "", kit.WrapError(err, "fetch_user_data_failed", "")
+		return "", apperror.Wrap(err, "fetch_user_data_failed", "")
 	}
 
 	if userData.ID == "" {
-		return "", kit.AppError{
+		return "", &apperror.Err{
 			Code:    "fetched_userdata_missing_user_id",
 			Message: "The userData fetched from the service does not contain a userID",
 		}
@@ -201,9 +202,9 @@ func (a AuthAdaptorOauth) Authenticate(_ string, data map[string]interface{}) (s
 	// Find the auth item.
 	rawItem, err := a.backend.Q("users_auth_oauth").Filter("service", serviceName).Filter("external_user_id", userData.ID).First()
 	if err != nil {
-		return "", kit.WrapError(err, "auth_item_query_error", "")
+		return "", apperror.Wrap(err, "auth_item_query_error", "")
 	} else if rawItem == nil {
-		return "", kit.AppError{
+		return "", &apperror.Err{
 			Code:    "no_authitem",
 			Message: fmt.Sprintf("No oauth auth item could be found for userID %v", userData.ID),
 		}

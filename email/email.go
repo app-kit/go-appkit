@@ -4,6 +4,8 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/theduke/go-apperror"
+
 	. "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/utils"
 )
@@ -152,17 +154,17 @@ func (e *Mail) GetBodyParts() []EmailPart {
 	return e.sliceToEmailPart(e.BodyParts)
 }
 
-func (e *Mail) Attach(contentType string, data []byte) Error {
+func (e *Mail) Attach(contentType string, data []byte) apperror.Error {
 	e.Attachments = append(e.Attachments, &Part{MimeType: contentType, Content: data})
 	return nil
 }
 
-func (e *Mail) AttachReader(contentType string, reader io.ReadCloser) Error {
+func (e *Mail) AttachReader(contentType string, reader io.ReadCloser) apperror.Error {
 	e.Attachments = append(e.Attachments, &Part{MimeType: contentType, Reader: reader})
 	return nil
 }
 
-func (e *Mail) AttachFile(path string) Error {
+func (e *Mail) AttachFile(path string) apperror.Error {
 	content, err := utils.ReadFile(path)
 	if err != nil {
 		return err
@@ -175,17 +177,17 @@ func (e *Mail) GetAttachments() []EmailPart {
 	return e.sliceToEmailPart(e.Attachments)
 }
 
-func (e *Mail) Embed(contentType string, data []byte) Error {
+func (e *Mail) Embed(contentType string, data []byte) apperror.Error {
 	e.EmbeddedAttachments = append(e.EmbeddedAttachments, &Part{MimeType: contentType, Content: data})
 	return nil
 }
 
-func (e *Mail) EmbedReader(contentType string, reader io.ReadCloser) Error {
+func (e *Mail) EmbedReader(contentType string, reader io.ReadCloser) apperror.Error {
 	e.EmbeddedAttachments = append(e.EmbeddedAttachments, &Part{MimeType: contentType, Reader: reader})
 	return nil
 }
 
-func (e *Mail) EmbedFile(path string) Error {
+func (e *Mail) EmbedFile(path string) apperror.Error {
 	content, err := utils.ReadFile(path)
 	if err != nil {
 		return err

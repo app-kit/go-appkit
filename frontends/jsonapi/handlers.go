@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -17,7 +18,7 @@ func HandleWrap(collection string, handler kit.RequestHandler) kit.RequestHandle
 	}
 }
 
-func Find(app kit.App, request kit.Request) (kit.Response, kit.Error) {
+func Find(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 	if err := request.ParseJsonData(); err != nil {
 		return nil, err
 	}
@@ -26,7 +27,7 @@ func Find(app kit.App, request kit.Request) (kit.Response, kit.Error) {
 
 	res := app.Dependencies().Resource(collection)
 	if res == nil || !res.IsPublic() {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource '%v' does not exist", collection),
 		}
@@ -38,10 +39,10 @@ func Find(app kit.App, request kit.Request) (kit.Response, kit.Error) {
 	if jsonQuery != "" {
 		// A custom query was supplied.
 		// Try to parse the query.
-		var err kit.Error
+		var err apperror.Error
 		query, err = db.ParseJsonQuery(collection, []byte(jsonQuery))
 		if err != nil {
-			return nil, kit.WrapError(err, "invalid_query", "")
+			return nil, apperror.Wrap(err, "invalid_query", "")
 		}
 	}
 
@@ -53,7 +54,7 @@ func Find(app kit.App, request kit.Request) (kit.Response, kit.Error) {
 			var err error
 			limit, err = strconv.ParseInt(rawLimit, 10, 64)
 			if err != nil {
-				return nil, kit.AppError{
+				return nil, &apperror.Err{
 					Code:    "non_numeric_limit_parameter",
 					Message: "The get query contains a non-numeric ?limit",
 				}
@@ -63,7 +64,7 @@ func Find(app kit.App, request kit.Request) (kit.Response, kit.Error) {
 			var err error
 			offset, err = strconv.ParseInt(rawOffset, 10, 64)
 			if err != nil {
-				return nil, kit.AppError{
+				return nil, &apperror.Err{
 					Code:    "non_numeric_offset_parameter",
 					Message: "The get query contains a non-numeric ?offset",
 				}
@@ -100,7 +101,7 @@ func HandleFindOne(app kit.App, request kit.Request) (kit.Response, bool) {
 	return ConvertResponse(res.Backend(), res.ApiFindOne(id, request)), false
 }
 
-func Create(app kit.App, request kit.Request) (kit.Response, kit.Error) {
+func Create(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 	if err := request.ParseJsonData(); err != nil {
 		return nil, err
 	}
@@ -109,7 +110,7 @@ func Create(app kit.App, request kit.Request) (kit.Response, kit.Error) {
 
 	res := app.Dependencies().Resource(collection)
 	if res == nil || !res.IsPublic() {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource '%v' does not exist", collection),
 		}
@@ -137,7 +138,7 @@ func HandleCreate(app kit.App, request kit.Request) (kit.Response, bool) {
 	return response, false
 }
 
-func Update(app kit.App, request kit.Request) (kit.Response, kit.Error) {
+func Update(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 	if err := request.ParseJsonData(); err != nil {
 		return nil, err
 	}
@@ -146,7 +147,7 @@ func Update(app kit.App, request kit.Request) (kit.Response, kit.Error) {
 
 	res := app.Dependencies().Resource(collection)
 	if res == nil || !res.IsPublic() {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource '%v' does not exist", collection),
 		}

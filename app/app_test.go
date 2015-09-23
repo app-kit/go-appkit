@@ -14,6 +14,7 @@ import (
 	. "github.com/onsi/gomega"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/theduke/go-apperror"
 	"github.com/theduke/go-dukedb/backends/memory"
 
 	kit "github.com/theduke/go-appkit"
@@ -101,7 +102,7 @@ func buildApp() kit.App {
 
 type Data struct {
 	Data   interface{}            `json:"data"`
-	Errors []kit.AppError         `json:"errors"`
+	Errors []apperror.Error       `json:"errors"`
 	Meta   map[string]interface{} `json:"meta"`
 }
 

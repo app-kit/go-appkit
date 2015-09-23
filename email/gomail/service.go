@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/theduke/go-apperror"
 	"gopkg.in/gomail.v2"
 
 	kit "github.com/theduke/go-appkit"
@@ -70,7 +71,7 @@ func setAddressHeader(msg *gomail.Message, name string, recipients []kit.EmailRe
 	msg.SetHeader(name, header...)
 }
 
-func (s Service) buildMessage(e kit.Email) (*gomail.Message, []string, kit.Error) {
+func (s Service) buildMessage(e kit.Email) (*gomail.Message, []string, apperror.Error) {
 	msg := gomail.NewMessage()
 
 	msg.SetHeader("Subject", e.GetSubject())
@@ -116,7 +117,7 @@ func (s Service) buildMessage(e kit.Email) (*gomail.Message, []string, kit.Error
 	return msg, files, nil
 }
 
-func (s Service) Send(mail kit.Email) kit.Error {
+func (s Service) Send(mail kit.Email) apperror.Error {
 	err, errs := s.SendMultiple(mail)
 	if err != nil {
 		return err
@@ -124,19 +125,15 @@ func (s Service) Send(mail kit.Email) kit.Error {
 	return errs[0]
 }
 
-func (s Service) SendMultiple(emails ...kit.Email) (kit.Error, []kit.Error) {
+func (s Service) SendMultiple(emails ...kit.Email) (apperror.Error, []apperror.Error) {
 	sender, err := s.dialer.Dial()
 	if err != nil {
-		return kit.AppError{
-			Code:     "smtp_dial_failed",
-			Message:  fmt.Sprintf("Could not connect to smtp server at %v:%v: %v", s.dialer.Host, s.dialer.Port, err),
-			Errors:   []error{err},
-			Internal: true,
-		}, nil
+		msg := fmt.Sprintf("Could not connect to smtp server at %v:%v", s.dialer.Host, s.dialer.Port)
+		return apperror.Wrap(err, "smtp_dial_failed", msg), nil
 	}
 	defer sender.Close()
 
-	errs := make([]kit.Error, 0)
+	errs := make([]apperror.Error, 0)
 
 	for _, email := range emails {
 		msg, files, err := s.buildMessage(email)
@@ -152,12 +149,7 @@ func (s Service) SendMultiple(emails ...kit.Email) (kit.Error, []kit.Error) {
 		}(files)
 
 		if err := gomail.Send(sender, msg); err != nil {
-			errs = append(errs, kit.AppError{
-				Code:     "smtp_send_error",
-				Message:  err.Error(),
-				Errors:   []error{err},
-				Internal: true,
-			})
+			errs = append(errs, apperror.Wrap(err, "smtp_send_error"))
 			continue
 		}
 

@@ -6,6 +6,8 @@ import (
 	"math/big"
 	"time"
 
+	"github.com/theduke/go-apperror"
+
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/app/methods"
 )
@@ -38,10 +40,10 @@ type SessionResourceHooks struct {
 	ApiDeleteAllowed bool
 }
 
-func StartSession(res kit.Resource, user kit.User) (kit.Session, kit.Error) {
+func StartSession(res kit.Resource, user kit.User) (kit.Session, apperror.Error) {
 	token := randomToken()
 	if token == "" {
-		return nil, kit.AppError{Code: "token_creation_failed"}
+		return nil, apperror.New("token_creation_failed")
 	}
 
 	rawSession, err := res.Backend().CreateModel(res.Model().Collection())
@@ -78,7 +80,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 			Filter("username", userIdentifier).Or("email", userIdentifier).First()
 
 		if err != nil {
-			return &kit.AppResponse{Error: kit.WrapError(err, "user_query_error", "")}
+			return &kit.AppResponse{Error: apperror.Wrap(err, "user_query_error", "")}
 		} else if rawUser == nil {
 			return kit.NewErrorResponse("user_not_found", "User not found for identifier: "+userIdentifier)
 		}

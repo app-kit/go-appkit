@@ -8,11 +8,11 @@ import (
 	"net/url"
 	"strings"
 
-	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-apperror"
 )
 
 type Client interface {
-	Do(method, path string, data map[string]string) (int, map[string]interface{}, kit.Error)
+	Do(method, path string, data map[string]string) (int, map[string]interface{}, apperror.Error)
 }
 
 type TokenClient struct {
@@ -32,7 +32,7 @@ func NewTokenClient(service Service, token string) *TokenClient {
 	}
 }
 
-func (c *TokenClient) Do(method, path string, data map[string]string) (int, map[string]interface{}, kit.Error) {
+func (c *TokenClient) Do(method, path string, data map[string]string) (int, map[string]interface{}, apperror.Error) {
 	if path[0] != '/' {
 		path = "/" + path
 	}
@@ -41,7 +41,7 @@ func (c *TokenClient) Do(method, path string, data map[string]string) (int, map[
 
 	reqUrl, err := url.Parse(path)
 	if err != nil {
-		return 0, nil, kit.WrapError(err, "invalid_url", "")
+		return 0, nil, apperror.Wrap(err, "invalid_url", "")
 	}
 
 	query := reqUrl.Query()
@@ -69,7 +69,7 @@ func (c *TokenClient) Do(method, path string, data map[string]string) (int, map[
 
 	req, err := http.NewRequest(method, reqUrl.String(), reader)
 	if err != nil {
-		return 0, nil, kit.WrapError(err, "http_request_error", "")
+		return 0, nil, apperror.Wrap(err, "http_request_error", "")
 	}
 
 	if hasBodyData {
@@ -78,7 +78,7 @@ func (c *TokenClient) Do(method, path string, data map[string]string) (int, map[
 
 	resp, err := c.client.Do(req)
 	if err != nil {
-		return 0, nil, kit.WrapError(err, "http_error", "")
+		return 0, nil, apperror.Wrap(err, "http_error", "")
 	}
 
 	if resp.Body == nil {
@@ -88,12 +88,12 @@ func (c *TokenClient) Do(method, path string, data map[string]string) (int, map[
 
 	rawData, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return resp.StatusCode, nil, kit.WrapError(err, "body_read_error", "")
+		return resp.StatusCode, nil, apperror.Wrap(err, "body_read_error", "")
 	}
 
 	var respData map[string]interface{}
 	if err := json.Unmarshal(rawData, &respData); err != nil {
-		return resp.StatusCode, nil, kit.WrapError(err, "json_unmarshal_error", "")
+		return resp.StatusCode, nil, apperror.Wrap(err, "json_unmarshal_error", "")
 	}
 
 	return resp.StatusCode, respData, nil

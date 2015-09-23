@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"reflect"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -59,14 +60,14 @@ func (d *ApiModel) GetRelation(name string) []*ApiModel {
 	return d.Relationships[name]["data"]
 }
 
-func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Model, kit.Error) {
+func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Model, apperror.Error) {
 	var request ApiModelData
 	if err := json.Unmarshal(rawData, &request); err != nil {
-		return nil, kit.WrapError(err, "invalid_json_body", "")
+		return nil, apperror.Wrap(err, "invalid_json_body", "")
 	}
 
 	if request.Data == nil {
-		return nil, kit.AppError{Code: "no_model_data"}
+		return nil, apperror.New("no_model_data")
 	}
 
 	data := request.Data
@@ -75,11 +76,11 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	}
 
 	if data.Type == "" {
-		return nil, kit.AppError{Code: "missing_model_type"}
+		return nil, apperror.New("missing_model_type")
 	}
 
 	if !backend.HasCollection(data.Type) {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_model_type",
 			Message: fmt.Sprintf("The model type %v is not supported", data.Type),
 		}
@@ -98,7 +99,7 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	for key := range data.Attributes {
 		fieldName := info.MapMarshalName(key)
 		if fieldName == "" {
-			return nil, kit.AppError{
+			return nil, &apperror.Err{
 				Code:    "invalid_attribute",
 				Message: fmt.Sprintf("The collection '%v' does not have a field '%v'", data.Type, key),
 			}
@@ -108,16 +109,16 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	}
 
 	if err := db.UpdateModelFromData(info, model, fieldData); err != nil {
-		return nil, kit.WrapError(err, "update_model_from_dict_error", "")
+		return nil, apperror.Wrap(err, "update_model_from_dict_error", "")
 	}
 
 	return model, nil
 }
 
-func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, kit.Error) {
+func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, apperror.Error) {
 	modelData, err := backend.ModelToMap(m, true)
 	if err != nil {
-		return nil, nil, kit.WrapError(err, "model_convert_error", "")
+		return nil, nil, apperror.Wrap(err, "model_convert_error", "")
 	}
 
 	info := backend.ModelInfo(m.Collection())
@@ -143,7 +144,7 @@ func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, kit.
 		// Retrieve the related model.
 		fieldVal, err := db.GetStructField(m, fieldName)
 		if err != nil {
-			return nil, nil, kit.WrapError(err, "model_get_field_error", "")
+			return nil, nil, apperror.Wrap(err, "model_get_field_error", "")
 		}
 
 		// If field is zero value, skip.
@@ -175,7 +176,7 @@ func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, kit.
 			// Convert the related model.
 			relationData, included, err := ConvertModel(backend, relatedModel)
 			if err != nil {
-				return nil, nil, kit.WrapError(err, "included_model_convert_error", "")
+				return nil, nil, apperror.Wrap(err, "included_model_convert_error", "")
 			}
 
 			// Build relation info and set in in relationships map.
@@ -197,14 +198,14 @@ func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, kit.
 	return data, includedModels, nil
 }
 
-func ConvertModels(backend db.Backend, models []kit.Model) ([]*ApiModel, []*ApiModel, kit.Error) {
+func ConvertModels(backend db.Backend, models []kit.Model) ([]*ApiModel, []*ApiModel, apperror.Error) {
 	modelsData := make([]*ApiModel, 0)
 	includedModels := make([]*ApiModel, 0)
 
 	for _, m := range models {
 		modelData, included, err := ConvertModel(backend, m)
 		if err != nil {
-			return nil, nil, kit.WrapError(err, "model_convert_error", "")
+			return nil, nil, apperror.Wrap(err, "model_convert_error", "")
 		}
 
 		modelsData = append(modelsData, modelData)
@@ -217,8 +218,8 @@ func ConvertModels(backend db.Backend, models []kit.Model) ([]*ApiModel, []*ApiM
 func ConvertError(err error) []*ApiError {
 	errs := make([]*ApiError, 0)
 
-	if appError, ok := err.(kit.Error); ok {
-		if appError.IsInternal() {
+	if appError, ok := err.(apperror.Error); ok {
+		if !appError.IsPublic() {
 			// Internal error, so do not provide any details.
 			errs = append(errs, &ApiError{Code: "internal_server_error"})
 		} else {
@@ -278,7 +279,7 @@ func ConvertResponse(backend db.Backend, resp kit.Response) kit.Response {
 	js, err := json.Marshal(apiResponse)
 	if err != nil {
 		return ConvertResponse(backend, &kit.AppResponse{
-			Error: kit.WrapError(err, "json_marshal_error", ""),
+			Error: apperror.Wrap(err, "json_marshal_error", ""),
 		})
 	}
 

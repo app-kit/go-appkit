@@ -4,6 +4,7 @@ import (
 	"io"
 	"strings"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -176,14 +177,14 @@ type FileStrID struct {
 // Ensure FileStrID implements File interface.
 var _ kit.File = (*FileStrID)(nil)
 
-func (f *FileStrID) Reader() (io.ReadCloser, kit.Error) {
+func (f *FileStrID) Reader() (io.ReadCloser, apperror.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
+func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}
@@ -203,14 +204,14 @@ type FileIntID struct {
 // Ensure FileIntID implements File interface.
 var _ kit.File = (*FileIntID)(nil)
 
-func (f *FileIntID) Reader() (io.ReadCloser, kit.Error) {
+func (f *FileIntID) Reader() (io.ReadCloser, apperror.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
 	return f.Backend.Reader(f)
 }
 
-func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, kit.Error) {
+func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
 		return "", nil, nil
 	}

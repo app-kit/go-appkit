@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/theduke/go-apperror"
 
 	kit "github.com/theduke/go-appkit"
 )
@@ -45,7 +46,7 @@ func (s *Service) SetDefaultFrom(r kit.EmailRecipient) {
 	s.defaultSender = r
 }
 
-func (s Service) Send(e kit.Email) kit.Error {
+func (s Service) Send(e kit.Email) apperror.Error {
 	err, errs := s.SendMultiple(e)
 	if err != nil {
 		return err
@@ -53,7 +54,7 @@ func (s Service) Send(e kit.Email) kit.Error {
 	return errs[0]
 }
 
-func (s Service) SendMultiple(emails ...kit.Email) (kit.Error, []kit.Error) {
+func (s Service) SendMultiple(emails ...kit.Email) (apperror.Error, []apperror.Error) {
 	for _, e := range emails {
 		from := e.GetFrom().GetEmail()
 		if from == "" {
@@ -87,5 +88,5 @@ func (s Service) SendMultiple(emails ...kit.Email) (kit.Error, []kit.Error) {
 		}).Debug(msg)
 	}
 
-	return nil, make([]kit.Error, len(emails))
+	return nil, make([]apperror.Error, len(emails))
 }

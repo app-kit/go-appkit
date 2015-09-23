@@ -2,6 +2,7 @@ package jsonapi
 
 import (
 	"github.com/Sirupsen/logrus"
+	"github.com/theduke/go-apperror"
 
 	kit "github.com/theduke/go-appkit"
 )
@@ -44,7 +45,7 @@ func (f *Frontend) Logger() *logrus.Logger {
 	return f.app.Dependencies().Logger()
 }
 
-func (f *Frontend) Init() kit.Error {
+func (f *Frontend) Init() apperror.Error {
 	apiPrefix := f.app.Config().UString("api.prefix", "api")
 
 	resources := f.app.Dependencies().Resources()
@@ -60,7 +61,7 @@ func (f *Frontend) Init() kit.Error {
 	return nil
 }
 
-func (f *Frontend) Start() kit.Error {
+func (f *Frontend) Start() apperror.Error {
 	// Noop.
 	return nil
 }

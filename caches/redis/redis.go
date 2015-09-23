@@ -48,10 +48,9 @@ var _ kit.Cache = (*Redis)(nil)
 
 func redisErr(err error) Error {
 	return kit.AppError{
-		Code:     "redis_error",
-		Message:  err.Error(),
-		Errors:   []error{err},
-		Internal: true,
+		Code:    "redis_error",
+		Message: err.Error(),
+		Errors:  []error{err},
 	}
 }
 
@@ -175,10 +174,9 @@ func (r *Redis) Set(item kit.CacheItem) Error {
 	value, err := item.ToString()
 	if err != nil {
 		return kit.AppError{
-			Code:     "cacheitem_tostring_error",
-			Message:  err.Error(),
-			Errors:   []error{err},
-			Internal: true,
+			Code:    "cacheitem_tostring_error",
+			Message: err.Error(),
+			Errors:  []error{err},
 		}
 	}
 	if value == "" {
@@ -252,10 +250,9 @@ func (r *Redis) Get(key string, items ...kit.CacheItem) (kit.CacheItem, Error) {
 	}
 	if err := item.FromString(result[0]); err != nil {
 		return nil, kit.AppError{
-			Code:     "cacheitem_fromstring_error",
-			Message:  err.Error(),
-			Errors:   []error{err},
-			Internal: true,
+			Code:    "cacheitem_fromstring_error",
+			Message: err.Error(),
+			Errors:  []error{err},
 		}
 	}
 

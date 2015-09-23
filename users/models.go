@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -155,30 +156,22 @@ func (u *User) GetLastLogin() time.Time {
 	return u.LastLogin
 }
 
-func (u *User) GetData() (interface{}, kit.Error) {
+func (u *User) GetData() (interface{}, apperror.Error) {
 	if u.Data == "" {
 		return nil, nil
 	}
 	var data interface{}
 	err := json.Unmarshal([]byte(u.Data), &data)
 	if err != nil {
-		return nil, kit.AppError{
-			Code:     "json_marshal_error",
-			Message:  err.Error(),
-			Internal: true,
-		}
+		return nil, apperror.Wrap(err, "json_marshal_error")
 	}
 	return data, nil
 }
 
-func (u *User) SetData(x interface{}) kit.Error {
+func (u *User) SetData(x interface{}) apperror.Error {
 	js, err := json.Marshal(x)
 	if err != nil {
-		return kit.AppError{
-			Code:     "json_marshal_error",
-			Message:  err.Error(),
-			Internal: true,
-		}
+		return apperror.Wrap(err, "json_marshal_error")
 	}
 	u.Data = string(js)
 	return nil

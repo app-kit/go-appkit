@@ -3,6 +3,7 @@ package password
 import (
 	"fmt"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 	"golang.org/x/crypto/bcrypt"
 
@@ -72,18 +73,18 @@ func (a *AuthAdaptorPassword) SetBackend(b db.Backend) {
 	a.backend = b
 }
 
-func (a *AuthAdaptorPassword) RegisterUser(user kit.User, data map[string]interface{}) (kit.AuthItem, kit.Error) {
+func (a *AuthAdaptorPassword) RegisterUser(user kit.User, data map[string]interface{}) (kit.AuthItem, apperror.Error) {
 	if data == nil {
-		return nil, kit.AppError{Code: "invalid_nil_data"}
+		return nil, apperror.New("invalid_nil_data")
 	}
 	pw, _ := GetStringFromMap(data, "password")
 	if pw == "" {
-		return nil, kit.AppError{Code: "invalid_data_no_password"}
+		return nil, apperror.New("invalid_data_no_password")
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(pw), 10)
 	if err != nil {
-		return nil, kit.WrapError(err, "hash_errr", "")
+		return nil, apperror.Wrap(err, "hash_errr", "")
 	}
 
 	item := &AuthItemPassword{
@@ -94,12 +95,12 @@ func (a *AuthAdaptorPassword) RegisterUser(user kit.User, data map[string]interf
 	return item, nil
 }
 
-func (a *AuthAdaptorPassword) GetItem(userId string) (*AuthItemPassword, kit.Error) {
+func (a *AuthAdaptorPassword) GetItem(userId string) (*AuthItemPassword, apperror.Error) {
 	rawItem, err := a.backend.FindOne("users_auth_passwords", userId)
 	if err != nil {
 		return nil, err
 	} else if rawItem == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "no_authitem",
 			Message: fmt.Sprintf("No password auth item could be found for userID %v", userId),
 		}
@@ -108,14 +109,14 @@ func (a *AuthAdaptorPassword) GetItem(userId string) (*AuthItemPassword, kit.Err
 	return rawItem.(*AuthItemPassword), nil
 }
 
-func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interface{}) (string, kit.Error) {
+func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interface{}) (string, apperror.Error) {
 	if userID == "" {
-		return "", kit.AppError{Code: "empty_user_id"}
+		return "", apperror.New("empty_user_id")
 	}
 
 	pw, _ := GetStringFromMap(data, "password")
 	if pw == "" {
-		return "", kit.AppError{Code: "invalid_data_no_password"}
+		return "", apperror.New("invalid_data_no_password")
 	}
 
 	item, err := a.GetItem(userID)
@@ -124,13 +125,13 @@ func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interfa
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(item.Hash), []byte(pw)); err != nil {
-		return "", kit.AppError{Code: "invalid_credentials"}
+		return "", apperror.New("invalid_credentials")
 	}
 
 	return userID, nil
 }
 
-func (a *AuthAdaptorPassword) ChangePassword(userId, newPw string) kit.Error {
+func (a *AuthAdaptorPassword) ChangePassword(userId, newPw string) apperror.Error {
 	item, err := a.GetItem(userId)
 	if err != nil {
 		return err
@@ -138,7 +139,7 @@ func (a *AuthAdaptorPassword) ChangePassword(userId, newPw string) kit.Error {
 
 	hash, err2 := bcrypt.GenerateFromPassword([]byte(newPw), 10)
 	if err2 != nil {
-		return kit.WrapError(err, "hash_err", "")
+		return apperror.Wrap(err, "hash_err", "")
 	}
 
 	item.Hash = string(hash)

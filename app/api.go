@@ -19,6 +19,7 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
+	"github.com/theduke/go-apperror"
 	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
@@ -89,10 +90,9 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	if ok, _ := utils.FileExists(tmpDir); !ok {
 		if err := os.MkdirAll(tmpDir, 0777); err != nil {
 			return &kit.AppResponse{
-				Error: kit.AppError{
-					Code:     "create_tmp_dir_failed",
-					Message:  fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
-					Internal: true,
+				Error: &apperror.Err{
+					Code:    "create_tmp_dir_failed",
+					Message: fmt.Sprintf("Could not create the tmp directory at %v: %v", tmpDir, err),
 				},
 			}
 		}
@@ -124,13 +124,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 		app.Logger().Errorf("Phantomjs execution error: %v", string(result))
 
 		return &kit.AppResponse{
-			Error: kit.AppError{
-				Code:     "phantom_execution_failed",
-				Message:  err.Error(),
-				Data:     result,
-				Errors:   []error{err},
-				Internal: true,
-			},
+			Error: apperror.Wrap(err, "phantom_execution_failed"),
 		}
 	}
 
@@ -213,22 +207,18 @@ func defaultNotFoundTpl() *template.Template {
 	return t
 }
 
-func getIndexTpl(app kit.App) ([]byte, kit.Error) {
+func getIndexTpl(app kit.App) ([]byte, apperror.Error) {
 	if path := app.Config().UString("frontend.indexTpl"); path != "" {
 		f, err := os.Open(path)
 		if err != nil {
-			return nil, kit.AppError{
-				Code:    "cant_open_index_tpl",
-				Message: fmt.Sprintf("The index template at %v could not be opened: %v", path, err),
-			}
+			return nil, apperror.Wrap(err, "index_tpl_open_error",
+				fmt.Sprintf("The index template at %v could not be opened", path))
 		}
 
 		tpl, err := ioutil.ReadAll(f)
 		if err != nil {
-			return nil, kit.AppError{
-				Code:    "index_tpl_read_error",
-				Message: fmt.Sprintf("Could not read index template at %v: %v", path, err),
-			}
+			return nil, apperror.Wrap(err, "index_tpl_read_error",
+				fmt.Sprintf("Could not read index template at %v", path))
 		}
 
 		return tpl, nil
@@ -281,7 +271,7 @@ func notFoundHandler(app kit.App, r kit.Request) (kit.Response, bool) {
 
 	// For api requests, render the api not found error.
 	return &kit.AppResponse{
-		Error: kit.AppError{
+		Error: &apperror.Err{
 			Code:    "not_found",
 			Message: "This api route does not exist",
 		},
@@ -311,7 +301,7 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 		additionalErrs := response.GetError().GetErrors()
 		if additionalErrs != nil {
 			for _, err := range additionalErrs {
-				if apiErr, ok := err.(kit.Error); ok && !apiErr.IsInternal() {
+				if apiErr, ok := err.(apperror.Error); ok && apiErr.IsPublic() {
 					errs = append(errs, apiErr)
 				}
 			}
@@ -326,10 +316,7 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 		code = 500
 		respData = map[string]interface{}{
 			"errors": []error{
-				&kit.AppError{
-					Code:    "json_encode_error",
-					Message: err2.Error(),
-				},
+				apperror.Wrap(err2, "json_encode_error"),
 			},
 		}
 		output, _ = json.Marshal(respData)

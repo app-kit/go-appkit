@@ -3,6 +3,7 @@ package resources
 import (
 	"fmt"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -68,10 +69,10 @@ func (s *Service) RegisterResource(res kit.Resource) {
 	s.resources[res.Collection()] = res
 }
 
-func (s *Service) Q(modelType string) (db.Query, kit.Error) {
+func (s *Service) Q(modelType string) (db.Query, apperror.Error) {
 	res := s.resources[modelType]
 	if res == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource %v was not registered with service", modelType),
 		}
@@ -80,10 +81,10 @@ func (s *Service) Q(modelType string) (db.Query, kit.Error) {
 	return res.Q(), nil
 }
 
-func (s *Service) FindOne(modelType string, id string) (kit.Model, kit.Error) {
+func (s *Service) FindOne(modelType string, id string) (kit.Model, apperror.Error) {
 	res := s.resources[modelType]
 	if res == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource %v was not registered with service", modelType),
 		}
@@ -92,10 +93,10 @@ func (s *Service) FindOne(modelType string, id string) (kit.Model, kit.Error) {
 	return res.FindOne(id)
 }
 
-func (s *Service) Create(m kit.Model, user kit.User) kit.Error {
+func (s *Service) Create(m kit.Model, user kit.User) apperror.Error {
 	res := s.resources[m.Collection()]
 	if res == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource %v was not registered with service", m.Collection()),
 		}
@@ -104,10 +105,10 @@ func (s *Service) Create(m kit.Model, user kit.User) kit.Error {
 	return res.Create(m, user)
 }
 
-func (s *Service) Update(m kit.Model, user kit.User) kit.Error {
+func (s *Service) Update(m kit.Model, user kit.User) apperror.Error {
 	res := s.resources[m.Collection()]
 	if res == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource %v was not registered with service", m.Collection()),
 		}
@@ -116,10 +117,10 @@ func (s *Service) Update(m kit.Model, user kit.User) kit.Error {
 	return res.Update(m, user)
 }
 
-func (s *Service) Delete(m kit.Model, user kit.User) kit.Error {
+func (s *Service) Delete(m kit.Model, user kit.User) apperror.Error {
 	res := s.resources[m.Collection()]
 	if res == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource %v was not registered with service", m.Collection()),
 		}

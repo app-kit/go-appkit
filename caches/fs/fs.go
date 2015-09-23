@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/theduke/go-apperror"
+
 	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/caches"
 	"github.com/theduke/go-appkit/utils"
@@ -20,30 +22,17 @@ type Fs struct {
 // Ensure redis implements the Cache interface.
 var _ kit.Cache = (*Fs)(nil)
 
-func fsErr(err error) kit.Error {
-	return kit.AppError{
-		Code:     "fs_error",
-		Message:  err.Error(),
-		Errors:   []error{err},
-		Internal: true,
-	}
+func fsErr(err error) apperror.Error {
+	return apperror.Wrap(err, "fs_error")
 }
 
-func New(path string) (*Fs, kit.Error) {
+func New(path string) (*Fs, apperror.Error) {
 	if path == "" {
-		return nil, kit.AppError{
-			Code:     "empty_path",
-			Internal: true,
-		}
+		return nil, apperror.New("empty_path")
 	}
 
 	if err := os.MkdirAll(path, 0777); err != nil {
-		return nil, kit.AppError{
-			Code:     "root_path_unwritable",
-			Message:  err.Error(),
-			Errors:   []error{err},
-			Internal: true,
-		}
+		return nil, apperror.Wrap(err, "root_path_unwritable")
 	}
 
 	fs := &Fs{
@@ -75,27 +64,22 @@ func (fs *Fs) keyMetaPath(key string) string {
 }
 
 // Save a new item into the cache.
-func (fs *Fs) Set(item kit.CacheItem) kit.Error {
+func (fs *Fs) Set(item kit.CacheItem) apperror.Error {
 	key := fs.key(item.GetKey())
 	if key == "" {
-		return kit.AppError{Code: "empty_key"}
+		return apperror.New("empty_key")
 	}
 
 	if item.IsExpired() {
-		return kit.AppError{Code: "item_expired"}
+		return apperror.New("item_expired")
 	}
 
 	value, err := item.ToString()
 	if err != nil {
-		return kit.AppError{
-			Code:     "cacheitem_tostring_error",
-			Message:  err.Error(),
-			Errors:   []error{err},
-			Internal: true,
-		}
+		return apperror.Wrap(err, "cacheitem_tostring_error")
 	}
 	if value == "" {
-		return kit.AppError{Code: "empty_value"}
+		return apperror.New("empty_value")
 	}
 
 	// Marshal metadata.
@@ -104,11 +88,7 @@ func (fs *Fs) Set(item kit.CacheItem) kit.Error {
 
 	js, err2 := json.Marshal(item)
 	if err2 != nil {
-		return kit.AppError{
-			Code:     "json_marshal_error",
-			Message:  err2.Error(),
-			Internal: true,
-		}
+		return apperror.Wrap(err2, "json_marshal_error")
 	}
 	item.SetValue(tmpVal)
 
@@ -122,7 +102,7 @@ func (fs *Fs) Set(item kit.CacheItem) kit.Error {
 	return nil
 }
 
-func (fs *Fs) SetString(key string, value string, expiresAt *time.Time, tags []string) kit.Error {
+func (fs *Fs) SetString(key string, value string, expiresAt *time.Time, tags []string) apperror.Error {
 	item := &StrItem{
 		Key:   key,
 		Value: value,
@@ -136,14 +116,13 @@ func (fs *Fs) SetString(key string, value string, expiresAt *time.Time, tags []s
 }
 
 // Retrieve a cache item from the cache.
-func (fs *Fs) Get(key string, items ...kit.CacheItem) (kit.CacheItem, kit.Error) {
+func (fs *Fs) Get(key string, items ...kit.CacheItem) (kit.CacheItem, apperror.Error) {
 	var item kit.CacheItem = &StrItem{}
 	if items != nil {
 		if len(items) != 1 {
-			return nil, kit.AppError{
-				Code:     "invalid_item",
-				Message:  "You must specify one item only",
-				Internal: true,
+			return nil, &apperror.Err{
+				Code:    "invalid_item",
+				Message: "You must specify one item only",
 			}
 		}
 		item = items[0]
@@ -151,7 +130,7 @@ func (fs *Fs) Get(key string, items ...kit.CacheItem) (kit.CacheItem, kit.Error)
 
 	key = fs.key(key)
 	if key == "" {
-		return nil, kit.AppError{Code: "empty_key"}
+		return nil, apperror.New("empty_key")
 	}
 
 	exists, err := utils.FileExists(fs.keyPath(key))
@@ -168,11 +147,7 @@ func (fs *Fs) Get(key string, items ...kit.CacheItem) (kit.CacheItem, kit.Error)
 		return nil, err
 	}
 	if err := json.Unmarshal(metaContent, &item); err != nil {
-		return nil, kit.AppError{
-			Code:     "metadata_unmarshal_error",
-			Message:  err.Error(),
-			Internal: true,
-		}
+		return nil, apperror.Wrap(err, "metadata_unmarshal_error")
 	}
 
 	// Reset ExpiresAt if it is zero, since json.Unmarshal produces
@@ -187,12 +162,7 @@ func (fs *Fs) Get(key string, items ...kit.CacheItem) (kit.CacheItem, kit.Error)
 	}
 
 	if err := item.FromString(string(content)); err != nil {
-		return nil, kit.AppError{
-			Code:     "cacheitem_fromstring_error",
-			Message:  err.Error(),
-			Errors:   []error{err},
-			Internal: true,
-		}
+		return nil, apperror.Wrap(err, "cacheitem_fromstring_error")
 	}
 
 	// Return nil if item is expired.
@@ -203,7 +173,7 @@ func (fs *Fs) Get(key string, items ...kit.CacheItem) (kit.CacheItem, kit.Error)
 	return item, nil
 }
 
-func (fs *Fs) GetString(key string) (string, kit.Error) {
+func (fs *Fs) GetString(key string) (string, apperror.Error) {
 	item, err := fs.Get(key)
 	if err != nil {
 		return "", err
@@ -220,11 +190,11 @@ func (fs *Fs) GetString(key string) (string, kit.Error) {
 }
 
 // Delete item from the cache.
-func (fs *Fs) Delete(keys ...string) kit.Error {
+func (fs *Fs) Delete(keys ...string) apperror.Error {
 	for _, rawKey := range keys {
 		key := fs.key(rawKey)
 		if key == "" {
-			return kit.AppError{Code: "empty_key"}
+			return apperror.New("empty_key")
 		}
 
 		exists, err := utils.FileExists(fs.keyPath(key))
@@ -233,11 +203,7 @@ func (fs *Fs) Delete(keys ...string) kit.Error {
 		}
 		if exists {
 			if err := os.Remove(fs.keyPath(key)); err != nil {
-				return kit.AppError{
-					Code:     "file_delete_error",
-					Message:  err.Error(),
-					Internal: true,
-				}
+				return apperror.Wrap(err, "file_delete_error")
 			}
 		}
 
@@ -247,11 +213,7 @@ func (fs *Fs) Delete(keys ...string) kit.Error {
 		}
 		if exists {
 			if err := os.Remove(fs.keyMetaPath(key)); err != nil {
-				return kit.AppError{
-					Code:     "file_delete_error",
-					Message:  err.Error(),
-					Internal: true,
-				}
+				return apperror.Wrap(err, "file_delete_error")
 			}
 		}
 	}
@@ -259,7 +221,7 @@ func (fs *Fs) Delete(keys ...string) kit.Error {
 	return nil
 }
 
-func (fs *Fs) Keys() ([]string, kit.Error) {
+func (fs *Fs) Keys() ([]string, apperror.Error) {
 	files, err := utils.ListFiles(fs.path)
 	if err != nil {
 		return nil, err
@@ -275,7 +237,7 @@ func (fs *Fs) Keys() ([]string, kit.Error) {
 	return keys, nil
 }
 
-func (fs *Fs) KeysByTags(tags ...string) ([]string, kit.Error) {
+func (fs *Fs) KeysByTags(tags ...string) ([]string, apperror.Error) {
 	allKeys, err := fs.Keys()
 	if err != nil {
 		return nil, err
@@ -299,7 +261,7 @@ func (fs *Fs) KeysByTags(tags ...string) ([]string, kit.Error) {
 }
 
 // Clear all items from the cache.
-func (fs *Fs) Clear() kit.Error {
+func (fs *Fs) Clear() apperror.Error {
 	keys, err := fs.Keys()
 	if err != nil {
 		return err
@@ -309,7 +271,7 @@ func (fs *Fs) Clear() kit.Error {
 }
 
 // Clean up all expired entries.
-func (fs *Fs) Cleanup() kit.Error {
+func (fs *Fs) Cleanup() apperror.Error {
 	keys, err := fs.Keys()
 	if err != nil {
 		return err
@@ -336,7 +298,7 @@ func (fs *Fs) Cleanup() kit.Error {
 }
 
 // Clear all items with the specified tags.
-func (fs *Fs) ClearTag(tag string) kit.Error {
+func (fs *Fs) ClearTag(tag string) apperror.Error {
 	keys, err := fs.KeysByTags(tag)
 	if err != nil {
 		return err

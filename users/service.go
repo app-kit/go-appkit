@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 	"github.com/twinj/uuid"
 
@@ -190,7 +191,7 @@ func (u *Service) SetPermissionResource(x kit.Resource) {
 	u.Permissions = x
 }
 
-func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserToken, kit.Error) {
+func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserToken, apperror.Error) {
 	token := uuid.NewV4().String()
 
 	tokenItem := s.Tokens.CreateModel().(kit.UserToken)
@@ -199,16 +200,16 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 	tokenItem.SetUserID(userId)
 
 	if err := s.Tokens.Create(tokenItem, nil); err != nil {
-		return nil, kit.WrapError(err, "token_create_error", "Could not save token to database")
+		return nil, apperror.Wrap(err, "token_create_error", "Could not save token to database")
 	}
 
 	return tokenItem, nil
 }
 
-func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[string]interface{}) kit.Error {
+func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[string]interface{}) apperror.Error {
 	adaptor := s.AuthAdaptor(adaptorName)
 	if adaptor == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "unknown_auth_adaptor",
 			Message: fmt.Sprintf("Auth adaptor %v was not registered with user service", adaptorName),
 		}
@@ -216,7 +217,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 
 	authItem, err := adaptor.RegisterUser(user, authData)
 	if err != nil {
-		return kit.WrapError(err, "adaptor_error", "")
+		return apperror.Wrap(err, "adaptor_error", "")
 	}
 
 	if user.GetUsername() == "" {
@@ -229,7 +230,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 	if err2 != nil {
 		return err2
 	} else if oldUser != nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "user_exists",
 			Message: "A user with the username or email already exists",
 		}
@@ -260,7 +261,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 		authItemUserId.SetUserID(user.GetID())
 	}
 	if err := s.Users.Backend().Create(authItem); err != nil {
-		return kit.WrapError(err, "auth_item_create_error", "")
+		return apperror.Wrap(err, "auth_item_create_error", "")
 	}
 
 	if err := s.SendConfirmationEmail(user); err != nil {
@@ -270,12 +271,12 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 	return nil
 }
 
-func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
+func (s *Service) SendConfirmationEmail(user kit.User) apperror.Error {
 	// Check that an email service is configured.
 
 	mailService := s.deps.EmailService()
 	if mailService == nil {
-		return kit.AppError{Code: "no_email_service"}
+		return apperror.New("no_email_service")
 	}
 
 	conf := s.deps.Config()
@@ -296,15 +297,14 @@ func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
 
 	confirmationPath := conf.UString("users.emailConfirmationPath")
 	if confirmationPath == "" {
-		return kit.AppError{
-			Code:     "no_email_confirmation_path",
-			Message:  "Config must specify users.emailConfirmationPath",
-			Internal: true,
+		return &apperror.Err{
+			Code:    "no_email_confirmation_path",
+			Message: "Config must specify users.emailConfirmationPath",
 		}
 	}
 
 	if !strings.Contains(confirmationPath, "{token}") {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "invalid_email_confirmation_path",
 			Message: "users.emailConfirmationPath does not contain {token} placeholder",
 		}
@@ -323,23 +323,23 @@ func (s *Service) SendConfirmationEmail(user kit.User) kit.Error {
 		// Check that a template engine is configured.
 		engine := s.deps.TemplateEngine()
 		if engine == nil {
-			return kit.AppError{Code: "no_template_engine"}
+			return apperror.New("no_template_engine")
 		}
 
 		data := map[string]interface{}{
 			"user":  user,
 			"token": token,
 		}
-		var err kit.Error
+		var err apperror.Error
 
 		txtContent, err = s.deps.TemplateEngine().BuildFileAndRender(txtTpl, data)
 		if err != nil {
-			return kit.WrapError(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
+			return apperror.Wrap(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
 		}
 
 		htmlContent, err = s.deps.TemplateEngine().BuildFileAndRender(htmlTpl, data)
 		if err != nil {
-			return kit.WrapError(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
+			return apperror.Wrap(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
 		}
 	} else {
 		tpl := `Welcome to Appkit
@@ -376,26 +376,26 @@ To confirm your email address, please visit <a href="%v">this link</a>.
 	return nil
 }
 
-func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
+func (s *Service) ConfirmEmail(token string) (kit.User, apperror.Error) {
 	rawToken, err := s.Tokens.FindOne(token)
 	if err != nil {
-		return nil, kit.WrapError(err, "token_query_error", "")
+		return nil, apperror.Wrap(err, "token_query_error", "")
 	}
 	if rawToken == nil {
-		return nil, kit.AppError{Code: "invalid_token"}
+		return nil, apperror.New("invalid_token")
 	}
 
 	tokenItem := rawToken.(kit.UserToken)
 	if !tokenItem.IsValid() {
-		return nil, kit.AppError{Code: "expired_token"}
+		return nil, apperror.New("expired_token")
 	}
 
 	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
 	if err != nil {
-		return nil, kit.WrapError(err, "user_query_error", "")
+		return nil, apperror.Wrap(err, "user_query_error", "")
 	}
 	if rawUser == nil {
-		return nil, kit.AppError{Code: "invalid_user"}
+		return nil, apperror.New("invalid_user")
 	}
 
 	user := rawUser.(kit.User)
@@ -407,7 +407,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
 		q := s.Tokens.Q().Filter("user_id", userId).Filter("type", "email_confirmation")
 		s.Tokens.Backend().DeleteMany(q)
 
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "email_already_confirmed",
 			Message: "The email is already confirmed",
 		}
@@ -415,7 +415,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
 
 	user.SetIsEmailConfirmed(true)
 	if err := s.Users.Backend().Update(user); err != nil {
-		return nil, kit.WrapError(err, "user_persist_error", "")
+		return nil, apperror.Wrap(err, "user_persist_error", "")
 	}
 
 	// Delete tokens.
@@ -431,12 +431,12 @@ func (s *Service) ConfirmEmail(token string) (kit.User, kit.Error) {
 	return user, nil
 }
 
-func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
+func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 	// Check that an email service is configured.
 
 	mailService := s.deps.EmailService()
 	if mailService == nil {
-		return kit.AppError{Code: "no_email_service"}
+		return apperror.New("no_email_service")
 	}
 
 	hoursValid := 48
@@ -455,15 +455,14 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 
 	resetPath := conf.UString("users.passwordResetPath")
 	if resetPath == "" {
-		return kit.AppError{
-			Code:     "no_password_reset_path",
-			Message:  "Config must specify users.passwordResetPath",
-			Internal: true,
+		return &apperror.Err{
+			Code:    "no_password_reset_path",
+			Message: "Config must specify users.passwordResetPath",
 		}
 	}
 
 	if !strings.Contains(resetPath, "{token}") {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "invalid_password_reset_path",
 			Message: "users.passwordResetPath does not contain {token} placeholder",
 		}
@@ -482,7 +481,7 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 		// Check that a template engine is configured.
 		engine := s.deps.TemplateEngine()
 		if engine == nil {
-			return kit.AppError{Code: "no_template_engine"}
+			return apperror.New("no_template_engine")
 		}
 
 		data := map[string]interface{}{
@@ -490,16 +489,16 @@ func (s *Service) SendPasswordResetEmail(user kit.User) kit.Error {
 			"token":       token,
 			"hours_valid": hoursValid,
 		}
-		var err kit.Error
+		var err apperror.Error
 
 		txtContent, err = s.deps.TemplateEngine().BuildFileAndRender(txtTpl, data)
 		if err != nil {
-			return kit.WrapError(err, "password_reset_tpl_error", "Could not render password reset tpl")
+			return apperror.Wrap(err, "password_reset_tpl_error", "Could not render password reset tpl")
 		}
 
 		htmlContent, err = s.deps.TemplateEngine().BuildFileAndRender(htmlTpl, data)
 		if err != nil {
-			return kit.WrapError(err, "password_reset_tpl_error", "Could not render password reset tpl")
+			return apperror.Wrap(err, "password_reset_tpl_error", "Could not render password reset tpl")
 		}
 	} else {
 		tpl := `Password reset
@@ -538,10 +537,10 @@ The link will be valid for %v hours.
 	return nil
 }
 
-func (s *Service) ChangePassword(user kit.User, newPassword string) kit.Error {
+func (s *Service) ChangePassword(user kit.User, newPassword string) apperror.Error {
 	adaptor := s.AuthAdaptor("password")
 	if adaptor == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "no_password_adaptor",
 			Message: "The UserService does not have the password auth adaptor",
 		}
@@ -556,26 +555,26 @@ func (s *Service) ChangePassword(user kit.User, newPassword string) kit.Error {
 	return nil
 }
 
-func (s *Service) ResetPassword(token, newPassword string) (kit.User, kit.Error) {
+func (s *Service) ResetPassword(token, newPassword string) (kit.User, apperror.Error) {
 	rawToken, err := s.Tokens.FindOne(token)
 	if err != nil {
-		return nil, kit.WrapError(err, "token_query_error", "")
+		return nil, apperror.Wrap(err, "token_query_error", "")
 	}
 	if rawToken == nil {
-		return nil, kit.AppError{Code: "invalid_token"}
+		return nil, apperror.New("invalid_token")
 	}
 
 	tokenItem := rawToken.(kit.UserToken)
 	if !tokenItem.IsValid() {
-		return nil, kit.AppError{Code: "expired_token"}
+		return nil, apperror.New("expired_token")
 	}
 
 	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
 	if err != nil {
-		return nil, kit.WrapError(err, "user_query_error", "")
+		return nil, apperror.Wrap(err, "user_query_error", "")
 	}
 	if rawUser == nil {
-		return nil, kit.AppError{Code: "invalid_user"}
+		return nil, apperror.New("invalid_user")
 	}
 	user := rawUser.(kit.User)
 
@@ -594,10 +593,10 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, kit.Error)
 	return user, nil
 }
 
-func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data map[string]interface{}) (kit.User, kit.Error) {
+func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data map[string]interface{}) (kit.User, apperror.Error) {
 	authAdaptor := h.AuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_auth_adaptor",
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
@@ -607,18 +606,18 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 		userId = user.GetStrID()
 	}
 
-	var err kit.Error
+	var err apperror.Error
 	userId, err = authAdaptor.Authenticate(userId, data)
 	if err != nil {
-		return nil, kit.WrapError(err, "adaptor_error", "")
+		return nil, apperror.Wrap(err, "adaptor_error", "")
 	}
 
 	if user == nil {
 		rawUser, err := h.Users.FindOne(userId)
 		if err != nil {
-			return nil, kit.WrapError(err, "user_query_error", "")
+			return nil, apperror.Wrap(err, "user_query_error", "")
 		} else if rawUser == nil {
-			return nil, kit.AppError{
+			return nil, &apperror.Err{
 				Code:    "user_not_found",
 				Message: fmt.Sprintf("User with id %v could not be found", userId),
 			}
@@ -627,19 +626,19 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 	}
 
 	if !user.IsActive() {
-		return nil, kit.AppError{Code: "user_inactive"}
+		return nil, apperror.New("user_inactive")
 	}
 
 	return user, nil
 }
 
-func (h *Service) VerifySession(token string) (kit.User, kit.Session, kit.Error) {
+func (h *Service) VerifySession(token string) (kit.User, kit.Session, apperror.Error) {
 	rawSession, err := h.Sessions.FindOne(token)
 	if err != nil {
 		return nil, nil, err
 	}
 	if rawSession == nil {
-		return nil, nil, kit.AppError{Code: "session_not_found"}
+		return nil, nil, apperror.New("session_not_found")
 	}
 	session := rawSession.(kit.Session)
 
@@ -651,11 +650,11 @@ func (h *Service) VerifySession(token string) (kit.User, kit.Session, kit.Error)
 	user := rawUser.(kit.User)
 
 	if !user.IsActive() {
-		return nil, nil, kit.AppError{Code: "user_inactive"}
+		return nil, nil, apperror.New("user_inactive")
 	}
 
 	if session.GetValidUntil().Sub(time.Now()) < 1 {
-		return nil, nil, kit.AppError{Code: "session_expired"}
+		return nil, nil, apperror.New("session_expired")
 	}
 
 	// Prolong session

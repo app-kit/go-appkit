@@ -5,6 +5,8 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+
+	"github.com/theduke/go-apperror"
 )
 
 type AppRequest struct {
@@ -89,9 +91,9 @@ func (r *AppRequest) SetHttpResponseWriter(writer http.ResponseWriter) {
 	r.HttpResponseWriter = writer
 }
 
-func (r *AppRequest) ReadHtmlBody() Error {
+func (r *AppRequest) ReadHtmlBody() apperror.Error {
 	if r.HttpRequest == nil {
-		return AppError{Code: "no_http_request"}
+		return apperror.New("no_http_request")
 	}
 
 	if r.HttpRequest.Body == nil {
@@ -102,16 +104,16 @@ func (r *AppRequest) ReadHtmlBody() Error {
 	defer r.HttpRequest.Body.Close()
 	body, err := ioutil.ReadAll(r.HttpRequest.Body)
 	if err != nil {
-		return WrapError(err, "http_body_read_error", "Could not read http body")
+		return apperror.Wrap(err, "http_body_read_error", "Could not read http body")
 	}
 
 	r.RawData = body
 	return nil
 }
 
-func (r *AppRequest) ParseJsonData() Error {
+func (r *AppRequest) ParseJsonData() apperror.Error {
 	if r.RawData == nil {
-		return AppError{Code: "no_raw_data"}
+		return apperror.New("no_raw_data")
 	}
 
 	if string(r.RawData) == "" {
@@ -123,7 +125,7 @@ func (r *AppRequest) ParseJsonData() Error {
 	allData := make(map[string]interface{})
 
 	if err := json.Unmarshal(r.RawData, &allData); err != nil {
-		return WrapError(err, "invalid_json_body", "JSON in body could not be unmarshalled")
+		return apperror.Wrap(err, "invalid_json_body", "JSON in body could not be unmarshalled")
 	}
 
 	if rawData, ok := allData["data"]; ok {
@@ -140,7 +142,7 @@ func (r *AppRequest) ParseJsonData() Error {
 }
 
 type AppResponse struct {
-	Error      Error
+	Error      apperror.Error
 	HttpStatus int
 
 	Meta map[string]interface{}
@@ -150,7 +152,7 @@ type AppResponse struct {
 	RawDataReader io.ReadCloser
 }
 
-func (r *AppResponse) GetError() Error {
+func (r *AppResponse) GetError() apperror.Error {
 	return r.Error
 }
 
@@ -196,7 +198,7 @@ func (r *AppResponse) SetRawDataReader(reader io.ReadCloser) {
 
 func NewErrorResponse(code, message string) *AppResponse {
 	return &AppResponse{
-		Error: AppError{Code: code, Message: message},
+		Error: apperror.New(code, message),
 	}
 }
 

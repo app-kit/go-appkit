@@ -12,6 +12,7 @@ import (
 	"github.com/olebedev/config"
 	"github.com/spf13/cobra"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -464,9 +465,9 @@ func (a *App) RegisterMethod(method kit.Method) {
 	a.methods[method.Name()] = method
 }
 
-func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, kit.Error) {
+func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, apperror.Error) {
 	if r.GetSession() == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "no_session",
 			Message: "Can't run a method without a session",
 		}
@@ -474,7 +475,7 @@ func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response)
 
 	method := a.methods[name]
 	if method == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_method",
 			Message: fmt.Sprintf("The method %v does not exist", name),
 		}
@@ -637,11 +638,11 @@ func (a *App) RegisterHttpHandler(method, path string, handler kit.RequestHandle
  * Migrations and Backend functionality.
  */
 
-func (a *App) MigrateBackend(name string, version int, force bool) kit.Error {
+func (a *App) MigrateBackend(name string, version int, force bool) apperror.Error {
 	a.Logger().Infof("MIGRATE: Migrating backend '%v'", name)
 	backend := a.Backend(name)
 	if backend == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "unknown_backend",
 			Message: fmt.Sprint("The backend '%v' does not exist", name),
 		}
@@ -649,7 +650,7 @@ func (a *App) MigrateBackend(name string, version int, force bool) kit.Error {
 
 	migrationBackend, ok := backend.(db.MigrationBackend)
 	if !ok {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "backend_cant_migrate",
 			Message: fmt.Sprintf("The backend '%v' does not support migrations", name),
 		}
@@ -664,7 +665,7 @@ func (a *App) MigrateBackend(name string, version int, force bool) kit.Error {
 	return nil
 }
 
-func (a *App) MigrateAllBackends(force bool) kit.Error {
+func (a *App) MigrateAllBackends(force bool) apperror.Error {
 	a.Logger().Infof("MIGRATE: Migrating all backends to newest version")
 	backends := a.deps.Backends()
 	for key := range backends {
@@ -676,7 +677,7 @@ func (a *App) MigrateAllBackends(force bool) kit.Error {
 	return nil
 }
 
-func (a *App) DropBackend(name string) kit.Error {
+func (a *App) DropBackend(name string) apperror.Error {
 	b := a.Backend(name)
 	if b == nil {
 		a.Logger().Panicf("Unknown backend %v", name)
@@ -692,7 +693,7 @@ func (a *App) DropBackend(name string) kit.Error {
 	return nil
 }
 
-func (a *App) DropAllBackends() kit.Error {
+func (a *App) DropAllBackends() apperror.Error {
 	a.Logger().Infof("Dropping all backends")
 	for name := range a.deps.Backends() {
 		if err := a.DropBackend(name); err != nil {
@@ -703,7 +704,7 @@ func (a *App) DropAllBackends() kit.Error {
 	return nil
 }
 
-func (a *App) RebuildBackend(name string) kit.Error {
+func (a *App) RebuildBackend(name string) apperror.Error {
 	b := a.Backend(name)
 	if b == nil {
 		a.Logger().Panicf("Unknown backend %v", name)
@@ -717,16 +718,13 @@ func (a *App) RebuildBackend(name string) kit.Error {
 
 	if err := a.MigrateBackend(name, 0, false); err != nil {
 		a.Logger().Errorf("Migration failed: %v", err)
-		return kit.AppError{
-			Code:    "backend_migration_failed",
-			Message: err.Error(),
-		}
+		return apperror.Wrap(err, "backend_migration_failed")
 	}
 
 	return nil
 }
 
-func (a *App) RebuildAllBackends() kit.Error {
+func (a *App) RebuildAllBackends() apperror.Error {
 	a.Logger().Infof("Rebuilding all backends")
 	for key := range a.deps.Backends() {
 		if err := a.RebuildBackend(key); err != nil {

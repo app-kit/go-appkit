@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -104,18 +105,18 @@ func (m *methodQueue) CountAddedSince(seconds int) int {
 	return count
 }
 
-func (m *methodQueue) Add(method *methodInstance) kit.Error {
+func (m *methodQueue) Add(method *methodInstance) apperror.Error {
 	m.lastAction = time.Now()
 
 	if len(m.queue) >= m.maxQueued {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "max_methods_queued",
 			Message: "The maximum amount of methods is already running",
 		}
 	}
 
 	if m.CountAddedSince(60) >= m.maxPerMinute {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "max_methods_per_minute",
 			Message: "You have reached the maximum methods/minute limit.",
 		}
@@ -290,7 +291,7 @@ func NewSessionManager(app *App) *SessionManager {
 	}
 }
 
-func (m *SessionManager) QueueMethod(session kit.Session, method *methodInstance) kit.Error {
+func (m *SessionManager) QueueMethod(session kit.Session, method *methodInstance) apperror.Error {
 	queue := m.queues[session]
 	if queue == nil {
 		m.Lock()
@@ -331,7 +332,7 @@ type ResourceMethodData struct {
 	Query    db.Query
 }
 
-func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodData, kit.Error) {
+func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodData, apperror.Error) {
 	if data, ok := rawData.(ResourceMethodData); ok {
 		return &data, nil
 	}
@@ -339,7 +340,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 
 	data, ok := rawData.(map[string]interface{})
 	if !ok {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "invalid_data_map_expected",
 			Message: "Data must contain a map/dict",
 		}
@@ -348,7 +349,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 	// Try to build model objects.
 	resourceName, _ := data["resource"].(string)
 	if resourceName == "" {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "resource_missing",
 			Message: "Data must contain a 'resource' key",
 		}
@@ -356,7 +357,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 
 	resource := app.Resource(resourceName)
 	if resource == nil {
-		return nil, kit.AppError{
+		return nil, &apperror.Err{
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource %v is not registered", resourceName),
 		}
@@ -368,7 +369,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 		for index, rawId := range rawIds {
 			id, ok := rawId.(string)
 			if !ok {
-				return nil, kit.AppError{
+				return nil, &apperror.Err{
 					Code:    "invalid_id",
 					Message: fmt.Sprintf("The %vth id '%v' must be a string", index, rawId),
 				}
@@ -390,7 +391,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 			// Try to unmarshal the data.
 			rawObjects, ok := data["objects"].([]interface{})
 			if !ok {
-				return nil, kit.AppError{
+				return nil, &apperror.Err{
 					Code:    "invalid_object_data",
 					Message: "Expected array in key 'objects'",
 				}
@@ -399,20 +400,13 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 			for index, rawObj := range rawObjects {
 				js, err := json.Marshal(rawObj)
 				if err != nil {
-					return nil, kit.AppError{
-						Code:    "json_error",
-						Message: err.Error(),
-						Errors:  []error{err},
-					}
+					return nil, apperror.Wrap(err, "json_error")
 				}
 
 				model := resource.CreateModel()
 				if err := json.Unmarshal(js, model); err != nil {
-					return nil, kit.AppError{
-						Code:    "json_unmarshal_error",
-						Message: fmt.Sprintf("Could not unmarshal model %v: %v", index, err),
-						Errors:  []error{err},
-					}
+					return nil, apperror.Wrap(err, "json_unmarshal_error",
+						fmt.Sprintf("Could not unmarshal model %v", index))
 				}
 
 				methodData.Objects = append(methodData.Objects, model)
@@ -424,11 +418,7 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 	if rawQuery, ok := data["query"].(map[string]interface{}); ok {
 		query, err := db.ParseQuery(resourceName, rawQuery)
 		if err != nil {
-			return nil, kit.AppError{
-				Code:    "invalid_query",
-				Message: fmt.Sprintf("Error while parsing query: %v", err),
-				Errors:  []error{err},
-			}
+			return nil, apperror.Wrap(err, "invalid_query")
 		}
 		methodData.Query = query
 	}

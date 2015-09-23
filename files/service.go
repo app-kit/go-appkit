@@ -7,6 +7,8 @@ import (
 	"os"
 	"strings"
 
+	"github.com/theduke/go-apperror"
+
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/files/backends/fs"
 	"github.com/theduke/go-appkit/resources"
@@ -105,9 +107,9 @@ func (h *FileService) SetModel(x interface{}) {
 	h.model = x
 }
 
-func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, deleteDir bool) kit.Error {
+func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, deleteDir bool) apperror.Error {
 	if h.DefaultBackend == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "no_default_backend",
 			Message: "Cant build a file without a default backend.",
 		}
@@ -119,14 +121,14 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 
 	backend := h.Backend(file.GetBackendName())
 	if backend == nil {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "unknown_backend",
 			Message: fmt.Sprintf("The backend %v does not exist", file.GetBackendName()),
 		}
 	}
 
 	if file.GetBucket() == "" {
-		return kit.AppError{
+		return &apperror.Err{
 			Code:    "missing_bucket",
 			Message: "Bucket must be set on the file",
 		}
@@ -135,21 +137,18 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 	stat, err := os.Stat(filePath)
 	if err != nil {
 		if err == os.ErrNotExist {
-			return kit.AppError{
+			return &apperror.Err{
 				Code:    "file_not_found",
 				Message: fmt.Sprintf("File %v does not exist", filePath),
 			}
 		}
 
-		return kit.AppError{
-			Code:    "stat_error",
-			Message: fmt.Sprintf("Could not get file stats for file at %v: %v", filePath, err),
-			Errors:  []error{err},
-		}
+		return apperror.Wrap(err, "stat_error",
+			fmt.Sprintf("Could not get file stats for file at %v: %v", filePath, err))
 	}
 
 	if stat.IsDir() {
-		return kit.AppError{Code: "path_is_directory"}
+		return apperror.New("path_is_directory")
 	}
 
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
@@ -185,29 +184,20 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 	// Store the file in the backend.
 	backendId, writer, err2 := file.Writer(true)
 	if err2 != nil {
-		return kit.AppError{
-			Code:    "backend_error",
-			Message: err2.Error(),
-		}
+		return apperror.Wrap(err2, "backend_error")
 	}
 	defer writer.Close()
 
 	// Open file for reading.
 	f, err := os.Open(filePath)
 	if err != nil {
-		return kit.AppError{
-			Code:    "read_error",
-			Message: fmt.Sprintf("Could not read file at %v", filePath),
-		}
+		return apperror.Wrap(err, "read_error", fmt.Sprintf("Could not read file at %v", filePath))
 	}
 
 	_, err = io.Copy(writer, f)
 	if err != nil {
 		f.Close()
-		return kit.AppError{
-			Code:    "copy_to_backend_failed",
-			Message: err.Error(),
-		}
+		return apperror.Wrap(err, "copy_to_backend_failed")
 	}
 	f.Close()
 
@@ -219,11 +209,7 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 	if err2 != nil {
 		// Delete file from backend again.
 		backend.DeleteFile(file)
-		return kit.AppError{
-			Code:    "db_error",
-			Message: fmt.Sprintf("Could not save file to database: %v\n", err2),
-			Errors:  []error{err2},
-		}
+		return apperror.Wrap(err2, "db_error", "Could not save file to database")
 	}
 
 	// Delete tmp file.
@@ -243,7 +229,7 @@ func (h *FileService) New() kit.File {
 	return f
 }
 
-func (h *FileService) FindOne(id string) (kit.File, kit.Error) {
+func (h *FileService) FindOne(id string) (kit.File, apperror.Error) {
 	file, err := h.resource.FindOne(id)
 	if err != nil {
 		return nil, err
@@ -263,7 +249,7 @@ func (h *FileService) FindOne(id string) (kit.File, kit.Error) {
 	}
 }
 
-func (h *FileService) Find(q db.Query) ([]kit.File, kit.Error) {
+func (h *FileService) Find(q db.Query) ([]kit.File, apperror.Error) {
 	rawFiles, err := h.resource.Query(q)
 	if err != nil {
 		return nil, err
@@ -286,14 +272,14 @@ func (h *FileService) Find(q db.Query) ([]kit.File, kit.Error) {
 	return files, nil
 }
 
-func (h *FileService) Create(f kit.File, u kit.User) kit.Error {
+func (h *FileService) Create(f kit.File, u kit.User) apperror.Error {
 	return h.resource.Create(f, u)
 }
 
-func (h *FileService) Update(f kit.File, u kit.User) kit.Error {
+func (h *FileService) Update(f kit.File, u kit.User) apperror.Error {
 	return h.resource.Update(f, u)
 }
 
-func (h *FileService) Delete(f kit.File, u kit.User) kit.Error {
+func (h *FileService) Delete(f kit.File, u kit.User) apperror.Error {
 	return h.resource.Delete(f, u)
 }

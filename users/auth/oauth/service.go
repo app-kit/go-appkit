@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"strings"
 
-	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-apperror"
 )
 
 type Service interface {
@@ -20,9 +20,9 @@ type Service interface {
 	GetExchangeUrl(token string) string
 	GetEndpointUrl() string
 
-	Exchange(token string) (string, kit.Error)
+	Exchange(token string) (string, apperror.Error)
 	GetClient(token string) Client
-	GetUserData(token string) (*UserData, kit.Error)
+	GetUserData(token string) (*UserData, apperror.Error)
 }
 
 type BaseService struct {
@@ -59,20 +59,20 @@ func (s *BaseService) GetEndpointUrl() string {
 	return s.EndpointUrl
 }
 
-func exchangeToken(url string) (string, kit.Error) {
+func exchangeToken(url string) (string, apperror.Error) {
 	resp, err := http.Get(url)
 	if err != nil {
-		return "", kit.WrapError(err, "http_error", "")
+		return "", apperror.Wrap(err, "http_error", "")
 	}
 
 	if resp.Body == nil {
-		return "", kit.AppError{Code: "http_no_body"}
+		return "", apperror.New("http_no_body")
 	}
 	defer resp.Body.Close()
 
 	content, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return "", kit.WrapError(err, "body_read_error", "")
+		return "", apperror.Wrap(err, "body_read_error", "")
 	}
 
 	return strings.TrimSpace(string(content)), nil
@@ -121,7 +121,7 @@ func (s *Facebook) GetExchangeUrl(token string) string {
 	return exchangeUrl
 }
 
-func (s *Facebook) Exchange(token string) (string, kit.Error) {
+func (s *Facebook) Exchange(token string) (string, apperror.Error) {
 	data, err := exchangeToken(s.GetExchangeUrl(token))
 	if err != nil {
 		return "", err
@@ -129,18 +129,18 @@ func (s *Facebook) Exchange(token string) (string, kit.Error) {
 
 	vals, err2 := url.ParseQuery(data)
 	if err2 != nil {
-		return "", kit.WrapError(err, "body_parse_error", "")
+		return "", apperror.Wrap(err, "body_parse_error", "")
 	}
 
 	appToken := vals.Get("access_token")
 	if appToken == "" {
-		return "", kit.AppError{Code: "no_access_token_in_response"}
+		return "", apperror.New("no_access_token_in_response")
 	}
 
 	return appToken, nil
 }
 
-func (s *Facebook) GetUserData(token string) (*UserData, kit.Error) {
+func (s *Facebook) GetUserData(token string) (*UserData, apperror.Error) {
 	c := s.GetClient(token)
 	_, data, err := c.Do("GET", "/me", nil)
 	if err != nil {

@@ -61,7 +61,7 @@ var _ = Describe("Json", func() {
 
 	It("Should convert internal error", func() {
 		resp := &kit.AppResponse{
-			Error: kit.AppError{Code: "err", Message: "errmsg", Internal: true},
+			Error: kit.AppError{Code: "err", Message: "errmsg"},
 		}
 
 		convertedResp := ConvertResponse(backend, resp)

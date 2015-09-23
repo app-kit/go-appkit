@@ -8,6 +8,7 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/olebedev/config"
+	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 )
 
@@ -85,8 +86,8 @@ type User interface {
 	SetProfile(UserProfile)
 	GetProfile() UserProfile
 
-	GetData() (interface{}, Error)
-	SetData(interface{}) Error
+	GetData() (interface{}, apperror.Error)
+	SetData(interface{}) apperror.Error
 
 	GetRoles() []Role
 	AddRole(Role)
@@ -136,12 +137,12 @@ type AuthAdaptor interface {
 	Backend() db.Backend
 	SetBackend(db.Backend)
 
-	RegisterUser(user User, data map[string]interface{}) (AuthItem, Error)
+	RegisterUser(user User, data map[string]interface{}) (AuthItem, apperror.Error)
 
 	// Authenticate  a user based on data map, and return userID or an error.
 	// The userID argument may be an empty string if the adaptor has to
 	// map the userID.
-	Authenticate(userID string, data map[string]interface{}) (string, Error)
+	Authenticate(userID string, data map[string]interface{}) (string, apperror.Error)
 }
 
 /**
@@ -156,7 +157,7 @@ type Request interface {
 	GetRawData() []byte
 
 	// Parse json contained in RawData and extract data and meta.
-	ParseJsonData() Error
+	ParseJsonData() apperror.Error
 
 	GetUser() User
 	SetUser(User)
@@ -167,14 +168,14 @@ type Request interface {
 	GetHttpRequest() *http.Request
 	SetHttpRequest(request *http.Request)
 
-	ReadHtmlBody() Error
+	ReadHtmlBody() apperror.Error
 
 	GetHttpResponseWriter() http.ResponseWriter
 	SetHttpResponseWriter(writer http.ResponseWriter)
 }
 
 type Response interface {
-	GetError() Error
+	GetError() apperror.Error
 
 	GetHttpStatus() int
 	SetHttpStatus(int)
@@ -214,8 +215,8 @@ type CacheItem interface {
 	GetValue() interface{}
 	SetValue(interface{})
 
-	ToString() (string, Error)
-	FromString(string) Error
+	ToString() (string, apperror.Error)
+	FromString(string) apperror.Error
 
 	GetExpiresAt() time.Time
 	SetExpiresAt(time.Time)
@@ -230,30 +231,30 @@ type Cache interface {
 	SetName(string)
 
 	// Save a new item into the cache.
-	Set(CacheItem) Error
-	SetString(key string, value string, expiresAt *time.Time, tags []string) Error
+	Set(CacheItem) apperror.Error
+	SetString(key string, value string, expiresAt *time.Time, tags []string) apperror.Error
 
 	// Retrieve a cache item from the cache.
-	Get(key string, item ...CacheItem) (CacheItem, Error)
-	GetString(key string) (string, Error)
+	Get(key string, item ...CacheItem) (CacheItem, apperror.Error)
+	GetString(key string) (string, apperror.Error)
 
 	// Delete item from the cache.
-	Delete(key ...string) Error
+	Delete(key ...string) apperror.Error
 
 	// Get all keys stored in the cache.
-	Keys() ([]string, Error)
+	Keys() ([]string, apperror.Error)
 
 	// Return all keys that have a certain tag.
-	KeysByTags(tag ...string) ([]string, Error)
+	KeysByTags(tag ...string) ([]string, apperror.Error)
 
 	// Clear all items from the cache.
-	Clear() Error
+	Clear() apperror.Error
 
 	// Clear all items with the specified tags.
-	ClearTag(tag string) Error
+	ClearTag(tag string) apperror.Error
 
 	// Clean up all expired entries.
-	Cleanup() Error
+	Cleanup() apperror.Error
 }
 
 /**
@@ -292,15 +293,15 @@ type Email interface {
 	AddBody(contentType string, body []byte)
 	GetBodyParts() []EmailPart
 
-	Attach(contentType string, data []byte) Error
-	AttachReader(contentType string, reader io.ReadCloser) Error
-	AttachFile(path string) Error
+	Attach(contentType string, data []byte) apperror.Error
+	AttachReader(contentType string, reader io.ReadCloser) apperror.Error
+	AttachFile(path string) apperror.Error
 
 	GetAttachments() []EmailPart
 
-	Embed(contentType string, data []byte) Error
-	EmbedReader(contentType string, reader io.ReadCloser) Error
-	EmbedFile(path string) Error
+	Embed(contentType string, data []byte) apperror.Error
+	EmbedReader(contentType string, reader io.ReadCloser) apperror.Error
+	EmbedFile(path string) apperror.Error
 
 	GetEmbeddedAttachments() []EmailPart
 
@@ -313,15 +314,15 @@ type Email interface {
  */
 
 type TemplateEngine interface {
-	Build(name string, tpl string) (interface{}, Error)
-	BuildFile(name string, paths ...string) (interface{}, Error)
+	Build(name string, tpl string) (interface{}, apperror.Error)
+	BuildFile(name string, paths ...string) (interface{}, apperror.Error)
 
 	GetTemplate(name string) interface{}
 
-	BuildAndRender(name string, tpl string, data interface{}) ([]byte, Error)
-	BuildFileAndRender(name string, data interface{}, paths ...string) ([]byte, Error)
+	BuildAndRender(name string, tpl string, data interface{}) ([]byte, apperror.Error)
+	BuildFileAndRender(name string, data interface{}, paths ...string) ([]byte, apperror.Error)
 
-	Render(name string, data interface{}) ([]byte, Error)
+	Render(name string, data interface{}) ([]byte, apperror.Error)
 
 	// Clean up all templates.
 	Clear()
@@ -364,19 +365,19 @@ type Resource interface {
 
 	Q() db.Query
 
-	Query(db.Query) ([]Model, Error)
-	FindOne(id interface{}) (Model, Error)
+	Query(db.Query) ([]Model, apperror.Error)
+	FindOne(id interface{}) (Model, apperror.Error)
 
 	ApiFindOne(string, Request) Response
 	ApiFind(db.Query, Request) Response
 
-	Create(obj Model, user User) Error
+	Create(obj Model, user User) apperror.Error
 	ApiCreate(obj Model, r Request) Response
 
-	Update(obj Model, user User) Error
+	Update(obj Model, user User) apperror.Error
 	ApiUpdate(obj Model, r Request) Response
 
-	Delete(obj Model, user User) Error
+	Delete(obj Model, user User) apperror.Error
 	ApiDelete(id string, r Request) Response
 }
 
@@ -399,12 +400,12 @@ type Service interface {
 type ResourceService interface {
 	Service
 
-	Q(modelType string) (db.Query, Error)
-	FindOne(modelType string, id string) (Model, Error)
+	Q(modelType string) (db.Query, apperror.Error)
+	FindOne(modelType string, id string) (Model, apperror.Error)
 
-	Create(Model, User) Error
-	Update(Model, User) Error
-	Delete(Model, User) Error
+	Create(Model, User) apperror.Error
+	Update(Model, User) apperror.Error
+	Delete(Model, User) apperror.Error
 }
 
 /**
@@ -433,7 +434,7 @@ type FileService interface {
 	// it will be left in the file system.
 	// If deleteDir is true, the directory holding the file will be deleted
 	// also.
-	BuildFile(file File, user User, filePath string, deleteDir bool) Error
+	BuildFile(file File, user User, filePath string, deleteDir bool) apperror.Error
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.
@@ -441,12 +442,12 @@ type FileService interface {
 	// Create a new file model.
 	New() File
 
-	FindOne(id string) (File, Error)
-	Find(db.Query) ([]File, Error)
+	FindOne(id string) (File, apperror.Error)
+	Find(db.Query) ([]File, apperror.Error)
 
-	Create(File, User) Error
-	Update(File, User) Error
-	Delete(File, User) Error
+	Create(File, User) apperror.Error
+	Update(File, User) apperror.Error
+	Delete(File, User) apperror.Error
 }
 
 /**
@@ -458,8 +459,8 @@ type EmailService interface {
 
 	SetDefaultFrom(EmailRecipient)
 
-	Send(Email) Error
-	SendMultiple(...Email) (Error, []Error)
+	Send(Email) apperror.Error
+	SendMultiple(...Email) (apperror.Error, []apperror.Error)
 }
 
 /**
@@ -487,17 +488,17 @@ type UserService interface {
 	PermissionResource() Resource
 
 	// Build a token, persist it and return it.
-	BuildToken(typ, userId string, expiresAt time.Time) (UserToken, Error)
+	BuildToken(typ, userId string, expiresAt time.Time) (UserToken, apperror.Error)
 
-	CreateUser(user User, adaptor string, data map[string]interface{}) Error
-	AuthenticateUser(user User, adaptor string, data map[string]interface{}) (User, Error)
-	VerifySession(token string) (User, Session, Error)
+	CreateUser(user User, adaptor string, data map[string]interface{}) apperror.Error
+	AuthenticateUser(user User, adaptor string, data map[string]interface{}) (User, apperror.Error)
+	VerifySession(token string) (User, Session, apperror.Error)
 
-	SendConfirmationEmail(User) Error
-	ConfirmEmail(token string) (User, Error)
+	SendConfirmationEmail(User) apperror.Error
+	ConfirmEmail(token string) (User, apperror.Error)
 
-	SendPasswordResetEmail(User) Error
-	ResetPassword(token, newPassword string) (User, Error)
+	SendPasswordResetEmail(User) apperror.Error
+	ResetPassword(token, newPassword string) (User, apperror.Error)
 }
 
 /**
@@ -567,11 +568,11 @@ type File interface {
 	// Get a reader for the file.
 	// Might return an error if the file does not exist in the backend,
 	// or it is not connected to a backend.
-	Reader() (io.ReadCloser, Error)
+	Reader() (io.ReadCloser, apperror.Error)
 
 	// Get a writer for the file.
 	// Might return an error if the file is not connected to a backend.
-	Writer(create bool) (string, io.WriteCloser, Error)
+	Writer(create bool) (string, io.WriteCloser, apperror.Error)
 }
 
 type FileBackend interface {
@@ -579,46 +580,46 @@ type FileBackend interface {
 	SetName(string)
 
 	// Lists the buckets that currently exist.
-	Buckets() ([]string, Error)
+	Buckets() ([]string, apperror.Error)
 
 	// Check if a Bucket exists.
-	HasBucket(string) (bool, Error)
+	HasBucket(string) (bool, apperror.Error)
 
 	// Create a bucket.
-	CreateBucket(string, BucketConfig) Error
+	CreateBucket(string, BucketConfig) apperror.Error
 
 	// Return the configuration for a a bucket.
 	BucketConfig(string) BucketConfig
 
 	// Change the configuration for a bucket.
-	ConfigureBucket(string, BucketConfig) Error
+	ConfigureBucket(string, BucketConfig) apperror.Error
 
 	// Delete all files in a bucket.
-	ClearBucket(bucket string) Error
+	ClearBucket(bucket string) apperror.Error
 
-	DeleteBucket(bucket string) Error
+	DeleteBucket(bucket string) apperror.Error
 
 	// Clear all buckets.
-	ClearAll() Error
+	ClearAll() apperror.Error
 
 	// Return the ids of all files in a bucket.
-	FileIDs(bucket string) ([]string, Error)
+	FileIDs(bucket string) ([]string, apperror.Error)
 
-	HasFile(File) (bool, Error)
-	HasFileById(bucket, id string) (bool, Error)
+	HasFile(File) (bool, apperror.Error)
+	HasFileById(bucket, id string) (bool, apperror.Error)
 
-	DeleteFile(File) Error
-	DeleteFileById(bucket, id string) Error
+	DeleteFile(File) apperror.Error
+	DeleteFileById(bucket, id string) apperror.Error
 
 	// Retrieve a reader for a file.
-	Reader(File) (io.ReadCloser, Error)
+	Reader(File) (io.ReadCloser, apperror.Error)
 	// Retrieve a reader for a file in a bucket.
-	ReaderById(bucket, id string) (io.ReadCloser, Error)
+	ReaderById(bucket, id string) (io.ReadCloser, apperror.Error)
 
 	// Retrieve a writer for a file in a bucket.
-	Writer(f File, create bool) (string, io.WriteCloser, Error)
+	Writer(f File, create bool) (string, io.WriteCloser, apperror.Error)
 	// Retrieve a writer for a file in a bucket.
-	WriterById(bucket, id string, create bool) (string, io.WriteCloser, Error)
+	WriterById(bucket, id string, create bool) (string, io.WriteCloser, apperror.Error)
 }
 
 /**
@@ -681,8 +682,8 @@ type Frontend interface {
 
 	Logger() *logrus.Logger
 
-	Init() Error
-	Start() Error
+	Init() apperror.Error
+	Start() apperror.Error
 }
 
 /**
@@ -718,12 +719,12 @@ type App interface {
 
 	RegisterBackend(backend db.Backend)
 	Backend(name string) db.Backend
-	MigrateBackend(name string, version int, force bool) Error
-	MigrateAllBackends(force bool) Error
-	DropBackend(name string) Error
-	DropAllBackends() Error
-	RebuildBackend(name string) Error
-	RebuildAllBackends() Error
+	MigrateBackend(name string, version int, force bool) apperror.Error
+	MigrateAllBackends(force bool) apperror.Error
+	DropBackend(name string) apperror.Error
+	DropAllBackends() apperror.Error
+	RebuildBackend(name string) apperror.Error
+	RebuildAllBackends() apperror.Error
 
 	// Cache methods.
 
@@ -753,7 +754,7 @@ type App interface {
 	// Method methods.
 
 	RegisterMethod(Method)
-	RunMethod(name string, r Request, responder func(Response), withFinishedChannel bool) (chan bool, Error)
+	RunMethod(name string, r Request, responder func(Response), withFinishedChannel bool) (chan bool, apperror.Error)
 
 	// Resource methodds.
 
