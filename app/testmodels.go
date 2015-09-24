@@ -9,7 +9,7 @@ import (
 )
 
 type Project struct {
-	db.BaseIntIDModel
+	db.IntIDModel
 	users.IntUserModel
 	govalidate.Model
 
@@ -41,7 +41,7 @@ func (t *Tag) SetID(tag string) error {
 }
 
 type Todo struct {
-	db.BaseIntIDModel
+	db.IntIDModel
 	users.IntUserModel
 
 	Name        string `db:"max:400"`

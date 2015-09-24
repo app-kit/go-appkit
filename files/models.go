@@ -170,7 +170,7 @@ func (f *File) SetHeight(x int) {
 
 type FileStrID struct {
 	File
-	db.BaseStrIDModel
+	db.StrIDModel
 	users.StrUserModel
 }
 
@@ -197,7 +197,7 @@ func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, apperror.Error)
 
 type FileIntID struct {
 	File
-	db.BaseIntIDModel
+	db.IntIDModel
 	users.IntUserModel
 }
 

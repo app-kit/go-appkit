@@ -11,7 +11,7 @@ import (
 )
 
 type AuthItemOauth struct {
-	db.BaseStrIDModel
+	db.StrIDModel
 	Service        string `db:"not-null;max:100;"`
 	UserID         string `db:"not-null;max:150;"`
 	ExternalUserID string `db:"not-null;max:100;"`

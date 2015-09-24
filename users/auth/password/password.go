@@ -25,7 +25,7 @@ func GetStringFromMap(data map[string]interface{}, field string) (string, bool) 
 
 type AuthItemPassword struct {
 	// ID serves as UserID.
-	db.BaseStrIDModel
+	db.StrIDModel
 
 	Hash string `db:"not-null;max:150"`
 }
