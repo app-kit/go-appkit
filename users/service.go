@@ -217,7 +217,7 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 }
 
 func (s *Service) FindUser(userId interface{}) (kit.User, apperror.Error) {
-	rawUser, err := s.Users.Q().Filter("id", userId).Join("Roles").First()
+	rawUser, err := s.Users.Q().Filter("id", userId).Join("Roles.Permissions").First()
 	if err != nil {
 		return nil, err
 	} else if rawUser == nil {
