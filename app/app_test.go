@@ -63,6 +63,13 @@ func (h LoggerHook) Fire(e *logrus.Entry) error {
 	return nil
 }
 
+type UserProfile struct {
+	users.IntIDUserProfile
+
+	FirstName string
+	LastName  string
+}
+
 func buildApp() kit.App {
 	app := NewApp("")
 
@@ -79,7 +86,7 @@ func buildApp() kit.App {
 
 	// Build user service.
 
-	userService := users.NewService(nil, backend, nil)
+	userService := users.NewService(nil, backend, &UserProfile{})
 	app.RegisterUserService(userService)
 
 	// Register facebook oauth service.
@@ -198,7 +205,13 @@ var _ = Describe("App", func() {
 			It("Should create user with password auth", func() {
 				js := `{
 					"data": {"attributes": {"email": "user1@appkit.com"}},
-					"meta": {"adaptor": "password", "auth-data": {"password": "test"}}
+					"meta": {
+						"adaptor": "password", "auth-data": {"password": "test"},
+						"profile": {
+							"firstName": "First",
+							"lastName": "Last"
+						}
+					}
 				}
 				`
 				status, _, err := client.PostJson("/api/users", js)
@@ -209,7 +222,20 @@ var _ = Describe("App", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(rawUser).ToNot(BeNil())
 
-				user := rawUser.(kit.User)
+				plainUser := rawUser.(kit.User)
+
+				// Find full user data with profile and roles.
+				user, err := app.UserService().FindUser(plainUser.GetID())
+				Expect(err).ToNot(HaveOccurred())
+				Expect(user).ToNot(BeNil())
+
+				// Check that user profile was properly created.
+				rawProfile := user.GetProfile()
+				Expect(rawProfile).ToNot(BeNil())
+
+				profile := rawProfile.(*UserProfile)
+				Expect(profile.FirstName).To(Equal("First"))
+				Expect(profile.LastName).To(Equal("Last"))
 
 				// Check that confirmation email was sent.
 				logEntry := logMessages[len(logMessages)-3]

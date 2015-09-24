@@ -24,13 +24,12 @@ type Service struct {
 	backend db.Backend
 
 	Users    kit.Resource
+	Profiles kit.Resource
 	Sessions kit.Resource
 	Tokens   kit.Resource
 
 	Roles       kit.Resource
 	Permissions kit.Resource
-
-	profileModel kit.UserProfile
 
 	AuthAdaptors map[string]kit.AuthAdaptor
 }
@@ -40,8 +39,7 @@ var _ kit.UserService = (*Service)(nil)
 
 func NewService(deps kit.Dependencies, backend db.Backend, profileModel kit.UserProfile) *Service {
 	h := Service{
-		deps:         deps,
-		profileModel: profileModel,
+		deps: deps,
 	}
 
 	h.AuthAdaptors = make(map[string]kit.AuthAdaptor)
@@ -57,10 +55,13 @@ func NewService(deps kit.Dependencies, backend db.Backend, profileModel kit.User
 	} else {
 		userModel = &UserIntID{}
 	}
-	users := resources.NewResource(userModel, UserResourceHooks{
-		ProfileModel: profileModel,
-	}, true)
+	users := resources.NewResource(userModel, UserResourceHooks{}, true)
 	h.Users = users
+
+	if profileModel != nil {
+		profiles := resources.NewResource(profileModel, nil, false)
+		h.Profiles = profiles
+	}
 
 	var sessionModel kit.Model
 	if backend.HasStringIDs() {
@@ -112,6 +113,11 @@ func (s *Service) SetBackend(b db.Backend) {
 	s.Users.SetBackend(b)
 	b.RegisterModel(s.Users.Model())
 
+	if s.Profiles != nil {
+		s.Profiles.SetBackend(b)
+		b.RegisterModel(s.Profiles.Model())
+	}
+
 	s.Sessions.SetBackend(b)
 	b.RegisterModel(s.Sessions.Model())
 
@@ -123,10 +129,6 @@ func (s *Service) SetBackend(b db.Backend) {
 
 	s.Permissions.SetBackend(b)
 	b.RegisterModel(s.Permissions.Model())
-
-	if s.profileModel != nil {
-		b.RegisterModel(s.profileModel)
-	}
 
 	for name := range s.AuthAdaptors {
 		s.AuthAdaptors[name].SetBackend(b)
@@ -151,6 +153,14 @@ func (h *Service) SetUserResource(x kit.Resource) {
 	h.Users = x
 }
 
+func (h *Service) ProfileResource() kit.Resource {
+	return h.Profiles
+}
+
+func (h *Service) SetProfileResource(x kit.Resource) {
+	h.Profiles = x
+}
+
 func (h *Service) SessionResource() kit.Resource {
 	return h.Sessions
 }
@@ -168,7 +178,7 @@ func (h *Service) SetTokenResource(x kit.Resource) {
 }
 
 func (h *Service) ProfileModel() kit.UserProfile {
-	return h.profileModel
+	return h.Profiles.Model().(kit.UserProfile)
 }
 
 /**
@@ -206,6 +216,28 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 	return tokenItem, nil
 }
 
+func (s *Service) FindUser(userId interface{}) (kit.User, apperror.Error) {
+	rawUser, err := s.Users.Q().Filter("id", userId).Join("Roles").First()
+	if err != nil {
+		return nil, err
+	} else if rawUser == nil {
+		return nil, nil
+	}
+
+	user := rawUser.(kit.User)
+
+	if s.Profiles != nil {
+		profile, err := s.Users.Backend().Q(s.Profiles.Collection()).Filter("id", user.GetID()).First()
+		if err != nil {
+			return nil, apperror.Wrap(err, "profile_query_error")
+		} else if profile != nil {
+			user.SetProfile(profile.(kit.UserProfile))
+		}
+	}
+
+	return user, nil
+}
+
 func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[string]interface{}) apperror.Error {
 	adaptor := s.AuthAdaptor(adaptorName)
 	if adaptor == nil {
@@ -238,9 +270,13 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 
 	user.SetIsActive(true)
 
-	if s.profileModel != nil && user.GetProfile() == nil {
-		newProfile, _ := s.Users.Backend().CreateModel(s.profileModel.Collection())
-		user.SetProfile(newProfile.(kit.UserProfile))
+	profile := user.GetProfile()
+
+	// If a profile is configured, and the user does not have a profile yet,
+	// create a new one.
+	if s.Profiles != nil && profile == nil {
+		profile = s.Profiles.CreateModel().(kit.UserProfile)
+		user.SetProfile(profile)
 	}
 
 	if err := s.Users.Create(user, nil); err != nil {
@@ -248,11 +284,12 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 	}
 
 	// Create profile if one exists.
-	if profile := user.GetProfile(); profile != nil {
-		profile.SetID(user.GetID())
-		if err := s.Users.Backend().Create(profile); err != nil {
+
+	if profile != nil {
+		profile.SetUser(user)
+		if err := s.Profiles.Create(profile, nil); err != nil {
 			s.Users.Backend().Delete(user)
-			return err
+			return apperror.Wrap(err, "user_profile_create_error", "Could not create the user profile")
 		}
 	}
 
@@ -261,6 +298,10 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 		authItemUserId.SetUserID(user.GetID())
 	}
 	if err := s.Users.Backend().Create(authItem); err != nil {
+		s.Users.Backend().Delete(user)
+		if profile != nil {
+			s.Profiles.Backend().Delete(profile)
+		}
 		return apperror.Wrap(err, "auth_item_create_error", "")
 	}
 
@@ -643,7 +684,7 @@ func (h *Service) VerifySession(token string) (kit.User, kit.Session, apperror.E
 	session := rawSession.(kit.Session)
 
 	// Load user.
-	rawUser, err := h.UserResource().FindOne(session.GetUserID())
+	rawUser, err := h.FindUser(session.GetUserID())
 	if err != nil {
 		return nil, nil, err
 	}

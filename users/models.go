@@ -96,6 +96,8 @@ type User struct {
 
 	Data string `db:"ignore-zero;max:10000"`
 
+	Profile interface{} `db:"-"`
+
 	CreatedAt time.Time `db:"ignore-zero"`
 	UpdatedAt time.Time `db:"ignore-zero"`
 
@@ -109,11 +111,7 @@ func (u User) Collection() string {
 // Implement User interface.
 
 func (a User) GetProfile() kit.UserProfile {
-	return nil
-}
-
-func (a User) SetProfile(p kit.UserProfile) {
-
+	return a.Profile.(kit.UserProfile)
 }
 
 func (u *User) SetIsActive(x bool) {
@@ -256,6 +254,11 @@ type UserStrID struct {
 // Ensure UserStrID implements kit.User interface.
 var _ kit.User = (*UserStrID)(nil)
 
+func (u *UserStrID) SetProfile(p kit.UserProfile) {
+	p.SetUser(u)
+	u.Profile = p
+}
+
 type UserIntID struct {
 	User
 	db.BaseIntIDModel
@@ -264,36 +267,61 @@ type UserIntID struct {
 // Ensure UserIntID implements kit.User interface.
 var _ kit.User = (*UserStrID)(nil)
 
+func (u *UserIntID) SetProfile(p kit.UserProfile) {
+	p.SetUser(u)
+	u.Profile = p
+}
+
 /**
  * UserProfile.
  */
 
-type UserProfile struct {
-	StrUserModel
+type StrIDUserProfile struct {
+	db.BaseStrIDModel
 }
 
-func (p UserProfile) Collection() string {
+func (p StrIDUserProfile) Collection() string {
 	return "user_profiles"
 }
 
-func (p *UserProfile) GetID() interface{} {
-	return p.UserID
+func (p StrIDUserProfile) GetUserID() interface{} {
+	return p.ID
 }
 
-func (p *UserProfile) SetID(id interface{}) error {
-	return p.SetUserID(id)
+func (p *StrIDUserProfile) SetUserID(id interface{}) error {
+	return p.SetID(id)
 }
 
-type IntUserProfile struct {
-	IntUserModel
+func (p StrIDUserProfile) GetUser() kit.User {
+	return nil
 }
 
-func (p *IntUserProfile) GetID() interface{} {
-	return p.UserID
+func (p StrIDUserProfile) SetUser(user kit.User) {
+	p.SetUserID(user.GetID())
 }
 
-func (p *IntUserProfile) SetID(rawId interface{}) error {
-	return p.SetUserID(rawId)
+type IntIDUserProfile struct {
+	db.BaseIntIDModel
+}
+
+func (p IntIDUserProfile) Collection() string {
+	return "user_profiles"
+}
+
+func (p IntIDUserProfile) GetUserID() interface{} {
+	return p.ID
+}
+
+func (p *IntIDUserProfile) SetUserID(id interface{}) error {
+	return p.SetID(id)
+}
+
+func (p IntIDUserProfile) GetUser() kit.User {
+	return nil
+}
+
+func (p IntIDUserProfile) SetUser(user kit.User) {
+	p.SetUserID(user.GetID())
 }
 
 /**

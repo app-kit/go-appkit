@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/theduke/go-apperror"
+	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/app/methods"
@@ -122,7 +123,6 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
  */
 
 type UserResourceHooks struct {
-	ProfileModel kit.UserProfile
 }
 
 func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
@@ -266,7 +266,32 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 	}
 
 	user := obj.(kit.User)
-	if err := res.Dependencies().UserService().CreateUser(user, adaptor, data); err != nil {
+
+	service := res.Dependencies().UserService()
+
+	// If a profile model was registered, and profile data is in meta,
+	// create the profile model.
+	if profiles := service.ProfileResource(); profiles != nil {
+		profile := profiles.CreateModel().(kit.UserProfile)
+
+		if rawData, ok := meta.Get("profile"); ok {
+			if data, ok := rawData.(map[string]interface{}); ok {
+				// Profile data present in meta.
+				// Update profile with data.
+				info := res.Backend().ModelInfo(profile.Collection())
+				if err := db.UpdateModelFromData(info, profile, data); err != nil {
+					return &kit.AppResponse{
+						Error: apperror.Wrap(err, "invalid_profile_data", "Invalid profile data.", true),
+					}
+				}
+				fmt.Printf("\nCreated profile: %+v\n", profile)
+			}
+		}
+
+		user.SetProfile(profile)
+	}
+
+	if err := service.CreateUser(user, adaptor, data); err != nil {
 		return &kit.AppResponse{Error: err}
 	}
 

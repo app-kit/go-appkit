@@ -11,12 +11,13 @@ import (
  * Resource.
  */
 
-// Allow resource hooks to specify custom http routes.
+// ApiHttpRoutes allows a reseource to specify custom http routes.
 type ApiHttpRoutes interface {
 	// Allows to set up custom http handlers with the httprouter directly.
 	HttpRoutes(kit.Resource) []kit.HttpRoute
 }
 
+// MethodsHook allows a resource to specify additional methods.
 type MethodsHook interface {
 	Methods(kit.Resource) []kit.Method
 }
@@ -34,6 +35,7 @@ type ApiFindHook interface {
 }
 
 type ApiAlterQueryHook interface {
+	// Alter an API query before it is executed.
 	ApiAlterQuery(res kit.Resource, query db.Query, r kit.Request) apperror.Error
 }
 

@@ -76,7 +76,7 @@ func (res *Resource) SetModel(x kit.Model) {
 func (res *Resource) CreateModel() kit.Model {
 	n, err := res.backend.CreateModel(res.model.Collection())
 	if err != nil {
-		return nil
+
 	}
 	return n.(kit.Model)
 }

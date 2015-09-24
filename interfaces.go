@@ -476,6 +476,9 @@ type UserService interface {
 	UserResource() Resource
 	SetUserResource(Resource)
 
+	ProfileResource() Resource
+	SetProfileResource(resource Resource)
+
 	ProfileModel() UserProfile
 
 	SessionResource() Resource
@@ -487,8 +490,11 @@ type UserService interface {
 	SetPermissionResource(Resource)
 	PermissionResource() Resource
 
-	// Build a token, persist it and return it.
+	// Build a user token, persist it and return it.
 	BuildToken(typ, userId string, expiresAt time.Time) (UserToken, apperror.Error)
+
+	// Return a full user with roles and the profile joined.
+	FindUser(userId interface{}) (User, apperror.Error)
 
 	CreateUser(user User, adaptor string, data map[string]interface{}) apperror.Error
 	AuthenticateUser(user User, adaptor string, data map[string]interface{}) (User, apperror.Error)
