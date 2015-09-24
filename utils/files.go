@@ -2,6 +2,7 @@ package utils
 
 import (
 	"fmt"
+	"io"
 	"io/ioutil"
 	"os"
 	"path"
@@ -74,6 +75,28 @@ func WriteFile(p string, content []byte, createDir bool) apperror.Error {
 
 	if _, err := f.Write(content); err != nil {
 		return apperror.Wrap(err, "file_write_error")
+	}
+
+	return nil
+}
+
+func CopyFile(sourcePath, targetPath string) apperror.Error {
+	source, err := os.Open(sourcePath)
+	if err != nil {
+		return apperror.Wrap(err, "file_open_error",
+			fmt.Sprintf("Could not open file at %v", sourcePath))
+	}
+	defer source.Close()
+
+	target, err := os.Open(targetPath)
+	if err != nil {
+		return apperror.Wrap(err, "file_open_error",
+			fmt.Sprintf("Could not open file at %v", targetPath))
+	}
+	defer target.Close()
+
+	if _, err := io.Copy(target, source); err != nil {
+		return apperror.Wrap(err, "file_copy_error", fmt.Sprintf("Could not copy file from %v to %v", sourcePath, targetPath))
 	}
 
 	return nil
