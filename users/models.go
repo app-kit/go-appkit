@@ -111,6 +111,9 @@ func (u User) Collection() string {
 // Implement User interface.
 
 func (a User) GetProfile() kit.UserProfile {
+	if a.Profile == nil {
+		return nil
+	}
 	return a.Profile.(kit.UserProfile)
 }
 
@@ -195,50 +198,68 @@ func (u *User) GetUpdatedAt() time.Time {
  * RBAC methods.
  */
 
-func (u *User) GetRoles() []kit.Role {
-	slice := make([]kit.Role, 0)
+func (u *User) GetRoles() []string {
+	slice := make([]string, 0)
 	for _, r := range u.Roles {
-		slice = append(slice, r)
+		slice = append(slice, r.Name)
 	}
 	return slice
 }
 
-func (u *User) AddRole(r kit.Role) {
-	if u.Roles == nil {
-		u.Roles = make([]*Role, 0)
+func (u *User) SetRoles(roles []string) {
+	newRoles := make([]*Role, 0)
+	for _, r := range roles {
+		newRoles = append(newRoles, &Role{Name: r})
 	}
-	if !u.HasRole(r) {
-		u.Roles = append(u.Roles, r.(*Role))
+	u.Roles = newRoles
+}
+
+func (u *User) AddRole(roles ...string) {
+	for _, role := range roles {
+		if !u.HasRole(role) {
+			u.Roles = append(u.Roles, &Role{Name: role})
+		}
 	}
 }
 
-func (u *User) RemoveRole(r kit.Role) {
-	if u.Roles == nil {
-		return
-	}
+func (u *User) RemoveRole(roles ...string) {
+	newRoles := make([]*Role, 0)
 
-	for i := 0; i < len(u.Roles); i++ {
-		if u.Roles[i].Name == r.GetName() {
-			u.Roles = append(u.Roles[:i], u.Roles[i+1:]...)
+	for _, role := range u.Roles {
+		keep := true
+		for _, roleToRemove := range roles {
+			if role.Name == roleToRemove {
+				keep = false
+				break
+			}
+		}
+		if keep {
+			newRoles = append(newRoles, role)
 		}
 	}
+
+	u.Roles = newRoles
 }
 
 func (u *User) ClearRoles() {
 	u.Roles = make([]*Role, 0)
 }
 
-func (u *User) HasRole(r kit.Role) bool {
-	return u.HasRoleStr(r.GetName())
-}
-
-func (u *User) HasRoleStr(role string) bool {
-	if u.Roles == nil {
-		return false
+func (u *User) HasRole(roles ...string) bool {
+	for _, role := range u.Roles {
+		for _, matchRole := range roles {
+			if role.Name == matchRole {
+				return true
+			}
+		}
 	}
 
-	for i := 0; i < len(u.Roles); i++ {
-		if u.Roles[i].Name == role {
+	return false
+}
+
+func (u *User) HasPermission(perms ...string) bool {
+	for _, r := range u.Roles {
+		if r.HasPermission(perms...) {
 			return true
 		}
 	}
@@ -248,7 +269,7 @@ func (u *User) HasRoleStr(role string) bool {
 
 type UserStrID struct {
 	User
-	db.BaseStrIDModel
+	db.StrIDModel
 }
 
 // Ensure UserStrID implements kit.User interface.
@@ -261,7 +282,7 @@ func (u *UserStrID) SetProfile(p kit.UserProfile) {
 
 type UserIntID struct {
 	User
-	db.BaseIntIDModel
+	db.IntIDModel
 }
 
 // Ensure UserIntID implements kit.User interface.
@@ -277,7 +298,7 @@ func (u *UserIntID) SetProfile(p kit.UserProfile) {
  */
 
 type StrIDUserProfile struct {
-	db.BaseStrIDModel
+	db.StrIDModel
 }
 
 func (p StrIDUserProfile) Collection() string {
@@ -301,7 +322,7 @@ func (p StrIDUserProfile) SetUser(user kit.User) {
 }
 
 type IntIDUserProfile struct {
-	db.BaseIntIDModel
+	db.IntIDModel
 }
 
 func (p IntIDUserProfile) Collection() string {
@@ -509,12 +530,63 @@ func (r *Role) SetStrID(n string) error {
 	return nil
 }
 
-func (r *Role) GetPermissions() []kit.Permission {
-	perms := make([]kit.Permission, 0)
+func (r *Role) GetPermissions() []string {
+	perms := make([]string, 0)
 	for _, p := range r.Permissions {
-		perms = append(perms, p)
+		perms = append(perms, p.Name)
 	}
 	return perms
+}
+
+func (r *Role) SetPermissions(perms []string) {
+	permList := make([]*Permission, 0)
+	for _, p := range perms {
+		permList = append(permList, &Permission{Name: p})
+	}
+	r.Permissions = permList
+}
+
+func (r *Role) AddPermission(perms ...string) {
+	for _, perm := range perms {
+		if !r.HasPermission(perm) {
+			r.Permissions = append(r.Permissions, &Permission{Name: perm})
+		}
+	}
+}
+
+func (r *Role) RemovePermission(perms ...string) {
+	var newPerms []*Permission
+
+	for _, perm := range r.Permissions {
+		matched := false
+		for _, matchPerm := range perms {
+			if perm.Name == matchPerm {
+				matched = true
+				break
+			}
+		}
+		if !matched {
+			newPerms = append(newPerms, perm)
+		}
+	}
+
+	r.Permissions = newPerms
+}
+
+func (r *Role) ClearPermissions() {
+	r.Permissions = make([]*Permission, 0)
+}
+
+func (r *Role) HasPermission(perms ...string) bool {
+	for _, p := range r.Permissions {
+		for _, matchPerm := range perms {
+			if p.Name == matchPerm {
+				return true
+			}
+		}
+	}
+
+	return false
 }
 
 /**

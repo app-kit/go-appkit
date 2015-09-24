@@ -49,7 +49,12 @@ type Role interface {
 	GetName() string
 	SetName(string)
 
-	GetPermissions() []Permission
+	GetPermissions() []string
+	SetPermissions(permissions []string)
+	AddPermission(perm ...string)
+	RemovePermission(perm ...string)
+	ClearPermissions()
+	HasPermission(perm ...string) bool
 }
 
 type Permission interface {
@@ -89,12 +94,14 @@ type User interface {
 	GetData() (interface{}, apperror.Error)
 	SetData(interface{}) apperror.Error
 
-	GetRoles() []Role
-	AddRole(Role)
-	RemoveRole(Role)
+	GetRoles() []string
+	SetRoles(roles []string)
 	ClearRoles()
-	HasRole(Role) bool
-	HasRoleStr(string) bool
+	AddRole(role ...string)
+	RemoveRole(role ...string)
+	HasRole(role ...string) bool
+
+	HasPermission(perm ...string) bool
 }
 
 type UserModel interface {
