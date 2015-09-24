@@ -208,6 +208,12 @@ func (res *Resource) Create(obj kit.Model, user kit.User) apperror.Error {
 		}
 	}
 
+	if userModel, ok := obj.(kit.UserModel); ok {
+		if db.IsZero(userModel.GetUserID()) {
+			userModel.SetUserID(user.GetID())
+		}
+	}
+
 	if beforeCreate, ok := res.hooks.(BeforeCreateHook); ok {
 		if err := beforeCreate.BeforeCreate(res, obj, user); err != nil {
 			return err
