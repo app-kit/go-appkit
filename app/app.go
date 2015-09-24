@@ -16,9 +16,11 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	//"github.com/theduke/go-appkit/caches"
+	"github.com/theduke/go-appkit/caches/fs"
 	"github.com/theduke/go-appkit/crawler"
+	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/resources"
+	"github.com/theduke/go-appkit/users"
 
 	"github.com/theduke/go-appkit/frontends/jsonapi"
 
@@ -106,7 +108,34 @@ func (a *App) Defaults() {
 	a.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
 	a.RegisterAfterMiddleware(RequestLoggerMiddleware)
 
+	// Register file service with fs backend.
+
+	dir := a.Config().UString("files.dir")
+	if dir == "" {
+		dir = a.Config().UString("dataDir", "data") + "/" + "files"
+	}
+	fileService := files.NewFileServiceWithFs(nil, dir)
+	a.RegisterFileService(fileService)
+
+	// Register fs cache.
+
+	// Build cache.
+	dir = a.Config().UString("caches.fs.dir")
+	if dir == "" {
+		dir = a.TmpDir() + "/" + "cache"
+	}
+	fsCache, err := fs.New(dir)
+	if err != nil {
+		panic("Could not initialize fs cache: " + err.Error())
+	}
+	a.RegisterCache(fsCache)
+
 	a.RegisterFrontend(jsonapi.New(a))
+}
+
+func (a *App) defaultUserService(b db.Backend) {
+	s := users.NewService(nil, b, nil)
+	a.RegisterUserService(s)
 }
 
 func (a *App) ENV() string {
@@ -388,6 +417,12 @@ func (a *App) RegisterBackend(b db.Backend) {
 	if b.GetLogger() == nil {
 		b.SetLogger(a.Logger())
 	}
+
+	// If no backend is registered yet, create a default UserService.
+	if a.DefaultBackend() == nil {
+		a.defaultUserService(b)
+	}
+
 	a.deps.AddBackend(b)
 }
 
