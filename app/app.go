@@ -56,7 +56,7 @@ type App struct {
 // Ensure App implements App interface.
 var _ kit.App = (*App)(nil)
 
-func NewApp(cfgPath string) *App {
+func NewApp(cfgPaths ...string) *App {
 	app := App{
 		deps:              NewDependencies(),
 		frontends:         make(map[string]kit.Frontend),
@@ -78,7 +78,12 @@ func NewApp(cfgPath string) *App {
 	})
 
 	app.InitCli()
-	app.ReadConfig(cfgPath)
+
+	configPath := "config.yaml"
+	if len(cfgPaths) > 0 {
+		configPath = cfgPaths[0]
+	}
+	app.ReadConfig(configPath)
 
 	app.Defaults()
 
@@ -388,6 +393,10 @@ func (a *App) RegisterBackend(b db.Backend) {
 
 func (a *App) Backend(name string) db.Backend {
 	return a.deps.Backend(name)
+}
+
+func (a *App) DefaultBackend() db.Backend {
+	return a.deps.DefaultBackend()
 }
 
 /**

@@ -718,6 +718,7 @@ type App interface {
 
 	PrepareBackends()
 	Run()
+	RunCli()
 
 	ServeFiles(route, path string)
 
@@ -725,6 +726,7 @@ type App interface {
 
 	RegisterBackend(backend db.Backend)
 	Backend(name string) db.Backend
+	DefaultBackend() db.Backend
 	MigrateBackend(name string, version int, force bool) apperror.Error
 	MigrateAllBackends(force bool) apperror.Error
 	DropBackend(name string) apperror.Error
