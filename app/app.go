@@ -108,19 +108,15 @@ func (a *App) Defaults() {
 	a.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
 	a.RegisterAfterMiddleware(RequestLoggerMiddleware)
 
-	// Register file service with fs backend.
-
-	dir := a.Config().UString("files.dir")
-	if dir == "" {
-		dir = a.Config().UString("dataDir", "data") + "/" + "files"
-	}
-	fileService := files.NewFileServiceWithFs(nil, dir)
-	a.RegisterFileService(fileService)
-
 	// Register fs cache.
+	a.defaultCache()
 
+	a.RegisterFrontend(jsonapi.New(a))
+}
+
+func (a *App) defaultCache() {
 	// Build cache.
-	dir = a.Config().UString("caches.fs.dir")
+	dir := a.Config().UString("caches.fs.dir")
 	if dir == "" {
 		dir = a.TmpDir() + "/" + "cache"
 	}
@@ -129,13 +125,22 @@ func (a *App) Defaults() {
 		panic("Could not initialize fs cache: " + err.Error())
 	}
 	a.RegisterCache(fsCache)
-
-	a.RegisterFrontend(jsonapi.New(a))
 }
 
 func (a *App) defaultUserService(b db.Backend) {
 	s := users.NewService(nil, b, nil)
 	a.RegisterUserService(s)
+}
+
+func (a *App) defaultFileService(b db.Backend) {
+	// Register file service with fs backend.
+
+	dir := a.Config().UString("files.dir")
+	if dir == "" {
+		dir = a.Config().UString("dataDir", "data") + "/" + "files"
+	}
+	fileService := files.NewFileServiceWithFs(nil, dir)
+	a.RegisterFileService(fileService)
 }
 
 func (a *App) ENV() string {
@@ -204,7 +209,7 @@ func (a *App) ReadConfig(path string) {
 		} else {
 			cfg, err = config.ParseYaml(string(content))
 			if err != nil {
-				a.Logger().Panicf("YAML error while parsing config at '%v': %v\n", path, err)
+				panic("Malformed config file " + path + ": " + err.Error())
 			}
 		}
 	}
@@ -226,12 +231,23 @@ func (a *App) ReadConfig(path string) {
 	}
 	a.env = env
 
+	if envCfg, err := cfg.Get(env); err == nil {
+		cfg = envCfg
+		cfg.Set("ENV", env)
+	}
+
 	// Fill in default values into the config and ensure they are valid.
 
 	// Ensure a tmp directory exists and is readable.
 	tmpDir := cfg.UString("tmpDir", "tmp")
 	if err := os.MkdirAll(tmpDir, 0777); err != nil {
 		a.Logger().Panicf("Could not read or create tmp dir at '%v': %v", tmpDir, err)
+	}
+
+	// Ensure a data directory exists and is readable.
+	dataDir := cfg.UString("dataDir", "data")
+	if err := os.MkdirAll(dataDir, 0777); err != nil {
+		a.Logger().Panicf("Could not read or create data dir at '%v': %v", tmpDir, err)
 	}
 
 	a.deps.SetConfig(cfg)
@@ -418,12 +434,18 @@ func (a *App) RegisterBackend(b db.Backend) {
 		b.SetLogger(a.Logger())
 	}
 
-	// If no backend is registered yet, create a default UserService.
-	if a.DefaultBackend() == nil {
-		a.defaultUserService(b)
-	}
-
+	isDefault := a.DefaultBackend() == nil
 	a.deps.AddBackend(b)
+
+	// If no backend was registered befre, create a default UserService and FileService.
+	if isDefault {
+		if a.UserService() == nil {
+			a.defaultUserService(b)
+		}
+		if a.FileService() == nil {
+			a.defaultFileService(b)
+		}
+	}
 }
 
 func (a *App) Backend(name string) db.Backend {
@@ -503,7 +525,7 @@ func (a *App) TemplateEngine() kit.TemplateEngine {
 
 func (a *App) RegisterMethod(method kit.Method) {
 	if _, exists := a.methods[method.Name()]; exists {
-		a.Logger().Panicf("Method name '%v' already registered.", method.Name())
+		a.Logger().Warn("Overwriting already registered method '%v'.", method.Name())
 	}
 
 	a.methods[method.Name()] = method
