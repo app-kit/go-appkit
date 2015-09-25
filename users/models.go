@@ -16,7 +16,7 @@ import (
 
 type StrUserModel struct {
 	User   *UserStrID
-	UserID string
+	UserID string `db:"not-null;max:255"`
 }
 
 func (m *StrUserModel) GetUserID() interface{} {
@@ -49,7 +49,7 @@ func (m *StrUserModel) SetUser(u kit.User) {
 
 type IntUserModel struct {
 	User   *UserIntID
-	UserID uint64
+	UserID uint64 `db:"not-null"`
 }
 
 func (m *IntUserModel) GetUserID() interface{} {

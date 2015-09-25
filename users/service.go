@@ -653,21 +653,22 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 		return nil, apperror.Wrap(err, "adaptor_error", "")
 	}
 
-	if user == nil {
-		rawUser, err := h.Users.FindOne(userId)
-		if err != nil {
-			return nil, apperror.Wrap(err, "user_query_error", "")
-		} else if rawUser == nil {
-			return nil, &apperror.Err{
-				Code:    "user_not_found",
-				Message: fmt.Sprintf("User with id %v could not be found", userId),
-			}
+	// Query user to get a full user with permissions and profile.
+
+	rawUser, err := h.FindUser(userId)
+	if err != nil {
+		return nil, apperror.Wrap(err, "user_query_error", "")
+	} else if rawUser == nil {
+		return nil, &apperror.Err{
+			Code:    "user_not_found",
+			Message: fmt.Sprintf("User with id %v could not be found", userId),
+			Public:  true,
 		}
-		user = rawUser.(kit.User)
 	}
+	user = rawUser.(kit.User)
 
 	if !user.IsActive() {
-		return nil, apperror.New("user_inactive")
+		return nil, apperror.New("user_inactive", true)
 	}
 
 	return user, nil
