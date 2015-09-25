@@ -196,9 +196,10 @@ func (r *AppResponse) SetRawDataReader(reader io.ReadCloser) {
 	r.RawDataReader = reader
 }
 
-func NewErrorResponse(code, message string) *AppResponse {
+// All arguments are passed to apperror.New(). Check apperror docs for more info.
+func NewErrorResponse(code string, args ...interface{}) *AppResponse {
 	return &AppResponse{
-		Error: apperror.New(code, message),
+		Error: apperror.New(code, args...),
 	}
 }
 
