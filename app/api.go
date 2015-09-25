@@ -372,18 +372,18 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	}
 
 	// Handle options requests.
+	header := w.Header()
+
+	allowedOrigins := app.Config().UString("accessControl.allowedOrigins", "*")
+	header.Set("Access-Control-Allow-Origin", allowedOrigins)
+
+	methods := app.Config().UString("accessControl.allowedMethods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+	header.Set("Access-Control-Allow-Methods", methods)
+
+	allowedHeaders := app.Config().UString("accessControl.allowedHeaders", "Authentication, Content-Type")
+	header.Set("Access-Control-Allow-Headers", allowedHeaders)
+
 	if r.Method == "OPTIONS" {
-		header := w.Header()
-
-		allowedOrigins := app.Config().UString("accessControl.allowedOrigins", "*")
-		header.Set("Access-Control-Allow-Origin", allowedOrigins)
-
-		methods := app.Config().UString("accessControl.allowedMethods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-		header.Set("Access-Control-Allow-Methods", methods)
-
-		allowedHeaders := app.Config().UString("accessControl.allowedHeaders", "Authentication, Content-Type")
-		header.Set("Access-Control-Allow-Headers", allowedHeaders)
-
 		response = &kit.AppResponse{
 			RawData: []byte{},
 		}
@@ -398,17 +398,15 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		}
 	}
 
-	if response.GetHttpStatus() == 0 {
+	status := response.GetHttpStatus()
+	if status == 0 {
+		status = 200
 		response.SetHttpStatus(200)
 	}
 
 	// If a data reader is set, write the data of the reader.
 	reader := response.GetRawDataReader()
 	if reader != nil {
-		status := response.GetHttpStatus()
-		if status == 0 {
-			status = 200
-		}
 		w.WriteHeader(status)
 		io.Copy(w, reader)
 		reader.Close()
@@ -418,10 +416,6 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// If raw data is set, write the raw data.
 	rawData := response.GetRawData()
 	if rawData != nil {
-		status := response.GetHttpStatus()
-		if status == 0 {
-			status = 200
-		}
 		w.WriteHeader(status)
 		w.Write(rawData)
 		return
@@ -474,8 +468,17 @@ func AuthenticationMiddleware(a kit.App, r kit.Request) (kit.Response, bool) {
  */
 
 func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bool {
-	if response.GetError() == nil {
+	err := response.GetError()
+	if err == nil {
 		return false
+	}
+
+	// If the error is an apperror, and it contains a status,
+	// set it as the http status of the response.
+	if apperr, ok := err.(apperror.Error); ok {
+		if apperr.GetStatus() != 0 {
+			response.SetHttpStatus(apperr.GetStatus())
+		}
 	}
 
 	if response.GetRawData() != nil {

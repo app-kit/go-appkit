@@ -524,11 +524,11 @@ func (a *App) TemplateEngine() kit.TemplateEngine {
  */
 
 func (a *App) RegisterMethod(method kit.Method) {
-	if _, exists := a.methods[method.Name()]; exists {
-		a.Logger().Warn("Overwriting already registered method '%v'.", method.Name())
+	if _, exists := a.methods[method.GetName()]; exists {
+		a.Logger().Warn("Overwriting already registered method '%v'.", method.GetName())
 	}
 
-	a.methods[method.Name()] = method
+	a.methods[method.GetName()] = method
 }
 
 func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, apperror.Error) {
