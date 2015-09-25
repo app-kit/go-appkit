@@ -248,38 +248,59 @@ func ConvertResponse(backend db.Backend, resp kit.Response) kit.Response {
 		apiResponse.Errors = ConvertError(err)
 	}
 
+	var modelData interface{}
+	var included []*ApiModel
+	var err apperror.Error
+
 	if data := resp.GetData(); data != nil {
 		if model, ok := data.(kit.Model); ok {
-			modelData, included, err := ConvertModel(backend, model)
-			if err != nil {
-				return ConvertResponse(backend, &kit.AppResponse{
-					Error: err,
-				})
-			}
-
-			apiResponse.Data = modelData
-			apiResponse.Included = included
+			modelData, included, err = ConvertModel(backend, model)
 		} else if models, ok := data.([]kit.Model); ok {
-			modelData, included, err := ConvertModels(backend, models)
-			if err != nil {
-				return ConvertResponse(backend, &kit.AppResponse{
-					Error: err,
-				})
-			}
-
-			apiResponse.Data = modelData
-			apiResponse.Included = included
+			modelData, included, err = ConvertModels(backend, models)
 		} else {
-			apiResponse.Data = data
+			modelData = data
 		}
 	}
 
-	apiResponse.Meta = resp.GetMeta()
-
-	js, err := json.Marshal(apiResponse)
 	if err != nil {
 		return ConvertResponse(backend, &kit.AppResponse{
-			Error: apperror.Wrap(err, "json_marshal_error", ""),
+			Error: err,
+		})
+	}
+
+	meta := resp.GetMeta()
+
+	// Check meta for modeldata to include.
+	if meta != nil {
+		for key, val := range meta {
+			if model, ok := val.(kit.Model); ok {
+				data, metaIncluded, err := ConvertModel(backend, model)
+
+				if err != nil {
+					return ConvertResponse(backend, &kit.AppResponse{
+						Error: err,
+					})
+				}
+
+				included = append(included, data)
+				included = append(included, metaIncluded...)
+
+				// Delete model from meta.
+				delete(meta, key)
+			}
+		}
+
+		// Set remaining meta data.
+		apiResponse.Meta = meta
+	}
+
+	apiResponse.Data = modelData
+	apiResponse.Included = included
+
+	js, err2 := json.Marshal(apiResponse)
+	if err2 != nil {
+		return ConvertResponse(backend, &kit.AppResponse{
+			Error: apperror.Wrap(err2, "json_marshal_error", ""),
 		})
 	}
 

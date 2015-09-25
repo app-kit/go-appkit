@@ -13,24 +13,16 @@ import (
 
 func HandleWrap(collection string, handler kit.RequestHandler) kit.RequestHandler {
 	return func(a kit.App, r kit.Request) (kit.Response, bool) {
+		fmt.Printf("collectioN: %v\n", collection)
 		r.GetContext().Set("collection", collection)
 		return handler(a, r)
 	}
 }
 
-func Find(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
+func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) {
+	collection := res.Collection()
 	if err := request.ParseJsonData(); err != nil {
 		return nil, err
-	}
-
-	collection := request.GetContext().MustString("collection")
-
-	res := app.Dependencies().Resource(collection)
-	if res == nil || !res.IsPublic() {
-		return nil, &apperror.Err{
-			Code:    "unknown_resource",
-			Message: fmt.Sprintf("The resource '%v' does not exist", collection),
-		}
 	}
 
 	var query db.Query
@@ -47,6 +39,8 @@ func Find(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 	}
 
 	if query == nil {
+		query = db.Q(collection)
+
 		// No custom query.
 		// Check paging parameters.
 		var limit, offset int64
@@ -72,7 +66,7 @@ func Find(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 		}
 
 		if limit > 0 {
-			query = db.Q(collection).Limit(int(limit)).Offset(int(offset))
+			query.Limit(int(limit)).Offset(int(offset))
 		}
 	}
 
@@ -80,12 +74,23 @@ func Find(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 }
 
 func HandleFind(app kit.App, request kit.Request) (kit.Response, bool) {
-	response, err := Find(app, request)
+	collection := request.GetContext().MustString("collection")
+
+	res := app.Dependencies().Resource(collection)
+	if res == nil || !res.IsPublic() {
+		err := &apperror.Err{
+			Code:    "unknown_resource",
+			Message: fmt.Sprintf("The resource '%v' does not exist", collection),
+		}
+		return &kit.AppResponse{Error: err}, false
+	}
+
+	response, err := Find(res, request)
 	if err != nil {
 		response = &kit.AppResponse{Error: err}
 	}
 
-	return ConvertResponse(nil, response), false
+	return ConvertResponse(res.Backend(), response), false
 }
 
 func HandleFindOne(app kit.App, request kit.Request) (kit.Response, bool) {

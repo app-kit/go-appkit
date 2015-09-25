@@ -50,6 +50,7 @@ func (f *Frontend) Init() apperror.Error {
 
 	resources := f.app.Dependencies().Resources()
 	for name := range resources {
+		f.app.Logger().Debugf("Registering jsonapi resource %v", name)
 		f.Logger().Infof("registering resource %v", name)
 		f.app.RegisterHttpHandler("GET", "/"+apiPrefix+"/"+name, HandleWrap(name, HandleFind))
 		f.app.RegisterHttpHandler("GET", "/"+apiPrefix+"/"+name+"/:id", HandleWrap(name, HandleFindOne))
