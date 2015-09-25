@@ -339,11 +339,12 @@ type TemplateEngine interface {
  * Method.
  */
 
+type MethodHandler func(a App, r Request, unblock func()) Response
+
 type Method interface {
-	Name() string
+	GetName() string
 	IsBlocking() bool
-	RequiresUser() bool
-	Run(a App, r Request, unblock func()) Response
+	GetHandler() MethodHandler
 }
 
 /**
