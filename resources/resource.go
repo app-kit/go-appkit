@@ -53,8 +53,12 @@ func (res *Resource) Backend() db.Backend {
 	return res.backend
 }
 
-func (res *Resource) SetBackend(x db.Backend) {
-	res.backend = x
+func (res *Resource) SetBackend(b db.Backend) {
+	res.backend = b
+
+	if !b.HasCollection(res.Collection()) {
+		b.RegisterModel(res.Model())
+	}
 }
 
 func (res *Resource) IsPublic() bool {
@@ -128,6 +132,11 @@ func (res *Resource) FindOne(rawId interface{}) (kit.Model, apperror.Error) {
  */
 
 func (res *Resource) ApiFindOne(rawId string, r kit.Request) kit.Response {
+	hook, ok := res.hooks.(ApiFindOneHook)
+	if ok {
+		return hook.ApiFindOne(res, rawId, r)
+	}
+
 	result, err := res.FindOne(rawId)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
@@ -370,4 +379,59 @@ func (r ReadOnlyResource) AllowUpdate(res kit.Resource, obj kit.Model, user kit.
 
 func (r ReadOnlyResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
 	return false
+}
+
+// AdminResource is a mixin that restricts create, update and delete.
+// Only users with the role admin or with the permission action_collectionname
+// may create, update or delete objects.
+// So if you want to allow a role to update all items in a collection
+// "totos", the permission update_todos to the role.
+type AdminResource struct{}
+
+func (AdminResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
+	return user != nil && (user.HasRole("admin") || user.HasPermission("create_"+res.Collection()))
+}
+
+func (AdminResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
+	return user != nil && (user.HasRole("admin") || user.HasPermission("update_"+res.Collection()))
+}
+
+func (AdminResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
+	return user != nil && (user.HasRole("admin") || user.HasPermission("delete"+res.Collection()))
+}
+
+// UserResource is a resource mixin that restricts create, read and update operations to
+// admins, users with the permission action_collectionname (see AdminResource) or
+// users that own the model.
+// This can only be used for models that implement the appkit.UserModel interface.
+type UserResource struct{}
+
+func (UserResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
+	if user == nil {
+		return false
+	}
+	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+		return true
+	}
+	return user.HasRole("admin") || user.HasPermission("create_"+res.Collection())
+}
+
+func (UserResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
+	if user == nil {
+		return false
+	}
+	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+		return true
+	}
+	return user.HasRole("admin") || user.HasPermission("update_"+res.Collection())
+}
+
+func (UserResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
+	if user == nil {
+		return false
+	}
+	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+		return true
+	}
+	return user.HasRole("admin") || user.HasPermission("delete_"+res.Collection())
 }

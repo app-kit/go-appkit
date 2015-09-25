@@ -30,6 +30,10 @@ type AllowFindHook interface {
 	AllowFind(res kit.Resource, model kit.Model, user kit.User) bool
 }
 
+type ApiFindOneHook interface {
+	ApiFindOne(res kit.Resource, rawId string, r kit.Request) kit.Response
+}
+
 type ApiFindHook interface {
 	ApiFind(res kit.Resource, query db.Query, r kit.Request) kit.Response
 }
