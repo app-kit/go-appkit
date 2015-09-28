@@ -107,11 +107,20 @@ func (h *FileService) SetModel(x interface{}) {
 	h.model = x
 }
 
-func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, deleteDir bool) apperror.Error {
+func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir bool) apperror.Error {
 	if h.DefaultBackend == nil {
 		return &apperror.Err{
 			Code:    "no_default_backend",
 			Message: "Cant build a file without a default backend.",
+		}
+	}
+
+	filePath := file.GetTmpPath()
+	if filePath == "" {
+		return &apperror.Err{
+			Code:    "no_tmp_path",
+			Message: "You must set TmpPath on a file before building it.",
+			Public:  true,
 		}
 	}
 
@@ -126,6 +135,8 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 			Message: fmt.Sprintf("The backend %v does not exist", file.GetBackendName()),
 		}
 	}
+
+	file.SetBackend(backend)
 
 	if file.GetBucket() == "" {
 		return &apperror.Err{
@@ -166,7 +177,6 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 
 	// Determine mime type.
 	mimeType := GetMimeType(filePath)
-	fmt.Printf("determined mime type: %v\n", mimeType)
 	if mimeType == "" {
 		mimeType = mime.TypeByExtension("." + extension)
 	}
@@ -174,7 +184,6 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 
 	// Determine image info.
 	imageInfo, err := GetImageInfo(filePath)
-	fmt.Printf("info: %+v, err: %v\n", imageInfo, err)
 	if imageInfo != nil {
 		file.SetIsImage(true)
 		file.SetWidth(int(imageInfo.Width))
@@ -184,7 +193,7 @@ func (h FileService) BuildFile(file kit.File, user kit.User, filePath string, de
 	// Store the file in the backend.
 	backendId, writer, err2 := file.Writer(true)
 	if err2 != nil {
-		return apperror.Wrap(err2, "backend_error")
+		return apperror.Wrap(err2, "file_backend_error")
 	}
 	defer writer.Close()
 

@@ -24,6 +24,9 @@ type File struct {
 	BackendID   string `db:"not-null;max:150"`
 	Bucket      string `db:"not-null;max:150"`
 
+	// Used to store the tmp file path before it is persisted to the backend.
+	TmpPath string
+
 	Name      string `db:"not-null;max:1000"`
 	Extension string `db:"max:100"`
 	FullName  string `db:"not-null;max:1100"`
@@ -42,6 +45,14 @@ type File struct {
 
 func (f *File) Collection() string {
 	return "files"
+}
+
+func (f *File) GetTmpPath() string {
+	return f.TmpPath
+}
+
+func (f *File) SetTmpPath(x string) {
+	f.TmpPath = x
 }
 
 func (f *File) GetBackend() kit.FileBackend {
@@ -186,7 +197,7 @@ func (f *FileStrID) Reader() (io.ReadCloser, apperror.Error) {
 
 func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
-		return "", nil, nil
+		panic("Called File.Writer() on a file with unset backend.")
 	}
 	return f.Backend.Writer(f, create)
 }
@@ -213,7 +224,7 @@ func (f *FileIntID) Reader() (io.ReadCloser, apperror.Error) {
 
 func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
-		return "", nil, nil
+		panic("Called File.Writer() on a file with unset backend.")
 	}
 	return f.Backend.Writer(f, create)
 }

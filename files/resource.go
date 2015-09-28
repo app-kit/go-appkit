@@ -20,7 +20,6 @@ import (
 	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/resources"
 	"github.com/theduke/go-appkit/utils"
 )
 
@@ -142,45 +141,33 @@ func getTmpPath(res kit.Resource) string {
 }
 
 func (_ FilesResource) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response {
-	tmpPath := getTmpPath(res)
-	if tmpPath == "" {
-		return &kit.AppResponse{
-			Error: &apperror.Err{
-				Code:    "no_tmp_path",
-				Message: "Tmp path is not configured",
-			},
-		}
-	}
-
-	tmpFile := r.GetMeta().String("file")
-	if tmpFile == "" {
-		return &kit.AppResponse{
-			Error: &apperror.Err{
-				Code:    "missing_file_in_meta",
-				Message: "Expected 'file' in metadata with id of tmp file",
-			},
-		}
-	}
-
-	tmpPath = tmpPath + string(os.PathSeparator) + tmpFile
-
-	user := r.GetUser()
-	if allowCreate, ok := r.(resources.AllowCreateHook); ok {
-		if !allowCreate.AllowCreate(res, obj, user) {
-			return kit.NewErrorResponse("permission_denied", "")
-		}
-	}
+	// Verify that tmp path is set either in metadata or on model.
 
 	file := obj.(kit.File)
-	err := res.Dependencies().FileService().BuildFile(file, user, tmpPath, true)
+	if file.GetTmpPath() == "" {
+		file.SetTmpPath(r.GetMeta().String("file"))
+	}
 
-	err = res.Create(obj, user)
+	filePath := file.GetTmpPath()
+	if filePath == "" {
+		return kit.NewErrorResponse("no_tmp_path", "A tmp path must be set when creating a file", true)
+	}
+
+	tmpPath := getTmpPath(res)
+
+	if !strings.HasPrefix(filePath, tmpPath) && filePath[0] != '/' {
+		filePath = tmpPath + string(os.PathSeparator) + filePath
+		file.SetTmpPath(filePath)
+	}
+
+	// Build the file, save it to backend and persist it to the db.
+	err := res.Dependencies().FileService().BuildFile(file, r.GetUser(), true)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
 
 	return &kit.AppResponse{
-		Data: obj,
+		Data: file,
 	}
 }
 
@@ -389,7 +376,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		}, true
 	}
 
-	uploadOptionsRoute := kit.NewHttpRoute("/api/files/upload", "OPTIONS", uploadOptionsHandler)
+	uploadOptionsRoute := kit.NewHttpRoute("/api/file-upload", "OPTIONS", uploadOptionsHandler)
 	routes = append(routes, uploadOptionsRoute)
 
 	tmpPath := getTmpPath(res)
@@ -420,7 +407,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 
 		return &kit.AppResponse{Data: data}, false
 	}
-	uploadRoute := kit.NewHttpRoute("/api/files/upload", "POST", uploadHandler)
+	uploadRoute := kit.NewHttpRoute("/api/file-upload", "POST", uploadHandler)
 	routes = append(routes, uploadRoute)
 
 	serveFileHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
