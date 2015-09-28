@@ -155,6 +155,8 @@ type MenuStrID struct {
 
 	TranslatedMenu   *MenuStrID
 	TranslatedMenuID string `db:"max:200"`
+
+	Items []*MenuItemStrID `db:"belongs-to:ID:MenuID"`
 }
 
 type MenuIntID struct {
@@ -163,6 +165,8 @@ type MenuIntID struct {
 
 	TranslatedMenu   *MenuIntID
 	TranslatedMenuID uint64
+
+	Items []*MenuItemIntID `db:"belongs-to:ID:MenuID"`
 }
 
 /**
@@ -235,7 +239,7 @@ type PageStrID struct {
 	users.StrUserModel
 	Page
 
-	MenuItem   *MenuStrID
+	MenuItem   *MenuItemStrID
 	MenuItemID string `db:"max:200"`
 
 	TranslatedPage   *PageStrID
@@ -250,8 +254,8 @@ type PageIntID struct {
 	users.IntUserModel
 	Page
 
-	MenuItem   *MenuIntID
-	MenuItemID string `db:"max:200"`
+	MenuItem   *MenuItemIntID
+	MenuItemID uint64
 
 	TranslatedPage   *PageIntID
 	TranslatedPageID string `db:"max:200"`
