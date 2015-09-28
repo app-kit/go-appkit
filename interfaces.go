@@ -383,7 +383,13 @@ type Resource interface {
 	ApiCreate(obj Model, r Request) Response
 
 	Update(obj Model, user User) apperror.Error
+	// Updates the model by loading the current version from the database
+	// and setting the changed values.
+	PartialUpdate(obj Model, user User) apperror.Error
+
 	ApiUpdate(obj Model, r Request) Response
+	// See PartialUpdate.
+	ApiPartialUpdate(obj Model, request Request) Response
 
 	Delete(obj Model, user User) apperror.Error
 	ApiDelete(id string, r Request) Response
@@ -442,7 +448,7 @@ type FileService interface {
 	// it will be left in the file system.
 	// If deleteDir is true, the directory holding the file will be deleted
 	// also.
-	BuildFile(file File, user User, filePath string, deleteDir bool) apperror.Error
+	BuildFile(file File, user User, deleteDir bool) apperror.Error
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.
@@ -511,6 +517,8 @@ type UserService interface {
 	SendConfirmationEmail(User) apperror.Error
 	ConfirmEmail(token string) (User, apperror.Error)
 
+	ChangePassword(user User, newPassword string) apperror.Error
+
 	SendPasswordResetEmail(User) apperror.Error
 	ResetPassword(token, newPassword string) (User, apperror.Error)
 }
@@ -542,6 +550,9 @@ type File interface {
 	// File bucket.
 	GetBucket() string
 	SetBucket(string)
+
+	GetTmpPath() string
+	SetTmpPath(path string)
 
 	// File name without extension.
 	GetName() string
