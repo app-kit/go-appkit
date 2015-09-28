@@ -116,7 +116,7 @@ func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interfa
 
 	pw, _ := GetStringFromMap(data, "password")
 	if pw == "" {
-		return "", apperror.New("invalid_data_no_password")
+		return "", apperror.New("invalid_data_no_password", true)
 	}
 
 	item, err := a.GetItem(userID)
@@ -125,13 +125,17 @@ func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interfa
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(item.Hash), []byte(pw)); err != nil {
-		return "", apperror.New("invalid_credentials")
+		return "", apperror.New("invalid_credentials", true)
 	}
 
 	return userID, nil
 }
 
 func (a *AuthAdaptorPassword) ChangePassword(userId, newPw string) apperror.Error {
+	if newPw == "" {
+		return apperror.New("empty_password", "The password may not be empty", true)
+	}
+
 	item, err := a.GetItem(userId)
 	if err != nil {
 		return err

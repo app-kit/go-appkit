@@ -24,7 +24,6 @@ var _ = Describe("Facebook", func() {
 			Expect(token).ToNot(Equal(""))
 
 			appToken = token
-			fmt.Printf("\nAPP TOKEN: %v\n", appToken)
 		})
 
 		It("Should .GetUserData()", func() {

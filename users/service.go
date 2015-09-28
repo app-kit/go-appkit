@@ -590,6 +590,11 @@ func (s *Service) ChangePassword(user kit.User, newPassword string) apperror.Err
 	passwordAdaptor := adaptor.(*password.AuthAdaptorPassword)
 
 	if err := passwordAdaptor.ChangePassword(user.GetStrID(), newPassword); err != nil {
+		if err.IsPublic() {
+			return err
+		} else {
+			return apperror.Wrap(err, "adapter_error")
+		}
 		return err
 	}
 
@@ -638,6 +643,7 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 	authAdaptor := h.AuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
 		return nil, &apperror.Err{
+			Public:  true,
 			Code:    "unknown_auth_adaptor",
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
@@ -650,7 +656,11 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 	var err apperror.Error
 	userId, err = authAdaptor.Authenticate(userId, data)
 	if err != nil {
-		return nil, apperror.Wrap(err, "adaptor_error", "")
+		if err.IsPublic() {
+			return nil, err
+		} else {
+			return nil, apperror.Wrap(err, "adaptor_error", true)
+		}
 	}
 
 	// Query user to get a full user with permissions and profile.

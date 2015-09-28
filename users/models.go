@@ -85,6 +85,8 @@ func (m *IntUserModel) SetUser(x kit.User) {
  */
 
 type User struct {
+	db.TimeStampedModel
+
 	Active bool
 
 	Username string `db:"unique;not-null"`
@@ -97,9 +99,6 @@ type User struct {
 	Data string `db:"ignore-zero;max:10000"`
 
 	Profile interface{} `db:"-"`
-
-	CreatedAt time.Time `db:"ignore-zero"`
-	UpdatedAt time.Time `db:"ignore-zero"`
 
 	Roles []*Role `db:"m2m;"`
 }
@@ -415,10 +414,8 @@ func (t *Token) IsValid() bool {
  */
 
 type Session struct {
-	StrUserModel
-
 	Token string `db:"primary-key;max:150"`
-	Typ   string `db:"not-null;max:100"`
+	Type  string `db:"max:100"`
 
 	StartedAt  time.Time `db:"not-null"`
 	ValidUntil time.Time `db:"not-null"`
@@ -447,11 +444,11 @@ func (s *Session) SetStrID(x string) error {
 }
 
 func (s *Session) GetType() string {
-	return s.Typ
+	return s.Type
 }
 
 func (s *Session) SetType(x string) {
-	s.Typ = x
+	s.Type = x
 }
 
 func (s *Session) SetToken(x string) {
@@ -478,13 +475,18 @@ func (s *Session) GetValidUntil() time.Time {
 	return s.ValidUntil
 }
 
-func (s *Session) IsGuest() bool {
+type StrUserSession struct {
+	StrUserModel
+	Session
+}
+
+func (s StrUserSession) IsGuest() bool {
 	return s.UserID == ""
 }
 
 type IntUserSession struct {
-	Session
 	IntUserModel
+	Session
 }
 
 func (s *IntUserSession) IsGuest() bool {

@@ -11,6 +11,8 @@ import (
 
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/app/methods"
+	"github.com/theduke/go-appkit/resources"
+	"github.com/theduke/go-appkit/utils"
 )
 
 func randomToken() string {
@@ -72,7 +74,7 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 		return kit.NewErrorResponse("empty_token", "Empty token")
 	}
 
-	user, _, err := res.Dependencies().UserService().VerifySession(rawId)
+	user, session, err := res.Dependencies().UserService().VerifySession(rawId)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
@@ -94,6 +96,7 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 	}
 
 	return &kit.AppResponse{
+		Data: session,
 		Meta: meta,
 	}
 }
@@ -116,7 +119,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 		if err != nil {
 			return &kit.AppResponse{Error: apperror.Wrap(err, "user_query_error", "")}
 		} else if rawUser == nil {
-			return kit.NewErrorResponse("user_not_found", "User not found for identifier: "+userIdentifier)
+			return kit.NewErrorResponse("user_not_found", "Username/Email does not exist ", true)
 		}
 
 		user = rawUser.(kit.User)
@@ -286,30 +289,30 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			// Verify that token is in data.
 			data, ok := r.GetData().(map[string]interface{})
 			if !ok {
-				return kit.NewErrorResponse("invalid_data", "Expected 'token' key in data")
+				return kit.NewErrorResponse("invalid_data", "Expected 'token' key in data", true)
 			}
 			token, ok := data["token"].(string)
 			if !ok {
-				return kit.NewErrorResponse("invalid_data", "Expected 'token' string key in data")
+				return kit.NewErrorResponse("invalid_data", "Expected 'token' string key in data", true)
 			}
 			if token == "" {
-				return kit.NewErrorResponse("empty_token", "")
+				return kit.NewErrorResponse("empty_token", "", true)
 			}
 
 			// Verify that password is in data.
 			newPw, ok := data["password"].(string)
 			if !ok {
-				return kit.NewErrorResponse("invalid_passord", "Expected 'password' string key in data")
+				return kit.NewErrorResponse("invalid_passord", "Expected 'password' string key in data", true)
 			}
 			if newPw == "" {
-				return kit.NewErrorResponse("empty_password", "Password may not be empty")
+				return kit.NewErrorResponse("empty_password", "Password may not be empty", true)
 			}
 
 			deps := res.Dependencies()
 
 			user, err := deps.UserService().ResetPassword(token, newPw)
 			if err != nil {
-				return kit.NewErrorResponse("password_reset_failed", "Could not reset the password.")
+				return kit.NewErrorResponse("password_reset_failed", "Could not reset the password.", true)
 			}
 
 			return &kit.AppResponse{
@@ -322,7 +325,64 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 		},
 	}
 
-	return []kit.Method{sendConfirmationEmail, confirmEmail, requestPwReset, pwReset}
+	changePassword := &methods.Method{
+		Name:     "users.change-password",
+		Blocking: false,
+		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+			// Get userId and password from request.
+			userId := utils.GetMapStringKey(r.GetData(), "userId")
+			if userId == "" {
+				return kit.NewErrorResponse("no_userid", "Expected userID key in data", true)
+			}
+			password := utils.GetMapStringKey(r.GetData(), "password")
+			if password == "" {
+				return kit.NewErrorResponse("no_password", "Expected password key in data", true)
+			}
+
+			// Permission check.
+			user := r.GetUser()
+			if user == nil {
+				return kit.NewErrorResponse("permission_denied", true)
+			}
+
+			// Users can only change their own password, unless they are admins.
+			if userId != user.GetStrID() {
+				if !(user.HasRole("admin") || user.HasPermission("users.change_passwords")) {
+					return kit.NewErrorResponse("permission_denied", true)
+				}
+			}
+
+			// User has the right permissions.
+			userService := res.Dependencies().UserService()
+
+			// Find the user.
+			rawUser, err := userService.UserResource().FindOne(userId)
+			if err != nil {
+				return kit.NewErrorResponse("db_error", true, err)
+			}
+			if rawUser == nil {
+				return kit.NewErrorResponse("user_does_not_exist", true)
+			}
+
+			targetUser := rawUser.(kit.User)
+
+			if err := userService.ChangePassword(targetUser, password); err != nil {
+				return &kit.AppResponse{Error: err}
+			}
+
+			// Everything worked fine.
+			return &kit.AppResponse{
+				Data: map[string]interface{}{"success": true},
+			}
+		},
+	}
+
+	return []kit.Method{
+		sendConfirmationEmail,
+		confirmEmail,
+		requestPwReset,
+		pwReset, changePassword,
+	}
 }
 
 func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response {
@@ -362,7 +422,6 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 						Error: apperror.Wrap(err, "invalid_profile_data", "Invalid profile data.", true),
 					}
 				}
-				fmt.Printf("\nCreated profile: %+v\n", profile)
 			}
 		}
 
@@ -387,15 +446,38 @@ func (hooks UserResourceHooks) AllowFind(res kit.Resource, obj kit.Model, user k
 }
 
 func (hooks UserResourceHooks) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
-	return user != nil && obj.GetID() == user.GetID()
+	if user == nil {
+		return false
+	}
+	if user.HasRole("admin") || user.HasPermission("users.update") {
+		return true
+	}
+	return obj.GetID() == user.GetID()
 }
 
 func (hooks UserResourceHooks) AllowDelete(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
 	return false
 }
 
+/**
+ * Roles resource.
+ */
+
 type RoleResourceHooks struct {
+	resources.AdminResource
+}
+
+// Restrict querying to admins.
+func (RoleResourceHooks) AllowFind(res kit.Resource, model kit.Model, user kit.User) bool {
+	return user != nil && user.HasRole("admin")
+}
+
+func (RoleResourceHooks) ApiAlterQuery(res kit.Resource, query db.Query, r kit.Request) apperror.Error {
+	// Join permissions.
+	query.Join("Permissions")
+	return nil
 }
 
 type PermissionResourceHooks struct {
+	resources.AdminResource
 }

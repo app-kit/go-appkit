@@ -37,8 +37,7 @@ func GetUserMigrations(service kit.UserService) []db.Migration {
 	migrations = append(migrations, v1)
 
 	v2 := db.Migration{
-		Name:            "Create admin role and user",
-		WrapTransaction: true,
+		Name: "Create admin role and user",
 		Up: func(b db.MigrationBackend) error {
 			allPerm := &Permission{Name: "all"}
 			if err := b.Create(allPerm); err != nil {
@@ -57,7 +56,10 @@ func GetUserMigrations(service kit.UserService) []db.Migration {
 			user.SetEmail("admin@admin.com")
 			user.AddRole("admin")
 
-			service.CreateUser(user, "password", map[string]interface{}{"password": "admin"})
+			err := service.CreateUser(user, "password", map[string]interface{}{"password": "admin"})
+			if err != nil {
+				return err
+			}
 
 			return nil
 		},
