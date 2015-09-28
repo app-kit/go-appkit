@@ -339,6 +339,13 @@ func (a *App) Run() {
 		return response, false
 	}
 
+	// Handle options requests.
+	a.router.OPTIONS("/api/method/:name", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
+		httpHandler(w, r, params, a, func(app kit.App, r kit.Request) (kit.Response, bool) {
+			return &kit.AppResponse{}, false
+		})
+	})
+	// Handle the method request.
 	a.router.POST("/api/method/:name", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
 		httpHandler(w, r, params, a, methodHandler)
 	})

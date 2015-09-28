@@ -155,7 +155,6 @@ func (c *Client) DoJson(method, path string, data string) (int, *Data, error) {
 
 	resp, err := c.Client.Do(req)
 	if err != nil {
-		fmt.Printf("request error: %v", err)
 		return 0, nil, err
 	}
 
@@ -260,8 +259,6 @@ var _ = Describe("App", func() {
 				Expect(status).To(Equal(201))
 
 				id := GetNested(data.Data, "id").(string)
-
-				fmt.Printf("\ndata: %+v\n", data.Data)
 
 				token := GetNested(data.Data, "attributes.token").(string)
 				Expect(token).ToNot(Equal(""))

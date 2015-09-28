@@ -328,12 +328,35 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 }
 
 func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, app kit.App, handler kit.RequestHandler) {
+	// Set Access-Control headers.
+	header := w.Header()
+
+	allowedOrigins := app.Config().UString("accessControl.allowedOrigins", "*")
+	header.Set("Access-Control-Allow-Origin", allowedOrigins)
+
+	methods := app.Config().UString("accessControl.allowedMethods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+	header.Set("Access-Control-Allow-Methods", methods)
+
+	allowedHeaders := app.Config().UString("accessControl.allowedHeaders", "Authentication, Content-Type")
+	header.Set("Access-Control-Allow-Headers", allowedHeaders)
+
+	// If it is an options request, just respond with 200.
+	if r.Method == "OPTIONS" {
+		w.WriteHeader(200)
+		return
+	}
+
 	request := kit.NewRequest()
 
 	request.SetHttpRequest(r)
 	request.SetHttpResponseWriter(w)
 
-	request.ReadHtmlBody()
+	// Try to parse json in body. Ignore error since body might not contain json.
+	contentType := r.Header.Get("Content-Type")
+	if strings.Contains(contentType, "json") {
+		request.ReadHtmlBody()
+		request.ParseJsonData()
+	}
 
 	for _, param := range params {
 		request.Context.Set(param.Key, param.Value)
@@ -368,24 +391,6 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		response, skip = handler(app, request)
 		if skip {
 			return
-		}
-	}
-
-	// Handle options requests.
-	header := w.Header()
-
-	allowedOrigins := app.Config().UString("accessControl.allowedOrigins", "*")
-	header.Set("Access-Control-Allow-Origin", allowedOrigins)
-
-	methods := app.Config().UString("accessControl.allowedMethods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-	header.Set("Access-Control-Allow-Methods", methods)
-
-	allowedHeaders := app.Config().UString("accessControl.allowedHeaders", "Authentication, Content-Type")
-	header.Set("Access-Control-Allow-Headers", allowedHeaders)
-
-	if r.Method == "OPTIONS" {
-		response = &kit.AppResponse{
-			RawData: []byte{},
 		}
 	}
 
@@ -473,13 +478,17 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 		return false
 	}
 
+	status := 500
+
 	// If the error is an apperror, and it contains a status,
 	// set it as the http status of the response.
 	if apperr, ok := err.(apperror.Error); ok {
 		if apperr.GetStatus() != 0 {
-			response.SetHttpStatus(apperr.GetStatus())
+			status = apperr.GetStatus()
 		}
 	}
+
+	response.SetHttpStatus(status)
 
 	if response.GetRawData() != nil {
 		return false
@@ -488,8 +497,6 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 	httpRequest := r.GetHttpRequest()
 	apiPrefix := "/" + app.Config().UString("api.prefix", "api")
 	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
-
-	response.SetHttpStatus(500)
 
 	data := map[string]interface{}{"errors": []error{response.GetError()}}
 
