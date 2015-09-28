@@ -2,7 +2,8 @@ package jsonapi
 
 import (
 	"fmt"
-	"strconv"
+	"math"
+	"strings"
 
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
@@ -11,9 +12,12 @@ import (
 	"github.com/theduke/go-appkit/utils"
 )
 
+func HandleOptions(a kit.App, r kit.Request) (kit.Response, bool) {
+	return &kit.AppResponse{}, false
+}
+
 func HandleWrap(collection string, handler kit.RequestHandler) kit.RequestHandler {
 	return func(a kit.App, r kit.Request) (kit.Response, bool) {
-		fmt.Printf("collectioN: %v\n", collection)
 		r.GetContext().Set("collection", collection)
 		return handler(a, r)
 	}
@@ -21,9 +25,8 @@ func HandleWrap(collection string, handler kit.RequestHandler) kit.RequestHandle
 
 func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) {
 	collection := res.Collection()
-	if err := request.ParseJsonData(); err != nil {
-		return nil, err
-	}
+
+	info := res.Backend().ModelInfo(collection)
 
 	var query db.Query
 
@@ -43,30 +46,87 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 
 		// No custom query.
 		// Check paging parameters.
-		var limit, offset int64
-		if rawLimit := request.GetContext().String("limit"); rawLimit != "" {
-			var err error
-			limit, err = strconv.ParseInt(rawLimit, 10, 64)
+		var limit, offset int
+
+		context := request.GetContext()
+
+		if context.Has("limit") {
+			val, err := context.Int("limit")
 			if err != nil {
 				return nil, &apperror.Err{
 					Code:    "non_numeric_limit_parameter",
 					Message: "The get query contains a non-numeric ?limit",
 				}
 			}
+			limit = val
 		}
-		if rawOffset := request.GetContext().String("offset"); rawOffset != "" {
-			var err error
-			offset, err = strconv.ParseInt(rawOffset, 10, 64)
+
+		if context.Has("offset") {
+			val, err := context.Int("offset")
 			if err != nil {
 				return nil, &apperror.Err{
 					Code:    "non_numeric_offset_parameter",
 					Message: "The get query contains a non-numeric ?offset",
 				}
 			}
+			offset = val
+		}
+
+		var page, perPage int
+
+		if context.Has("page") {
+			val, err := context.Int("page")
+			if err != nil {
+				return nil, &apperror.Err{
+					Code:    "non_numeric_page_parameter",
+					Message: "The get query contains a non-numeric ?page",
+				}
+			}
+			page = val
+		}
+
+		if context.Has("per_page") {
+			val, err := context.Int("per_page")
+			if err != nil {
+				return nil, &apperror.Err{
+					Code:    "non_numeric_per_page_parameter",
+					Message: "The get query contains a non-numeric ?per_page",
+				}
+			}
+			perPage = val
+		}
+
+		if perPage > 0 {
+			limit = perPage
+		}
+
+		if page > 1 {
+			offset = (page - 1) * limit
 		}
 
 		if limit > 0 {
 			query.Limit(int(limit)).Offset(int(offset))
+		}
+
+		// Add joins.
+		if context.Has("joins") {
+			parts := strings.Split(context.String("joins"), ",")
+			for _, name := range parts {
+				fieldName := info.MapMarshalName(name)
+				if fieldName == "" {
+					fieldName = name
+				}
+
+				if !info.HasField(fieldName) {
+					return nil, &apperror.Err{
+						Code:    "invalid_join",
+						Message: fmt.Sprintf("Tried to join a NON-existant relationship %v", name),
+						Public:  true,
+					}
+				}
+
+				query.Join(fieldName)
+			}
 		}
 	}
 
@@ -88,6 +148,18 @@ func HandleFind(app kit.App, request kit.Request) (kit.Response, bool) {
 	response, err := Find(res, request)
 	if err != nil {
 		response = &kit.AppResponse{Error: err}
+	}
+
+	// If response contains a count and the request a "perPage" param, add a total_pages param
+	// to meta.
+	perPage, err2 := request.GetContext().Int("per_page")
+
+	meta := response.GetMeta()
+	if meta != nil && err2 == nil {
+		count, ok := meta["count"]
+		if ok {
+			meta["total_pages"] = math.Ceil(float64(count.(int)) / float64(perPage))
+		}
 	}
 
 	return ConvertResponse(res.Backend(), response), false
@@ -163,8 +235,16 @@ func Update(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 		return nil, err
 	}
 
-	response := ConvertResponse(res.Backend(), res.ApiUpdate(model, request))
-	return response, nil
+	_, fullUpdate := request.GetContext().Get("full-update")
+	var response kit.Response
+
+	if fullUpdate {
+		response = res.ApiUpdate(model, request)
+	} else {
+		response = res.ApiPartialUpdate(model, request)
+	}
+
+	return ConvertResponse(res.Backend(), response), nil
 }
 
 func HandleUpdate(app kit.App, request kit.Request) (kit.Response, bool) {

@@ -37,37 +37,126 @@ type ApiModel struct {
 	Type          string                            `json:"type"`
 	Id            string                            `json:"id"`
 	Attributes    map[string]interface{}            `json:"attributes,omitempty"`
-	Relationships map[string]map[string][]*ApiModel `json:"relationships,omitempty"`
+	Relationships map[string]map[string]interface{} `json:"relationships,omitempty"`
 }
 
-func (d *ApiModel) AddRelation(name string, data *ApiModel) {
+func ApiModelFromMap(data map[string]interface{}) (*ApiModel, apperror.Error) {
+	rawType, ok := data["type"]
+	if !ok {
+		return nil, &apperror.Err{Code: "invalid_data_no_type"}
+	}
+
+	typ, ok := rawType.(string)
+	if !ok {
+		return nil, &apperror.Err{Code: "invalid_data_type_not_a_string"}
+	}
+
+	rawId, ok := data["id"]
+	if !ok {
+		return nil, &apperror.Err{Code: "invalid_data_no_id"}
+	}
+
+	id, ok := rawId.(string)
+	if !ok {
+		return nil, &apperror.Err{Code: "invalid_data_id_not_a_string"}
+	}
+
+	return &ApiModel{
+		Type: typ,
+		Id:   id,
+	}, nil
+}
+
+func ApiModelsFromData(data interface{}) ([]*ApiModel, apperror.Error) {
+	if item, ok := data.(map[string]interface{}); ok {
+		if model, err := ApiModelFromMap(item); err != nil {
+			return nil, err
+		} else {
+			return []*ApiModel{model}, nil
+		}
+	}
+
+	// Not a single model, so should be a slice.
+	if slice, ok := data.([]interface{}); ok {
+		models := make([]*ApiModel, 0)
+
+		for _, rawItem := range slice {
+			item := rawItem.(map[string]interface{})
+
+			if model, err := ApiModelFromMap(item); err != nil {
+				return nil, err
+			} else {
+				models = append(models, model)
+			}
+		}
+
+		return models, nil
+	}
+
+	return nil, apperror.New("invalid_data")
+}
+
+func (d *ApiModel) AddRelation(name string, data *ApiModel, isSingle bool) {
 	if d.Relationships == nil {
-		d.Relationships = make(map[string]map[string][]*ApiModel)
+		d.Relationships = make(map[string]map[string]interface{})
 	}
 
 	if _, ok := d.Relationships[name]; !ok {
-		d.Relationships[name] = make(map[string][]*ApiModel)
-		d.Relationships[name]["data"] = make([]*ApiModel, 0)
+		d.Relationships[name] = make(map[string]interface{})
+
+		if !isSingle {
+			d.Relationships[name]["data"] = make([]*ApiModel, 0)
+		}
 	}
 
-	d.Relationships[name]["data"] = append(d.Relationships[name]["data"], data)
+	if isSingle {
+		d.Relationships[name]["data"] = data
+	} else {
+		d.Relationships[name]["data"] = append(d.Relationships[name]["data"].([]*ApiModel), data)
+	}
 }
 
-func (d *ApiModel) GetRelation(name string) []*ApiModel {
+func (d *ApiModel) GetRelation(name string) ([]*ApiModel, apperror.Error) {
 	if _, ok := d.Relationships[name]; !ok {
-		return nil
+		return nil, nil
 	}
-	return d.Relationships[name]["data"]
+	data := d.Relationships[name]["data"]
+
+	if item, ok := data.(*ApiModel); ok {
+		return []*ApiModel{item}, nil
+	} else if items, ok := data.([]*ApiModel); ok {
+		return items, nil
+	} else {
+		return ApiModelsFromData(data)
+	}
+}
+
+func (d ApiModel) GetRelations() (map[string][]*ApiModel, apperror.Error) {
+	rels := make(map[string][]*ApiModel)
+
+	if d.Relationships != nil {
+		for key := range d.Relationships {
+			models, err := d.GetRelation(key)
+			if err != nil {
+				return nil, err
+			}
+			if models != nil {
+				rels[key] = models
+			}
+		}
+	}
+
+	return rels, nil
 }
 
 func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Model, apperror.Error) {
 	var request ApiModelData
 	if err := json.Unmarshal(rawData, &request); err != nil {
-		return nil, apperror.Wrap(err, "invalid_json_body", "")
+		return nil, apperror.Wrap(err, "invalid_json_body", true)
 	}
 
 	if request.Data == nil {
-		return nil, apperror.New("no_model_data")
+		return nil, apperror.New("no_model_data", true)
 	}
 
 	data := request.Data
@@ -76,13 +165,14 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	}
 
 	if data.Type == "" {
-		return nil, apperror.New("missing_model_type")
+		return nil, apperror.New("missing_model_type", true)
 	}
 
 	if !backend.HasCollection(data.Type) {
 		return nil, &apperror.Err{
+			Public:  true,
 			Code:    "unknown_model_type",
-			Message: fmt.Sprintf("The model type %v is not supported", data.Type),
+			Message: fmt.Sprintf("The model type %v is not supported", data.Type, true),
 		}
 	}
 
@@ -91,15 +181,12 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	rawModel, _ := backend.CreateModel(data.Type)
 	model := rawModel.(kit.Model)
 
-	if data.Id != "" {
-		model.SetID(data.Id)
-	}
-
 	fieldData := make(map[string]interface{})
 	for key := range data.Attributes {
 		fieldName := info.MapMarshalName(key)
 		if fieldName == "" {
 			return nil, &apperror.Err{
+				Public:  true,
 				Code:    "invalid_attribute",
 				Message: fmt.Sprintf("The collection '%v' does not have a field '%v'", data.Type, key),
 			}
@@ -108,8 +195,134 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 		fieldData[fieldName] = data.Attributes[key]
 	}
 
+	// Set ID if supplied.
+	if data.Id != "" {
+		if err := model.SetStrID(data.Id); err != nil {
+			return nil, apperror.Wrap(err, "invalid_id", true)
+		}
+	}
+
 	if err := db.UpdateModelFromData(info, model, fieldData); err != nil {
 		return nil, apperror.Wrap(err, "update_model_from_dict_error", "")
+	}
+
+	// Now, try to handle relationships.
+	allRelations, err := data.GetRelations()
+	if err != nil {
+		return nil, apperror.Wrap(err, "invalid_relationship_data")
+	}
+
+	for relationship, items := range allRelations {
+		if len(items) < 1 {
+			continue
+		}
+
+		if !info.HasField(relationship) {
+			relationship = info.MapMarshalName(relationship)
+		}
+
+		if !info.HasField(relationship) {
+			return nil, &apperror.Err{
+				Public:  true,
+				Code:    "invalid_relationship",
+				Message: fmt.Sprintf("The collection %v does not have a relationship %v", collection, relationship),
+			}
+		}
+
+		fieldInfo := info.GetField(relationship)
+		relatedInfo := backend.ModelInfo(fieldInfo.RelationCollection)
+
+		// Get a new related model for ID conversion.
+		rawModel, err := backend.CreateModel(relatedInfo.Collection)
+		if err != nil {
+			return nil, apperror.Wrap(err, "create_related_model_error")
+		}
+
+		relatedModel := rawModel.(kit.Model)
+
+		// Handle has-one field.
+		if fieldInfo.HasOne {
+			if len(items) != 1 {
+				return nil, &apperror.Err{
+					Code:    "multiple_items_for_has_one_relationship",
+					Message: fmt.Sprintf("Data contains more than one item for has-one relationshiop %v", relationship),
+				}
+			}
+
+			item := items[0]
+			if item.Type != fieldInfo.RelationCollection {
+				return nil, &apperror.Err{
+					Public:  true,
+					Code:    "invalid_relationship_type",
+					Message: fmt.Sprintf("The item with id %v supplied for relationship %v has wrong type %v", item.Id, relationship, item.Type),
+				}
+
+				targetModel, err := backend.FindOne(fieldInfo.RelationCollection, item.Id)
+				if err != nil {
+					return nil, apperror.Wrap(err, "db_error", true)
+				}
+
+				err2 := db.SetStructModelField(model, fieldInfo.Name, []interface{}{targetModel})
+				if err2 != nil {
+					return nil, apperror.Wrap(err2, "assing_relationship_models_error")
+				}
+			}
+		}
+
+		// Handle m2m field.
+		if fieldInfo.M2M {
+			// First, collect the IDs of all related models.
+
+			ids := make([]interface{}, 0)
+			for _, item := range items {
+
+				// Ensure that item has the correct collection.
+				if item.Type != relatedInfo.Collection {
+					return nil, &apperror.Err{
+						Public:  true,
+						Code:    "invalid_relationship_type",
+						Message: fmt.Sprintf("The item with id %v supplied for relationship %v has wrong type %v", item.Id, relationship, item.Type),
+					}
+				}
+
+				if item.Id == "" {
+					return nil, &apperror.Err{
+						Public:  true,
+						Code:    "relationship_item_without_id",
+						Message: fmt.Sprintf("An item for relationship %v does not have an id", relationship),
+					}
+				}
+
+				// Use the related model to convert the id.
+				if err := relatedModel.SetStrID(item.Id); err != nil {
+					return nil, &apperror.Err{
+						Public:  true,
+						Code:    "invalid_relationship_item_id",
+						Message: fmt.Sprintf("Item for relationship %v has invalid id %v", relationship, item.Id),
+					}
+				}
+
+				ids = append(ids, relatedModel.GetID())
+			}
+
+			// Now, query the records from the database.
+			res, err := backend.Q(relatedInfo.Collection).FilterCond(relatedInfo.PkField, "in", ids).Find()
+			if err != nil {
+				return nil, apperror.Wrap(err, "db_error")
+			}
+
+			if len(res) != len(ids) {
+				return nil, &apperror.Err{
+					Code:    "inexistant_relationship_ids",
+					Message: fmt.Sprintf("Supplied non-existant ids for relationship %v", relationship),
+				}
+			}
+
+			// Now we can update the model.
+			if err := db.SetStructModelField(model, fieldInfo.Name, res); err != nil {
+				return nil, apperror.Wrap(err, "assing_relationship_models_error")
+			}
+		}
 	}
 
 	return model, nil
@@ -133,6 +346,7 @@ func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, appe
 	includedModels := make([]*ApiModel, 0)
 
 	// Check every model  field.
+
 	for fieldName := range info.FieldInfo {
 		field := info.FieldInfo[fieldName]
 
@@ -185,7 +399,8 @@ func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, appe
 				Id:   relatedModel.GetStrID(),
 			}
 
-			data.AddRelation(field.MarshalName, relation)
+			isSingle := !field.RelationIsMany
+			data.AddRelation(field.MarshalName, relation, isSingle)
 
 			// Add related model to included data.
 			includedModels = append(includedModels, relationData)
