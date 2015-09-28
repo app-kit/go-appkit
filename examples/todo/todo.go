@@ -121,7 +121,6 @@ func start() error {
 	}
 	backend.SetDebug(true)
 	app.RegisterBackend(backend)
-	fmt.Printf("deps: %+v\n", app.Dependencies())
 
 	// Build cache.
 	fsCache, err := fs.New("tmp/cache")
