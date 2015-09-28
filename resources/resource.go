@@ -1,6 +1,8 @@
 package resources
 
 import (
+	"reflect"
+
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
@@ -124,6 +126,9 @@ func (res *Resource) FindOne(rawId interface{}) (kit.Model, apperror.Error) {
 	if err != nil {
 		return nil, err
 	}
+	if item == nil {
+		return nil, nil
+	}
 	return item.(kit.Model), nil
 }
 
@@ -211,13 +216,17 @@ func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
  */
 
 func (res *Resource) Create(obj kit.Model, user kit.User) apperror.Error {
+	if hook, ok := res.hooks.(CreateHook); ok {
+		return hook.Create(res, obj, user)
+	}
+
 	if allowCreate, ok := res.hooks.(AllowCreateHook); ok {
 		if !allowCreate.AllowCreate(res, obj, user) {
 			return apperror.New("permission_denied")
 		}
 	}
 
-	if userModel, ok := obj.(kit.UserModel); ok {
+	if userModel, ok := obj.(kit.UserModel); ok && user != nil {
 		if db.IsZero(userModel.GetUserID()) {
 			userModel.SetUserID(user.GetID())
 		}
@@ -262,7 +271,11 @@ func (res *Resource) ApiCreate(obj kit.Model, r kit.Request) kit.Response {
  * Update.
  */
 
-func (res *Resource) Update(obj kit.Model, user kit.User) apperror.Error {
+func (res *Resource) update(obj kit.Model, user kit.User, partial bool) apperror.Error {
+	if hook, ok := res.hooks.(UpdateHook); ok {
+		return hook.Update(res, obj, user)
+	}
+
 	oldObj, err := res.FindOne(obj.GetID())
 	if err != nil {
 		return err
@@ -282,6 +295,23 @@ func (res *Resource) Update(obj kit.Model, user kit.User) apperror.Error {
 		}
 	}
 
+	if partial {
+		info := res.backend.ModelInfo(obj.Collection())
+
+		reflNewObj := reflect.ValueOf(obj).Elem()
+		reflOldObj := reflect.ValueOf(oldObj).Elem()
+
+		for fieldName := range info.FieldInfo {
+			reflVal := reflNewObj.FieldByName(fieldName)
+
+			if !db.IsZero(reflVal.Interface()) {
+				reflOldObj.FieldByName(fieldName).Set(reflVal)
+			}
+		}
+
+		obj = oldObj
+	}
+
 	if err := res.backend.Update(obj); err != nil {
 		return err
 	}
@@ -293,6 +323,15 @@ func (res *Resource) Update(obj kit.Model, user kit.User) apperror.Error {
 	}
 
 	return nil
+}
+
+func (res *Resource) Update(obj kit.Model, user kit.User) apperror.Error {
+	return res.update(obj, user, false)
+
+}
+
+func (res *Resource) PartialUpdate(obj kit.Model, user kit.User) apperror.Error {
+	return res.update(obj, user, true)
 }
 
 func (res *Resource) ApiUpdate(obj kit.Model, r kit.Request) kit.Response {
@@ -311,11 +350,31 @@ func (res *Resource) ApiUpdate(obj kit.Model, r kit.Request) kit.Response {
 	}
 }
 
+func (res *Resource) ApiPartialUpdate(obj kit.Model, r kit.Request) kit.Response {
+	if updateHook, ok := res.hooks.(ApiUpdateHook); ok {
+		return updateHook.ApiUpdate(res, obj, r)
+	}
+
+	user := r.GetUser()
+	err := res.PartialUpdate(obj, user)
+	if err != nil {
+		return &kit.AppResponse{Error: err}
+	}
+
+	return &kit.AppResponse{
+		Data: obj,
+	}
+}
+
 /**
  * Delete.
  */
 
 func (res *Resource) Delete(obj kit.Model, user kit.User) apperror.Error {
+	if hook, ok := res.hooks.(DeleteHook); ok {
+		return hook.Delete(res, obj, user)
+	}
+
 	if allowDelete, ok := res.hooks.(AllowDeleteHook); ok {
 		if !allowDelete.AllowDelete(res, obj, user) {
 			return apperror.New("permission_denied")

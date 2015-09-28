@@ -80,7 +80,7 @@ type ApiUpdateHook interface {
 }
 
 type UpdateHook interface {
-	Update(res kit.Resource, obj kit.Model, r kit.Request) apperror.Error
+	Update(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 }
 
 type BeforeUpdateHook interface {
