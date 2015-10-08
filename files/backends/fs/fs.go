@@ -148,7 +148,7 @@ func (fs Fs) HasBucket(bucket string) (bool, apperror.Error) {
 }
 
 func (fs Fs) CreateBucket(bucket string, _ kit.BucketConfig) apperror.Error {
-	if err := os.Mkdir(fs.bucketPath(bucket), 0777); err != nil {
+	if err := os.MkdirAll(fs.bucketPath(bucket), 0777); err != nil {
 		return apperror.Wrap(err, "create_bucket_failed")
 	}
 

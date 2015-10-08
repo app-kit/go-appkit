@@ -32,7 +32,7 @@ type File struct {
 	FullName  string `db:"not-null;max:1100"`
 
 	Title       string `db:"max:100"`
-	Description string `db:"max:-1"`
+	Description string `db:""`
 
 	Size int64
 	Mime string
@@ -41,6 +41,12 @@ type File struct {
 
 	Width  int
 	Height int
+
+	// Can be used for sorting.
+	Weight int
+
+	// Can be used for categorization.
+	Type string `db:"max:200"`
 }
 
 func (f *File) Collection() string {

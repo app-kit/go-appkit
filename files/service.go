@@ -107,7 +107,7 @@ func (h *FileService) SetModel(x interface{}) {
 	h.model = x
 }
 
-func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir bool) apperror.Error {
+func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFile bool) apperror.Error {
 	if h.DefaultBackend == nil {
 		return &apperror.Err{
 			Code:    "no_default_backend",
@@ -222,7 +222,9 @@ func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir bool) app
 	}
 
 	// Delete tmp file.
-	os.Remove(filePath)
+	if deleteFile {
+		os.Remove(filePath)
+	}
 
 	if deleteDir {
 		dir := strings.Join(pathParts[:len(pathParts)-1], string(os.PathSeparator))
@@ -289,6 +291,30 @@ func (h *FileService) Update(f kit.File, u kit.User) apperror.Error {
 	return h.resource.Update(f, u)
 }
 
+func (h *FileService) DeleteByID(id interface{}, user kit.User) apperror.Error {
+	// Find the file first.
+	f, err := h.Resource().FindOne(id)
+	if err != nil {
+		return err
+	} else if f == nil {
+		return apperror.New("file_id_does_not_exist")
+	}
+
+	return h.Delete(f.(kit.File), user)
+}
+
 func (h *FileService) Delete(f kit.File, u kit.User) apperror.Error {
+	// Delete file from backend.
+	if f.GetBackendName() != "" && f.GetBackendID() != "" {
+		backend := h.Backend(f.GetBackendName())
+		if backend == nil {
+			h.Dependencies().Logger().Errorf("Deleting file %v in backend %v, which is unconfigured", f.GetID(), f.GetBackendName())
+		} else {
+			if err := backend.DeleteFile(f); err != nil {
+				return err
+			}
+		}
+	}
+
 	return h.resource.Delete(f, u)
 }

@@ -161,7 +161,7 @@ func (_ FilesResource) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request)
 	}
 
 	// Build the file, save it to backend and persist it to the db.
-	err := res.Dependencies().FileService().BuildFile(file, r.GetUser(), true)
+	err := res.Dependencies().FileService().BuildFile(file, r.GetUser(), true, true)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
@@ -257,8 +257,8 @@ func serveFile(w http.ResponseWriter, file kit.File, reader io.Reader) {
 	}
 }
 
-func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File, width, height int64, ip string) (io.Reader, apperror.Error) {
-	if width == 0 && height == 0 {
+func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File, width, height int64, filters []string, ip string) (io.Reader, apperror.Error) {
+	if width == 0 && height == 0 && len(filters) == 0 {
 		return file.Reader()
 	}
 
@@ -296,12 +296,13 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 		}
 	}
 
-	thumbId := fmt.Sprintf("%v_%v_%v_%v_%v.%v",
+	thumbId := fmt.Sprintf("%v_%v_%v_%v_%v_%v.%v",
 		file.GetID(),
 		file.GetBucket(),
 		file.GetName(),
 		strconv.FormatInt(width, 10),
 		strconv.FormatInt(height, 10),
+		strings.Replace(strings.Join(filters, "_"), ":", "_", -1),
 		"jpeg")
 
 	if ok, _ := file.GetBackend().HasFileById("thumbs", thumbId); !ok {
@@ -325,9 +326,62 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 			return nil, apperror.Wrap(err2, "image_decode_error")
 		}
 
-		gift := gift.New(
-			gift.ResizeToFill(int(width), int(height), gift.LanczosResampling, gift.CenterAnchor),
-		)
+		var giftFilters []gift.Filter
+
+		if !(height == 0 && width == 0) {
+			giftFilters = append(giftFilters, gift.ResizeToFill(int(width), int(height), gift.LanczosResampling, gift.CenterAnchor))
+		}
+
+		for _, filter := range filters {
+			if filter == "" {
+				continue
+			}
+
+			parts := strings.Split(filter, ":")
+
+			if len(parts) > 1 {
+				filter = parts[0]
+			}
+
+			switch filter {
+			case "sepia":
+				n := float32(100)
+
+				if len(parts) == 2 {
+					x, err := strconv.ParseFloat(parts[1], 64)
+					if err == nil {
+						n = float32(x)
+					} else {
+						panic("invalid float value for sepia filter")
+					}
+				}
+
+				giftFilters = append(giftFilters, gift.Sepia(n))
+
+			case "grayscale":
+				giftFilters = append(giftFilters, gift.Grayscale())
+
+			case "brightness":
+				n := float32(0)
+
+				if len(parts) == 2 {
+					x, err := strconv.ParseFloat(parts[1], 64)
+					if err == nil {
+						n = float32(x)
+					} else {
+						panic("Invalid float value for brightness filter")
+					}
+				}
+
+				giftFilters = append(giftFilters, gift.Brightness(n))
+
+			default:
+				panic("Unknown filter: " + filter)
+			}
+		}
+
+		gift := gift.New(giftFilters...)
+
 		thumb := image.NewRGBA(gift.Bounds(img.Bounds()))
 		gift.Draw(thumb, img)
 
@@ -480,6 +534,9 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 			height, _ = strconv.ParseInt(rawHeight, 10, 64)
 		}
 
+		rawFilters := query.Get("filters")
+		filters := strings.Split(rawFilters, ",")
+
 		thumbDir := a.Config().UString("thumbnailDir")
 		if thumbDir == "" {
 			thumbDir = tmpPath + string(os.PathSeparator) + "thumbnails"
@@ -490,7 +547,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 			ip = httpRequest.Header.Get("X-Forwarded-For")
 		}
 
-		reader, err := hooks.getImageReader(a, thumbDir, file, width, height, ip)
+		reader, err := hooks.getImageReader(a, thumbDir, file, width, height, filters, ip)
 		if err != nil {
 			return &kit.AppResponse{
 				Error: err,
