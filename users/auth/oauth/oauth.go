@@ -149,9 +149,16 @@ func (a *AuthAdaptorOauth) RegisterUser(user kit.User, data map[string]interface
 
 	// Fill in user information.
 
-	if user.GetEmail() == "" && userData.Email != "" {
-		user.SetEmail(userData.Email)
-		user.SetIsEmailConfirmed(true)
+	if user.GetEmail() == "" {
+		if userData.Email != "" {
+			user.SetEmail(userData.Email)
+			user.SetIsEmailConfirmed(true)
+		} else {
+			return nil, &apperror.Err{
+				Code:    "oauth_service_insufficient_data_error",
+				Message: fmt.Sprintf("The oauth service %v did not supply the users email, which is required", serviceName),
+			}
+		}
 	}
 
 	if user.GetUsername() == "" && userData.Username != "" {

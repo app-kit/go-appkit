@@ -390,17 +390,17 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 
 	adaptor := meta.String("adaptor")
 	if adaptor == "" {
-		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
+		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.", true)
 	}
 
 	rawData, ok := meta.Get("auth-data")
 	if !ok {
-		return kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
+		return kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.", true)
 	}
 
 	data, ok := rawData.(map[string]interface{})
 	if !ok {
-		return kit.NewErrorResponse("invalid_auth_data", "Invalid auth data: expected dictionary")
+		return kit.NewErrorResponse("invalid_auth_data", "Invalid auth data: expected dictionary", true)
 	}
 
 	user := obj.(kit.User)

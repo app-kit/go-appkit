@@ -244,6 +244,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 		return &apperror.Err{
 			Code:    "unknown_auth_adaptor",
 			Message: fmt.Sprintf("Auth adaptor %v was not registered with user service", adaptorName),
+			Public:  true,
 		}
 	}
 
@@ -265,6 +266,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 		return &apperror.Err{
 			Code:    "user_exists",
 			Message: "A user with the username or email already exists",
+			Public:  true,
 		}
 	}
 
@@ -287,7 +289,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 
 	if profile != nil {
 		profile.SetUser(user)
-		if err := s.Profiles.Create(profile, nil); err != nil {
+		if err := s.Profiles.Create(profile, user); err != nil {
 			s.Users.Backend().Delete(user)
 			return apperror.Wrap(err, "user_profile_create_error", "Could not create the user profile")
 		}
