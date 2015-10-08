@@ -444,7 +444,7 @@ func (a *App) RegisterBackend(b db.Backend) {
 	isDefault := a.DefaultBackend() == nil
 	a.deps.AddBackend(b)
 
-	// If no backend was registered befre, create a default UserService and FileService.
+	// If no backend was registered before, create a default UserService and FileService.
 	if isDefault {
 		if a.UserService() == nil {
 			a.defaultUserService(b)
@@ -539,12 +539,14 @@ func (a *App) RegisterMethod(method kit.Method) {
 }
 
 func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, apperror.Error) {
-	if r.GetSession() == nil {
-		return nil, &apperror.Err{
-			Code:    "no_session",
-			Message: "Can't run a method without a session",
+	/*
+		if r.GetSession() == nil {
+			return nil, &apperror.Err{
+				Code:    "no_session",
+				Message: "Can't run a method without a session",
+			}
 		}
-	}
+	*/
 
 	method := a.methods[name]
 	if method == nil {

@@ -11,6 +11,7 @@ import (
 type Dependencies struct {
 	logger          *logrus.Logger
 	config          *config.Config
+	defaultCache    kit.Cache
 	caches          map[string]kit.Cache
 	defaultBackend  db.Backend
 	backends        map[string]db.Backend
@@ -53,12 +54,23 @@ func (d *Dependencies) Cache(name string) kit.Cache {
 	return d.caches[name]
 }
 
+func (d *Dependencies) DefaultCache() kit.Cache {
+	return d.defaultCache
+}
+
+func (d *Dependencies) SetDefaultCache(c kit.Cache) {
+	d.defaultCache = c
+}
+
 func (d *Dependencies) Caches() map[string]kit.Cache {
 	return d.caches
 }
 
 func (d *Dependencies) AddCache(cache kit.Cache) {
 	d.caches[cache.Name()] = cache
+	if d.defaultCache == nil {
+		d.defaultCache = cache
+	}
 }
 
 func (d *Dependencies) SetCaches(caches map[string]kit.Cache) {

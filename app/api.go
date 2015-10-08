@@ -354,8 +354,13 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// Try to parse json in body. Ignore error since body might not contain json.
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "json") {
-		request.ReadHtmlBody()
-		request.ParseJsonData()
+		if err := request.ReadHtmlBody(); err != nil {
+			app.Logger().Debugf("Could not read request html body: %v", err)
+		} else {
+			if err := request.ParseJsonData(); err != nil {
+				app.Logger().Debugf("Could not parse request json body: %v", err)
+			}
+		}
 	}
 
 	for _, param := range params {
