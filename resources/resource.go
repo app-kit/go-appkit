@@ -31,6 +31,11 @@ func NewResource(model kit.Model, hooks interface{}, isPublic bool) *Resource {
 	}
 
 	r.SetModel(model)
+
+	if hooks == nil {
+		hooks = &LoggedInResource{}
+	}
+
 	r.SetHooks(hooks)
 	return &r
 }
@@ -102,12 +107,16 @@ func (res *Resource) SetHooks(h interface{}) {
 /**
  * Perform a query.
  */
-func (res Resource) Query(q db.Query) ([]kit.Model, apperror.Error) {
-	items, err := res.backend.Query(q)
+func (res Resource) Query(q db.Query, targetSlice ...interface{}) ([]kit.Model, apperror.Error) {
+	items, err := res.backend.Query(q, targetSlice...)
 	if err != nil {
 		return nil, err
 	}
 	return utils.InterfaceToModelSlice(items), nil
+}
+
+func (res Resource) Count(q db.Query) (int, apperror.Error) {
+	return res.Backend().Count(q)
 }
 
 /**
@@ -448,15 +457,15 @@ func (r ReadOnlyResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.
 type AdminResource struct{}
 
 func (AdminResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
-	return user != nil && (user.HasRole("admin") || user.HasPermission("create_"+res.Collection()))
+	return user != nil && (user.HasRole("admin") || user.HasPermission(res.Collection()+".create"))
 }
 
 func (AdminResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
-	return user != nil && (user.HasRole("admin") || user.HasPermission("update_"+res.Collection()))
+	return user != nil && (user.HasRole("admin") || user.HasPermission(res.Collection()+".update"))
 }
 
 func (AdminResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
-	return user != nil && (user.HasRole("admin") || user.HasPermission("delete"+res.Collection()))
+	return user != nil && (user.HasRole("admin") || user.HasPermission(res.Collection()+".delete"))
 }
 
 // UserResource is a resource mixin that restricts create, read and update operations to
@@ -472,7 +481,7 @@ func (UserResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) 
 	if obj.(kit.UserModel).GetUserID() == user.GetID() {
 		return true
 	}
-	return user.HasRole("admin") || user.HasPermission("create_"+res.Collection())
+	return user.HasRole("admin") || user.HasPermission(res.Collection()+".create")
 }
 
 func (UserResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
@@ -482,7 +491,7 @@ func (UserResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, 
 	if obj.(kit.UserModel).GetUserID() == user.GetID() {
 		return true
 	}
-	return user.HasRole("admin") || user.HasPermission("update_"+res.Collection())
+	return user.HasRole("admin") || user.HasPermission(res.Collection()+".update")
 }
 
 func (UserResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
@@ -492,5 +501,21 @@ func (UserResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) 
 	if obj.(kit.UserModel).GetUserID() == user.GetID() {
 		return true
 	}
-	return user.HasRole("admin") || user.HasPermission("delete_"+res.Collection())
+	return user.HasRole("admin") || user.HasPermission(res.Collection()+".delete")
+}
+
+// LoggedInResource is a resource mixin that restricts create, read and update operations to
+// logged in users.
+type LoggedInResource struct{}
+
+func (LoggedInResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
+	return user != nil
+}
+
+func (LoggedInResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
+	return user != nil
+}
+
+func (LoggedInResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
+	return user != nil
 }
