@@ -1,6 +1,8 @@
 package cms
 
 import (
+	"time"
+
 	db "github.com/theduke/go-dukedb"
 
 	"github.com/theduke/go-appkit/files"
@@ -11,7 +13,11 @@ import (
  * Address.
  */
 
-type Address struct {
+type Location struct {
+	Name        string `db:"max:200"`
+	Description string `db:"max:1000"`
+	Comments    string `db:"max:1000"`
+
 	Country      string `db:"min:2;max:2;"`
 	PostalCode   string `db:"max:100;"`
 	State        string `db:"max:100;"`
@@ -20,55 +26,46 @@ type Address struct {
 	StreetNumber string `db:"max:100"`
 	Top          string `db:"max:100"`
 
-	Description string `db:"max:1000"`
+	FormattedAddress string `db:"max:300":`
 
-	Latitude  string `db:"max:100"`
-	Longitude string `db:"max:100"`
+	Point *db.Point
 }
 
-func (a *Address) Collection() string {
-	return "addresses"
+func (a *Location) Collection() string {
+	return "locations"
 }
 
-type AddressIntID struct {
+type LocationIntID struct {
 	db.IntIDModel
-	Address
+	Location
 }
 
-type AddressStrID struct {
+type LocationStrID struct {
 	db.StrIDModel
-	Address
+	Location
 }
 
 /**
  * Tags.
  */
 
-type Tag struct {
-	Tag  string `db:"primary-key;not-null;max:100;index;unique-with:Type"`
-	Type string `db:"not-null;max:100;index"`
+type BaseTag struct {
+	Tag   string `db:"not-null;max:100;index;unique-with:Group"`
+	Group string `db:"not-null;max:100;index"`
 }
 
-func (t *Tag) Collection() string {
+func (t *BaseTag) Collection() string {
 	return "tags"
 }
 
-func (t *Tag) GetID() interface{} {
-	return t.Tag
+type TagStrID struct {
+	db.StrIDModel
+	BaseTag
 }
 
-func (t *Tag) SetID(tag interface{}) error {
-	t.Tag = tag.(string)
-	return nil
-}
-
-func (t *Tag) GetStrID() string {
-	return t.Tag
-}
-
-func (t *Tag) SetStrID(tag string) error {
-	t.Tag = tag
-	return nil
+type TagIntID struct {
+	db.IntIDModel
+	BaseTag
 }
 
 /**
@@ -99,6 +96,9 @@ type MenuItem struct {
 	Route string `db:"max:100"`
 	// Route arguments, separated by ;.
 	RouteArgs string `db:"max:1000"`
+
+	// Used for sorting.
+	Weight int `db:"not-null"`
 }
 
 func (i *MenuItem) Collection() string {
@@ -159,6 +159,11 @@ type MenuStrID struct {
 	Items []*MenuItemStrID `db:"belongs-to:ID:MenuID"`
 }
 
+func (i MenuStrID) BeforeDelete(b db.Backend) error {
+	// Delete menu items first.
+	return b.Q("menu_items").Filter("menu_id", i.ID).Delete()
+}
+
 type MenuIntID struct {
 	db.IntIDModel
 	Menu
@@ -167,6 +172,11 @@ type MenuIntID struct {
 	TranslatedMenuID uint64
 
 	Items []*MenuItemIntID `db:"belongs-to:ID:MenuID"`
+}
+
+func (i MenuIntID) BeforeDelete(b db.Backend) error {
+	// Delete menu items first.
+	return b.Q("menu_items").Filter("menu_id", i.ID).Delete()
 }
 
 /**
@@ -202,7 +212,8 @@ type Page struct {
 	// CreatedAt and UpdatedAt.
 	db.TimeStampedModel
 
-	Published bool
+	Published   bool
+	PublishedAt time.Time
 
 	// Internal title.
 	Name string `db:"not-null;max:200"`
@@ -218,16 +229,14 @@ type Page struct {
 	// Slug.
 	Slug string `db:"not-null;max:250"`
 
-	// Short summary for lists, SEO, etc..
+	// Summary for lists.
+	ListSummary string
+
+	// Summary for top of the page, seo, etc.
 	Summary string
 
 	// The actual content.
 	Content string `db:"not-null;"`
-
-	// Tags.
-	Tags []*Tag `db:"m2m:pages_tags"`
-
-	Comments []*Comment `db:"m2m:pages_comments"`
 }
 
 func (p Page) Collection() string {
@@ -245,8 +254,26 @@ type PageStrID struct {
 	TranslatedPage   *PageStrID
 	TranslatedPageID string `db:"max:200"`
 
-	Files         []*files.FileStrID `db:"m2m:pages_files"`
-	AttachedFiles []*files.FileStrID `db:"m2m:pages_attached_files"`
+	Files []*files.FileStrID `db:"m2m:pages_files"`
+
+	// Tags.
+	Tags []*TagStrID `db:"m2m:pages_tags"`
+}
+
+func (p PageStrID) BeforeDelete(b db.Backend) error {
+	// Delete tags.
+	m2m, _ := b.M2M(p, "Tags")
+	if err := m2m.Clear(); err != nil {
+		return err
+	}
+
+	if p.MenuItemID != "" {
+		if err := b.Q("menu_items").Filter("id", p.MenuItemID).Delete(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }
 
 type PageIntID struct {
@@ -260,6 +287,24 @@ type PageIntID struct {
 	TranslatedPage   *PageIntID
 	TranslatedPageID string `db:"max:200"`
 
-	Files         []*files.FileIntID `db:"m2m:pages_files"`
-	AttachedFiles []*files.FileIntID `db:"m2m:pages_attached_files"`
+	Files []*files.FileIntID `db:"m2m:pages_files"`
+
+	// Tags.
+	Tags []*TagIntID `db:"m2m:pages_tags"`
+}
+
+func (p PageIntID) BeforeDelete(b db.Backend) error {
+	// Delete tags.
+	m2m, _ := b.M2M(p, "Tags")
+	if err := m2m.Clear(); err != nil {
+		return err
+	}
+
+	if p.MenuItemID != 0 {
+		if err := b.Q("menu_items").Filter("id", p.MenuItemID).Delete(); err != nil {
+			return err
+		}
+	}
+
+	return nil
 }

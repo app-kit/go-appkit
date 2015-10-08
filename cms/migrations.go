@@ -19,6 +19,7 @@ func BuildMigrations(b db.MigrationBackend, app kit.App) []db.Migration {
 				"menus",
 				"menu_items",
 				"comments",
+				"locations",
 				"pages"); err != nil {
 				return err
 			}
