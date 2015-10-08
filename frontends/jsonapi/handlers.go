@@ -9,7 +9,6 @@ import (
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/utils"
 )
 
 func HandleOptions(a kit.App, r kit.Request) (kit.Response, bool) {
@@ -30,103 +29,168 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 
 	var query db.Query
 
-	jsonQuery := utils.GetMapStringKey(request.GetData(), "query")
+	jsonQuery := request.GetContext().String("query")
 	if jsonQuery != "" {
 		// A custom query was supplied.
 		// Try to parse the query.
 		var err apperror.Error
 		query, err = db.ParseJsonQuery(collection, []byte(jsonQuery))
 		if err != nil {
-			return nil, apperror.Wrap(err, "invalid_query", "")
+			return nil, apperror.Wrap(err, "invalid_query", "", true)
 		}
 	}
 
 	if query == nil {
 		query = db.Q(collection)
+	}
 
-		// No custom query.
-		// Check paging parameters.
-		var limit, offset int
+	// Check paging parameters.
+	var limit, offset int
 
-		context := request.GetContext()
+	context := request.GetContext()
 
-		if context.Has("limit") {
-			val, err := context.Int("limit")
-			if err != nil {
+	if context.Has("limit") {
+		val, err := context.Int("limit")
+		if err != nil {
+			return nil, &apperror.Err{
+				Public:  true,
+				Code:    "non_numeric_limit_parameter",
+				Message: "The get query contains a non-numeric ?limit",
+			}
+		}
+		limit = val
+	}
+
+	if context.Has("offset") {
+		val, err := context.Int("offset")
+		if err != nil {
+			return nil, &apperror.Err{
+				Public:  true,
+				Code:    "non_numeric_offset_parameter",
+				Message: "The get query contains a non-numeric ?offset",
+			}
+		}
+		offset = val
+	}
+
+	var page, perPage int
+
+	if context.Has("page") {
+		val, err := context.Int("page")
+		if err != nil {
+			return nil, &apperror.Err{
+				Public:  true,
+				Code:    "non_numeric_page_parameter",
+				Message: "The get query contains a non-numeric ?page",
+			}
+		}
+		page = val
+	}
+
+	if context.Has("per_page") {
+		val, err := context.Int("per_page")
+		if err != nil {
+			return nil, &apperror.Err{
+				Public:  true,
+				Code:    "non_numeric_per_page_parameter",
+				Message: "The get query contains a non-numeric ?per_page",
+			}
+		}
+		perPage = val
+	}
+
+	if perPage > 0 {
+		limit = perPage
+	}
+
+	if page > 1 {
+		offset = (page - 1) * limit
+	}
+
+	if limit > 0 {
+		query.Limit(int(limit)).Offset(int(offset))
+	}
+
+	// Add joins.
+	if context.Has("joins") {
+		parts := strings.Split(context.String("joins"), ",")
+		for _, name := range parts {
+			fieldName := info.MapMarshalName(name)
+			if fieldName == "" {
+				fieldName = name
+			}
+
+			if !info.HasField(fieldName) {
 				return nil, &apperror.Err{
-					Code:    "non_numeric_limit_parameter",
-					Message: "The get query contains a non-numeric ?limit",
+					Code:    "invalid_join",
+					Message: fmt.Sprintf("Tried to join a NON-existant relationship %v", name),
+					Public:  true,
 				}
 			}
-			limit = val
+
+			query.Join(fieldName)
 		}
 
-		if context.Has("offset") {
-			val, err := context.Int("offset")
-			if err != nil {
+	}
+
+	// Add filters.
+	if context.Has("filters") {
+		parts := strings.Split(context.String("filters"), ",")
+		for _, filter := range parts {
+			filterParts := strings.Split(filter, ":")
+
+			if len(filterParts) != 2 {
 				return nil, &apperror.Err{
-					Code:    "non_numeric_offset_parameter",
-					Message: "The get query contains a non-numeric ?offset",
+					Public:  true,
+					Code:    "invalid_filter",
+					Message: fmt.Sprintf("Invalid filter: %v", filter),
 				}
 			}
-			offset = val
-		}
 
-		var page, perPage int
+			fieldName := filterParts[0]
 
-		if context.Has("page") {
-			val, err := context.Int("page")
-			if err != nil {
+			// COnvert id query to pk field.
+			if fieldName == "id" {
+				fieldName = info.PkField
+			}
+
+			if !info.HasField(fieldName) {
+				fieldName = info.MapMarshalName(fieldName)
+			}
+
+			if !info.HasField(fieldName) {
 				return nil, &apperror.Err{
-					Code:    "non_numeric_page_parameter",
-					Message: "The get query contains a non-numeric ?page",
+					Code:    "filter_for_inexistant_field",
+					Message: fmt.Sprintf("Tried to filter with inexistant field %v", fieldName),
 				}
 			}
-			page = val
-		}
 
-		if context.Has("per_page") {
-			val, err := context.Int("per_page")
-			if err != nil {
-				return nil, &apperror.Err{
-					Code:    "non_numeric_per_page_parameter",
-					Message: "The get query contains a non-numeric ?per_page",
-				}
-			}
-			perPage = val
-		}
+			fieldInfo := info.GetField(fieldName)
 
-		if perPage > 0 {
-			limit = perPage
-		}
-
-		if page > 1 {
-			offset = (page - 1) * limit
-		}
-
-		if limit > 0 {
-			query.Limit(int(limit)).Offset(int(offset))
-		}
-
-		// Add joins.
-		if context.Has("joins") {
-			parts := strings.Split(context.String("joins"), ",")
-			for _, name := range parts {
-				fieldName := info.MapMarshalName(name)
-				if fieldName == "" {
-					fieldName = name
-				}
-
-				if !info.HasField(fieldName) {
+			if fieldInfo.IsRelation() {
+				if fieldInfo.HasOne {
+					fieldInfo = info.GetField(fieldInfo.HasOneField)
+					fieldName = fieldInfo.Name
+				} else {
 					return nil, &apperror.Err{
-						Code:    "invalid_join",
-						Message: fmt.Sprintf("Tried to join a NON-existant relationship %v", name),
 						Public:  true,
+						Code:    "cant_filter_on_relation",
+						Message: fmt.Sprintf("Tried to filter on relationship field %v (only possible for has-one relations)", fieldName),
 					}
 				}
-
-				query.Join(fieldName)
 			}
+
+			convertedVal, err := db.Convert(filterParts[1], fieldInfo.Type)
+			if err != nil {
+				return nil, &apperror.Err{
+					Public: true,
+					Code:   "inconvertible_filter_value",
+					Message: fmt.Sprintf("Coult not convert filter value %v for field %v (should be %v)",
+						filterParts[1], fieldName, fieldInfo.Type),
+				}
+			}
+
+			query.Filter(fieldName, convertedVal)
 		}
 	}
 
@@ -235,14 +299,7 @@ func Update(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 		return nil, err
 	}
 
-	_, fullUpdate := request.GetContext().Get("full-update")
-	var response kit.Response
-
-	if fullUpdate {
-		response = res.ApiUpdate(model, request)
-	} else {
-		response = res.ApiPartialUpdate(model, request)
-	}
+	response := res.ApiUpdate(model, request)
 
 	return ConvertResponse(res.Backend(), response), nil
 }

@@ -122,6 +122,10 @@ func (d *ApiModel) GetRelation(name string) ([]*ApiModel, apperror.Error) {
 	}
 	data := d.Relationships[name]["data"]
 
+	if data == nil {
+		return nil, nil
+	}
+
 	if item, ok := data.(*ApiModel); ok {
 		return []*ApiModel{item}, nil
 	} else if items, ok := data.([]*ApiModel); ok {
@@ -163,7 +167,6 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	if collection != "" {
 		data.Type = collection
 	}
-
 	if data.Type == "" {
 		return nil, apperror.New("missing_model_type", true)
 	}
@@ -178,7 +181,24 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 
 	info := backend.ModelInfo(data.Type)
 
-	rawModel, _ := backend.CreateModel(data.Type)
+	var rawModel interface{}
+
+	if data.Id != "" {
+		model, err := backend.FindOne(data.Type, data.Id)
+		if err != nil {
+			return nil, err
+		}
+		if model == nil {
+			return nil, &apperror.Err{
+				Code:    "inexistant_model",
+				Message: fmt.Sprintf("Model in collection %v with id %v does not exist", collection, data.Id),
+			}
+		}
+		rawModel = model
+	} else {
+		rawModel, _ = backend.CreateModel(data.Type)
+	}
+
 	model := rawModel.(kit.Model)
 
 	fieldData := make(map[string]interface{})
@@ -209,7 +229,7 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	// Now, try to handle relationships.
 	allRelations, err := data.GetRelations()
 	if err != nil {
-		return nil, apperror.Wrap(err, "invalid_relationship_data")
+		return nil, apperror.Wrap(err, "invalid_relationship_data", true)
 	}
 
 	for relationship, items := range allRelations {
@@ -256,17 +276,27 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 					Code:    "invalid_relationship_type",
 					Message: fmt.Sprintf("The item with id %v supplied for relationship %v has wrong type %v", item.Id, relationship, item.Type),
 				}
+			}
 
-				targetModel, err := backend.FindOne(fieldInfo.RelationCollection, item.Id)
-				if err != nil {
-					return nil, apperror.Wrap(err, "db_error", true)
-				}
-
-				err2 := db.SetStructModelField(model, fieldInfo.Name, []interface{}{targetModel})
-				if err2 != nil {
-					return nil, apperror.Wrap(err2, "assing_relationship_models_error")
+			targetModel, err := backend.FindOne(fieldInfo.RelationCollection, item.Id)
+			if err != nil {
+				return nil, apperror.Wrap(err, "db_error", true)
+			}
+			if targetModel == nil {
+				return nil, &apperror.Err{
+					Code: "inexistant_related_item",
+					Message: fmt.Sprintf("Model for relationship %v (collection %v) with id %v does not exist",
+						relationship, fieldInfo.RelationCollection, item.Id),
 				}
 			}
+
+			foreignKey, _ := db.GetStructFieldValue(targetModel, fieldInfo.HasOneForeignField)
+			err2 := db.SetStructField(model, fieldInfo.HasOneField, foreignKey)
+			if err2 != nil {
+				return nil, apperror.Wrap(err2, "assing_relationship_models_error")
+			}
+
+			fmt.Printf("item: %+v\n", model)
 		}
 
 		// Handle m2m field.
