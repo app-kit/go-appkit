@@ -18,6 +18,34 @@ func GetMapKey(rawData interface{}, key string) (interface{}, bool) {
 	return val, true
 }
 
+func GetMapDictKey(rawData interface{}, key string) (map[string]interface{}, bool) {
+	raw, ok := GetMapKey(rawData, key)
+	if !ok {
+		return nil, false
+	}
+
+	m, ok := raw.(map[string]interface{})
+	if !ok {
+		return nil, false
+	}
+
+	return m, true
+}
+
+func GetMapFloat64Key(rawData interface{}, key string) (float64, bool) {
+	val, ok := GetMapKey(rawData, key)
+	if !ok {
+		return float64(0), false
+	}
+
+	f, ok := val.(float64)
+	if !ok {
+		return float64(0), false
+	}
+
+	return f, true
+}
+
 func GetMapStringKey(rawData interface{}, key string) string {
 	val, ok := GetMapKey(rawData, key)
 	if !ok {
