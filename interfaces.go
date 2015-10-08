@@ -373,8 +373,10 @@ type Resource interface {
 
 	Q() db.Query
 
-	Query(db.Query) ([]Model, apperror.Error)
+	Query(query db.Query, targetSlice ...interface{}) ([]Model, apperror.Error)
 	FindOne(id interface{}) (Model, apperror.Error)
+
+	Count(query db.Query) (int, apperror.Error)
 
 	ApiFindOne(string, Request) Response
 	ApiFind(db.Query, Request) Response
@@ -448,7 +450,7 @@ type FileService interface {
 	// it will be left in the file system.
 	// If deleteDir is true, the directory holding the file will be deleted
 	// also.
-	BuildFile(file File, user User, deleteDir bool) apperror.Error
+	BuildFile(file File, user User, deleteDir, deleteFile bool) apperror.Error
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.
@@ -462,6 +464,8 @@ type FileService interface {
 	Create(File, User) apperror.Error
 	Update(File, User) apperror.Error
 	Delete(File, User) apperror.Error
+
+	DeleteByID(id interface{}, user User) apperror.Error
 }
 
 /**
@@ -657,6 +661,9 @@ type Dependencies interface {
 
 	Config() *config.Config
 	SetConfig(*config.Config)
+
+	DefaultCache() Cache
+	SetDefaultCache(cache Cache)
 
 	Cache(name string) Cache
 	Caches() map[string]Cache

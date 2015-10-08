@@ -173,7 +173,7 @@ func start() error {
 			f := fileHandler.New()
 			f.SetBucket("test")
 
-			err := fileHandler.BuildFile(f, nil, filepath, true)
+			err := fileHandler.BuildFile(f, nil, filepath, true, true)
 			log.Printf("file: %+v\nerr: %v", f, err)
 		}
 	}
