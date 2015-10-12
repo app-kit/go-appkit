@@ -3,13 +3,18 @@
 This project aims to provide an application framework for developing 
 web applications and APIs in the GO language.
 The endgoal is to provide a complete framework similar to [Meteor](https://www.meteor.com/),
-bit with an efficient and compiled language in the backend.
+but with an efficient and compiled language in the backend.
 
-Appkit comes with an extendable CLI, a migrations system, an ORM 
-and a [JSONAPI](jsonapi.org) frontend. 
-*Websocket and long polling support is in progress*
+**Main features:**
 
-Appkit works with the [DukeDB ORM](http://github.com/theduke/go-dukedb).
+* [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...)
+* Different frontends ([JSONAPI](http://jsonapi.org/), [WAMP](http://wamp-proto.org/) (under development).
+* Full user system with password and OAUTH authentication (easily extendable).
+* Server side rendering of javascript apps (Ember, AngularJS, ...) with PhantomJS.
+* Easily extendable CLI.
+* File storage with different backends (File system included, easily extendable to Amazon S3 etc).
+* Caching system with different caches (File system, in memory and REDIS included, easily extendable).
+
 
 ## TOC
 
