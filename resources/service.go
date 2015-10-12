@@ -10,8 +10,8 @@ import (
 )
 
 type Service struct {
-	debug bool
-	deps  kit.Dependencies
+	debug    bool
+	registry kit.Registry
 
 	defaultBackend db.Backend
 	resources      map[string]kit.Resource
@@ -20,11 +20,11 @@ type Service struct {
 // Ensure Service implements ResourceService.
 var _ kit.ResourceService = (*Service)(nil)
 
-func NewService(debug bool, deps kit.Dependencies) *Service {
+func NewService(debug bool, registry kit.Registry) *Service {
 	return &Service{
 		debug:          debug,
-		deps:           deps,
-		defaultBackend: deps.DefaultBackend(),
+		registry:       registry,
+		defaultBackend: registry.DefaultBackend(),
 		resources:      make(map[string]kit.Resource),
 	}
 }
@@ -37,12 +37,12 @@ func (s *Service) SetDebug(x bool) {
 	s.debug = x
 }
 
-func (s *Service) Dependencies() kit.Dependencies {
-	return s.deps
+func (s *Service) Registry() kit.Registry {
+	return s.registry
 }
 
-func (s *Service) SetDependencies(x kit.Dependencies) {
-	s.deps = x
+func (s *Service) SetRegistry(x kit.Registry) {
+	s.registry = x
 }
 
 func (s *Service) SetDefaultBackend(b db.Backend) {
@@ -56,14 +56,14 @@ func (s *Service) Resource(name string) kit.Resource {
 func (s *Service) RegisterResource(res kit.Resource) {
 	if res.Backend() == nil {
 		if s.defaultBackend == nil {
-			s.deps.Logger().Panic("Registering resource without backend, but no default backend set on resources.Service")
+			s.registry.Logger().Panic("Registering resource without backend, but no default backend set on resources.Service")
 		}
 		s.defaultBackend.RegisterModel(res.Model())
 		res.SetBackend(s.defaultBackend)
 	}
 
 	if res.Collection() == "" {
-		s.deps.Logger().Panic("Registering resource without a model type")
+		s.registry.Logger().Panic("Registering resource without a model type")
 	}
 
 	s.resources[res.Collection()] = res

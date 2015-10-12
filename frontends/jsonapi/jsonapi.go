@@ -42,13 +42,13 @@ func (f *Frontend) SetDebug(x bool) {
 }
 
 func (f *Frontend) Logger() *logrus.Logger {
-	return f.app.Dependencies().Logger()
+	return f.app.Registry().Logger()
 }
 
 func (f *Frontend) Init() apperror.Error {
 	apiPrefix := f.app.Config().UString("api.prefix", "api")
 
-	resources := f.app.Dependencies().Resources()
+	resources := f.app.Registry().Resources()
 	for name := range resources {
 		f.app.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name, HandleOptions)
 		f.app.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name+"/:id", HandleOptions)

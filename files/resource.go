@@ -129,9 +129,9 @@ type FilesResource struct {
 }
 
 func getTmpPath(res kit.Resource) string {
-	tmpPath := res.Dependencies().Config().UString("tmpDirUploads")
+	tmpPath := res.Registry().Config().UString("tmpDirUploads")
 	if tmpPath == "" {
-		tmpPath = res.Dependencies().Config().UString("tmpDir")
+		tmpPath = res.Registry().Config().UString("tmpDir")
 		if tmpPath != "" {
 			tmpPath += string(os.PathSeparator) + "uploads"
 		}
@@ -161,7 +161,7 @@ func (_ FilesResource) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request)
 	}
 
 	// Build the file, save it to backend and persist it to the db.
-	err := res.Dependencies().FileService().BuildFile(file, r.GetUser(), true, true)
+	err := res.Registry().FileService().BuildFile(file, r.GetUser(), true, true)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
@@ -400,9 +400,9 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 }
 
 func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
-	maxRunning := res.Dependencies().Config().UInt("files.thumbGenerator.maxRunning", 10)
-	maxPerIPPerMinute := res.Dependencies().Config().UInt("files.thumbGenerator.maxPerIPPerMinute", 100)
-	maxQueueSize := res.Dependencies().Config().UInt("files.thumbGenerator.maxQueueSize", 100)
+	maxRunning := res.Registry().Config().UInt("files.thumbGenerator.maxRunning", 10)
+	maxPerIPPerMinute := res.Registry().Config().UInt("files.thumbGenerator.maxPerIPPerMinute", 100)
+	maxQueueSize := res.Registry().Config().UInt("files.thumbGenerator.maxQueueSize", 100)
 	hooks.thumbnailRateLimiter = newRateLimiter(maxRunning, maxPerIPPerMinute, maxQueueSize)
 
 	routes := make([]kit.HttpRoute, 0)

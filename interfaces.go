@@ -355,8 +355,8 @@ type Resource interface {
 	Debug() bool
 	SetDebug(bool)
 
-	Dependencies() Dependencies
-	SetDependencies(Dependencies)
+	Registry() Registry
+	SetRegistry(Registry)
 
 	Backend() db.Backend
 	SetBackend(db.Backend)
@@ -405,8 +405,8 @@ type Service interface {
 	SetDebug(bool)
 	Debug() bool
 
-	Dependencies() Dependencies
-	SetDependencies(Dependencies)
+	Registry() Registry
+	SetRegistry(Registry)
 }
 
 /**
@@ -652,10 +652,10 @@ type FileBackend interface {
 }
 
 /**
- * Deps.
+ * Registry.
  */
 
-type Dependencies interface {
+type Registry interface {
 	Logger() *logrus.Logger
 	SetLogger(*logrus.Logger)
 
@@ -729,7 +729,7 @@ type App interface {
 	Debug() bool
 	SetDebug(bool)
 
-	Dependencies() Dependencies
+	Registry() Registry
 
 	Logger() *logrus.Logger
 	SetLogger(*logrus.Logger)

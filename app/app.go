@@ -35,7 +35,7 @@ type App struct {
 
 	logger *logrus.Logger
 
-	deps      kit.Dependencies
+	registry  kit.Registry
 	frontends map[string]kit.Frontend
 
 	methods map[string]kit.Method
@@ -60,7 +60,7 @@ var _ kit.App = (*App)(nil)
 
 func NewApp(cfgPaths ...string) *App {
 	app := App{
-		deps:              NewDependencies(),
+		registry:          NewRegistry(),
 		frontends:         make(map[string]kit.Frontend),
 		methods:           make(map[string]kit.Method),
 		beforeMiddlewares: make([]kit.RequestHandler, 0),
@@ -159,8 +159,8 @@ func (a *App) SetDebug(x bool) {
 	a.debug = x
 }
 
-func (a *App) Dependencies() kit.Dependencies {
-	return a.deps
+func (a *App) Registry() kit.Registry {
+	return a.registry
 }
 
 func (a *App) Logger() *logrus.Logger {
@@ -169,7 +169,7 @@ func (a *App) Logger() *logrus.Logger {
 
 func (a *App) SetLogger(x *logrus.Logger) {
 	a.logger = x
-	a.deps.SetLogger(x)
+	a.registry.SetLogger(x)
 }
 
 func (a *App) Router() *httprouter.Router {
@@ -177,7 +177,7 @@ func (a *App) Router() *httprouter.Router {
 }
 
 func (a *App) TmpDir() string {
-	return a.deps.Config().UString("tmpDir", "tmp")
+	return a.registry.Config().UString("tmpDir", "tmp")
 }
 
 /**
@@ -185,11 +185,11 @@ func (a *App) TmpDir() string {
  */
 
 func (a *App) Config() *config.Config {
-	return a.deps.Config()
+	return a.registry.Config()
 }
 
 func (a *App) SetConfig(x *config.Config) {
-	a.deps.SetConfig(x)
+	a.registry.SetConfig(x)
 }
 
 func (a *App) ReadConfig(path string) {
@@ -250,11 +250,11 @@ func (a *App) ReadConfig(path string) {
 		a.Logger().Panicf("Could not read or create data dir at '%v': %v", tmpDir, err)
 	}
 
-	a.deps.SetConfig(cfg)
+	a.registry.SetConfig(cfg)
 }
 
 func (a *App) PrepareBackends() {
-	backends := a.deps.Backends()
+	backends := a.registry.Backends()
 	for name := range backends {
 		backends[name].BuildRelationshipInfo()
 	}
@@ -442,7 +442,7 @@ func (a *App) RegisterBackend(b db.Backend) {
 	}
 
 	isDefault := a.DefaultBackend() == nil
-	a.deps.AddBackend(b)
+	a.registry.AddBackend(b)
 
 	// If no backend was registered before, create a default UserService and FileService.
 	if isDefault {
@@ -456,11 +456,11 @@ func (a *App) RegisterBackend(b db.Backend) {
 }
 
 func (a *App) Backend(name string) db.Backend {
-	return a.deps.Backend(name)
+	return a.registry.Backend(name)
 }
 
 func (a *App) DefaultBackend() db.Backend {
-	return a.deps.DefaultBackend()
+	return a.registry.DefaultBackend()
 }
 
 /**
@@ -468,11 +468,11 @@ func (a *App) DefaultBackend() db.Backend {
  */
 
 func (a *App) RegisterCache(c kit.Cache) {
-	a.deps.AddCache(c)
+	a.registry.AddCache(c)
 }
 
 func (a *App) Cache(name string) kit.Cache {
-	return a.deps.Cache(name)
+	return a.registry.Cache(name)
 }
 
 /**
@@ -480,13 +480,13 @@ func (a *App) Cache(name string) kit.Cache {
  */
 
 func (a *App) buildEmailService() {
-	host := a.deps.Config().UString("email.host")
-	port := a.deps.Config().UInt("email.port")
-	user := a.deps.Config().UString("email.user")
-	pw := a.deps.Config().UString("email.password")
+	host := a.registry.Config().UString("email.host")
+	port := a.registry.Config().UInt("email.port")
+	user := a.registry.Config().UString("email.user")
+	pw := a.registry.Config().UString("email.password")
 
-	fromEmail := a.deps.Config().UString("email.from", "no-reply@appkit")
-	fromName := a.deps.Config().UString("email.fromName", "Appkit")
+	fromEmail := a.registry.Config().UString("email.from", "no-reply@appkit")
+	fromName := a.registry.Config().UString("email.fromName", "Appkit")
 
 	from := email.Recipient{
 		Email: fromEmail,
@@ -494,24 +494,24 @@ func (a *App) buildEmailService() {
 	}
 
 	if host != "" && port > 0 && user != "" && pw != "" {
-		a.RegisterEmailService(gomail.New(a.deps, host, port, user, pw, fromEmail, fromName))
+		a.RegisterEmailService(gomail.New(a.registry, host, port, user, pw, fromEmail, fromName))
 		a.Logger().Debug("Using gomail email service")
 	} else {
-		a.RegisterEmailService(emaillog.New(a.deps, from))
+		a.RegisterEmailService(emaillog.New(a.registry, from))
 		a.Logger().Debug("Using log email service")
 	}
 }
 
 func (a *App) RegisterEmailService(s kit.EmailService) {
-	if s.Dependencies() == nil {
-		s.SetDependencies(a.deps)
+	if s.Registry() == nil {
+		s.SetRegistry(a.registry)
 	}
 	s.SetDebug(a.debug)
-	a.deps.SetEmailService(s)
+	a.registry.SetEmailService(s)
 }
 
 func (a *App) EmailService() kit.EmailService {
-	return a.deps.EmailService()
+	return a.registry.EmailService()
 }
 
 /**
@@ -519,11 +519,11 @@ func (a *App) EmailService() kit.EmailService {
  */
 
 func (a *App) RegisterTemplateEngine(e kit.TemplateEngine) {
-	a.deps.SetTemplateEngine(e)
+	a.registry.SetTemplateEngine(e)
 }
 
 func (a *App) TemplateEngine() kit.TemplateEngine {
-	return a.deps.TemplateEngine()
+	return a.registry.TemplateEngine()
 }
 
 /**
@@ -573,16 +573,16 @@ func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response)
 
 func (a *App) RegisterResource(res kit.Resource) {
 	if res.Backend() == nil {
-		if a.deps.DefaultBackend() == nil {
+		if a.registry.DefaultBackend() == nil {
 			a.Logger().Panic("Registering resource without backend, but no default backend set.")
 		}
 
 		// Set backend.
-		res.SetBackend(a.deps.DefaultBackend())
+		res.SetBackend(a.registry.DefaultBackend())
 	}
 
-	if res.Dependencies() == nil {
-		res.SetDependencies(a.deps)
+	if res.Registry() == nil {
+		res.SetRegistry(a.registry)
 	}
 
 	res.SetDebug(a.debug)
@@ -610,11 +610,11 @@ func (a *App) RegisterResource(res kit.Resource) {
 		}
 	}
 
-	a.deps.AddResource(res)
+	a.registry.AddResource(res)
 }
 
 func (a App) Resource(name string) kit.Resource {
-	return a.deps.Resource(name)
+	return a.registry.Resource(name)
 }
 
 /**
@@ -622,8 +622,8 @@ func (a App) Resource(name string) kit.Resource {
  */
 
 func (a *App) RegisterUserService(s kit.UserService) {
-	if s.Dependencies() == nil {
-		s.SetDependencies(a.deps)
+	if s.Registry() == nil {
+		s.SetRegistry(a.registry)
 	}
 
 	s.SetDebug(a.debug)
@@ -633,11 +633,11 @@ func (a *App) RegisterUserService(s kit.UserService) {
 	a.RegisterResource(s.RoleResource())
 	a.RegisterResource(s.PermissionResource())
 
-	a.deps.SetUserService(s)
+	a.registry.SetUserService(s)
 }
 
 func (a *App) UserService() kit.UserService {
-	return a.deps.UserService()
+	return a.registry.UserService()
 }
 
 /**
@@ -650,17 +650,17 @@ func (a *App) RegisterFileService(f kit.FileService) {
 		a.Logger().Panic("Trying to register file handler without resource")
 	}
 
-	if f.Dependencies() == nil {
-		f.SetDependencies(a.deps)
+	if f.Registry() == nil {
+		f.SetRegistry(a.registry)
 	}
 	f.SetDebug(a.debug)
 
 	a.RegisterResource(r)
-	a.deps.SetFileService(f)
+	a.registry.SetFileService(f)
 }
 
 func (a *App) FileService() kit.FileService {
-	return a.deps.FileService()
+	return a.registry.FileService()
 }
 
 /**
@@ -742,7 +742,7 @@ func (a *App) MigrateBackend(name string, version int, force bool) apperror.Erro
 
 func (a *App) MigrateAllBackends(force bool) apperror.Error {
 	a.Logger().Infof("MIGRATE: Migrating all backends to newest version")
-	backends := a.deps.Backends()
+	backends := a.registry.Backends()
 	for key := range backends {
 		if err := a.MigrateBackend(key, 0, force); err != nil {
 			return err
@@ -770,7 +770,7 @@ func (a *App) DropBackend(name string) apperror.Error {
 
 func (a *App) DropAllBackends() apperror.Error {
 	a.Logger().Infof("Dropping all backends")
-	for name := range a.deps.Backends() {
+	for name := range a.registry.Backends() {
 		if err := a.DropBackend(name); err != nil {
 			return err
 		}
@@ -801,7 +801,7 @@ func (a *App) RebuildBackend(name string) apperror.Error {
 
 func (a *App) RebuildAllBackends() apperror.Error {
 	a.Logger().Infof("Rebuilding all backends")
-	for key := range a.deps.Backends() {
+	for key := range a.registry.Backends() {
 		if err := a.RebuildBackend(key); err != nil {
 			return err
 		}

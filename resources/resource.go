@@ -11,8 +11,8 @@ import (
 )
 
 type Resource struct {
-	debug bool
-	deps  kit.Dependencies
+	debug    bool
+	registry kit.Registry
 
 	backend db.Backend
 	hooks   interface{}
@@ -48,12 +48,12 @@ func (res *Resource) SetDebug(x bool) {
 	res.debug = x
 }
 
-func (res *Resource) Dependencies() kit.Dependencies {
-	return res.deps
+func (res *Resource) Registry() kit.Registry {
+	return res.registry
 }
 
-func (res *Resource) SetDependencies(x kit.Dependencies) {
-	res.deps = x
+func (res *Resource) SetRegistry(x kit.Registry) {
+	res.registry = x
 }
 
 func (res *Resource) Backend() db.Backend {

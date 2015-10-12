@@ -16,8 +16,8 @@ import (
 )
 
 type FileService struct {
-	debug bool
-	deps  kit.Dependencies
+	debug    bool
+	registry kit.Registry
 
 	resource       kit.Resource
 	backends       map[string]kit.FileBackend
@@ -28,20 +28,20 @@ type FileService struct {
 // Ensure FileService implements FileService interface.
 var _ kit.FileService = (*FileService)(nil)
 
-func NewFileService(deps kit.Dependencies) *FileService {
+func NewFileService(registry kit.Registry) *FileService {
 	return &FileService{
-		deps:     deps,
+		registry: registry,
 		model:    &FileIntID{},
 		backends: make(map[string]kit.FileBackend),
 	}
 }
 
-func NewFileServiceWithFs(deps kit.Dependencies, dataPath string) *FileService {
+func NewFileServiceWithFs(registry kit.Registry, dataPath string) *FileService {
 	if dataPath == "" {
 		panic("Empty data path")
 	}
 
-	service := NewFileService(deps)
+	service := NewFileService(registry)
 
 	res := resources.NewResource(&FileIntID{}, FilesResource{}, true)
 	service.SetResource(res)
@@ -63,12 +63,12 @@ func (s *FileService) SetDebug(x bool) {
 	s.debug = x
 }
 
-func (s *FileService) Dependencies() kit.Dependencies {
-	return s.deps
+func (s *FileService) Registry() kit.Registry {
+	return s.registry
 }
 
-func (s *FileService) SetDependencies(x kit.Dependencies) {
-	s.deps = x
+func (s *FileService) SetRegistry(x kit.Registry) {
+	s.registry = x
 }
 
 func (h *FileService) Resource() kit.Resource {
@@ -308,7 +308,7 @@ func (h *FileService) Delete(f kit.File, u kit.User) apperror.Error {
 	if f.GetBackendName() != "" && f.GetBackendID() != "" {
 		backend := h.Backend(f.GetBackendName())
 		if backend == nil {
-			h.Dependencies().Logger().Errorf("Deleting file %v in backend %v, which is unconfigured", f.GetID(), f.GetBackendName())
+			h.Registry().Logger().Errorf("Deleting file %v in backend %v, which is unconfigured", f.GetID(), f.GetBackendName())
 		} else {
 			if err := backend.DeleteFile(f); err != nil {
 				return err

@@ -200,7 +200,7 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 func HandleFind(app kit.App, request kit.Request) (kit.Response, bool) {
 	collection := request.GetContext().MustString("collection")
 
-	res := app.Dependencies().Resource(collection)
+	res := app.Registry().Resource(collection)
 	if res == nil || !res.IsPublic() {
 		err := &apperror.Err{
 			Code:    "unknown_resource",
@@ -233,7 +233,7 @@ func HandleFindOne(app kit.App, request kit.Request) (kit.Response, bool) {
 	collection := request.GetContext().MustString("collection")
 	id := request.GetContext().MustString("id")
 
-	res := app.Dependencies().Resource(collection)
+	res := app.Registry().Resource(collection)
 	if res == nil || !res.IsPublic() {
 		resp := kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The resource '%v' does not exist", collection))
 		return ConvertResponse(res.Backend(), resp), false
@@ -249,7 +249,7 @@ func Create(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 
 	collection := request.GetContext().MustString("collection")
 
-	res := app.Dependencies().Resource(collection)
+	res := app.Registry().Resource(collection)
 	if res == nil || !res.IsPublic() {
 		return nil, &apperror.Err{
 			Code:    "unknown_resource",
@@ -286,7 +286,7 @@ func Update(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 
 	collection := request.GetContext().MustString("collection")
 
-	res := app.Dependencies().Resource(collection)
+	res := app.Registry().Resource(collection)
 	if res == nil || !res.IsPublic() {
 		return nil, &apperror.Err{
 			Code:    "unknown_resource",
@@ -317,7 +317,7 @@ func HandleDelete(app kit.App, request kit.Request) (kit.Response, bool) {
 	collection := request.GetContext().MustString("collection")
 	id := request.GetContext().MustString("id")
 
-	res := app.Dependencies().Resource(collection)
+	res := app.Registry().Resource(collection)
 	if res == nil || !res.IsPublic() {
 		resp := kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The resource '%v' does not exist", collection))
 		return ConvertResponse(res.Backend(), resp), false

@@ -12,16 +12,16 @@ import (
 
 type Service struct {
 	debug         bool
-	deps          kit.Dependencies
+	registry      kit.Registry
 	defaultSender kit.EmailRecipient
 }
 
 // Ensure Service implements email.Service.
 var _ kit.EmailService = (*Service)(nil)
 
-func New(deps kit.Dependencies, defaultSender kit.EmailRecipient) *Service {
+func New(registry kit.Registry, defaultSender kit.EmailRecipient) *Service {
 	return &Service{
-		deps:          deps,
+		registry:      registry,
 		defaultSender: defaultSender,
 	}
 }
@@ -34,12 +34,12 @@ func (s *Service) SetDebug(x bool) {
 	s.debug = x
 }
 
-func (s *Service) Dependencies() kit.Dependencies {
-	return s.deps
+func (s *Service) Registry() kit.Registry {
+	return s.registry
 }
 
-func (s *Service) SetDependencies(x kit.Dependencies) {
-	s.deps = x
+func (s *Service) SetRegistry(x kit.Registry) {
+	s.registry = x
 }
 
 func (s *Service) SetDefaultFrom(r kit.EmailRecipient) {
@@ -80,7 +80,7 @@ func (s Service) SendMultiple(emails ...kit.Email) (apperror.Error, []apperror.E
 		}
 		msg += "\n####################\n\n"
 
-		s.deps.Logger().WithFields(log.Fields{
+		s.registry.Logger().WithFields(log.Fields{
 			"action":  "send_email",
 			"from":    from,
 			"to":      recipients,

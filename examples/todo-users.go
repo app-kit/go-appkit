@@ -54,8 +54,8 @@ func BuildApp() appkit.App {
 	app.RegisterBackend(backend)
 
 	// Set up resources.
-	app.RegisterResource(resources.NewResource(&Project{}, &users.UserResource{}, true))
-	app.RegisterResource(resources.NewResource(&Todo{}, &users.UserResource{}, true))
+	app.RegisterResource(resources.NewResource(&Project{}, &resources.UserResource{}, true))
+	app.RegisterResource(resources.NewResource(&Todo{}, &resources.UserResource{}, true))
 
 	return app
 }

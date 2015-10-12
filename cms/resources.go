@@ -84,7 +84,7 @@ func (PageResource) BeforeDelete(res kit.Resource, obj kit.Model, user kit.User)
 	// Files have to be deleted here, since they require the fileService.
 
 	// Delete files.
-	fileService := res.Dependencies().FileService()
+	fileService := res.Registry().FileService()
 
 	m2m, err := res.Backend().M2M(obj, "Files")
 	if err != nil {

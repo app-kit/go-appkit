@@ -75,7 +75,7 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 		return kit.NewErrorResponse("empty_token", "Empty token")
 	}
 
-	user, session, err := res.Dependencies().UserService().VerifySession(rawId)
+	user, session, err := res.Registry().UserService().VerifySession(rawId)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
@@ -104,7 +104,7 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 
 // Creating a session is equivalent to logging in.
 func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response {
-	userService := res.Dependencies().UserService()
+	userService := res.Registry().UserService()
 	userResource := userService.UserResource()
 
 	meta := r.GetMeta()
@@ -192,7 +192,7 @@ type UserResourceHooks struct {
 }
 
 func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
-	deps := res.Dependencies()
+	registry := res.Registry()
 
 	sendConfirmationEmail := &methods.Method{
 		Name:     "users.send-confirmation-email",
@@ -207,7 +207,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 				return kit.NewErrorResponse("email_already_confirmed", "The users email address is already confirmed")
 			}
 
-			err := deps.UserService().SendConfirmationEmail(user)
+			err := registry.UserService().SendConfirmationEmail(user)
 			if err != nil {
 				return kit.NewErrorResponse("confirm_failed", "Could not confirm email")
 			}
@@ -234,7 +234,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 				return kit.NewErrorResponse("empty_token", "")
 			}
 
-			_, err := deps.UserService().ConfirmEmail(token)
+			_, err := registry.UserService().ConfirmEmail(token)
 			if err != nil {
 				return kit.NewErrorResponse("confirm_failed", "Could not confirm email")
 			}
@@ -249,7 +249,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 		Name:     "users.request-password-reset",
 		Blocking: false,
 		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			deps := res.Dependencies()
+			registry := res.Registry()
 
 			data, ok := r.GetData().(map[string]interface{})
 			if !ok {
@@ -271,9 +271,9 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 
 			user := rawUser.(kit.User)
 
-			err = deps.UserService().SendPasswordResetEmail(user)
+			err = registry.UserService().SendPasswordResetEmail(user)
 			if err != nil {
-				deps.Logger().Errorf("Could not send password reset email for user %v: %v", user, err)
+				registry.Logger().Errorf("Could not send password reset email for user %v: %v", user, err)
 				return kit.NewErrorResponse("reset_email_send_failed", "Could not send the reset password mail.", true)
 			}
 
@@ -309,9 +309,9 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 				return kit.NewErrorResponse("empty_password", "Password may not be empty", true)
 			}
 
-			deps := res.Dependencies()
+			registry := res.Registry()
 
-			user, err := deps.UserService().ResetPassword(token, newPw)
+			user, err := registry.UserService().ResetPassword(token, newPw)
 			if err != nil {
 				if err.IsPublic() {
 					return &kit.AppResponse{Error: err}
@@ -358,7 +358,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			}
 
 			// User has the right permissions.
-			userService := res.Dependencies().UserService()
+			userService := res.Registry().UserService()
 
 			// Find the user.
 			rawUser, err := userService.UserResource().FindOne(userId)
@@ -410,7 +410,7 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 
 	user := obj.(kit.User)
 
-	service := res.Dependencies().UserService()
+	service := res.Registry().UserService()
 
 	// If a profile model was registered, and profile data is in meta,
 	// create the profile model.

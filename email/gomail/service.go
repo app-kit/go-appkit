@@ -13,8 +13,8 @@ import (
 )
 
 type Service struct {
-	debug bool
-	deps  kit.Dependencies
+	debug    bool
+	registry kit.Registry
 
 	defaultSender kit.EmailRecipient
 
@@ -24,9 +24,9 @@ type Service struct {
 // Ensure Service implements email.Service.
 var _ kit.EmailService = (*Service)(nil)
 
-func New(deps kit.Dependencies, host string, port int, user, password, defaultSenderEmail, defaultSenderName string) *Service {
+func New(registry kit.Registry, host string, port int, user, password, defaultSenderEmail, defaultSenderName string) *Service {
 	s := &Service{
-		deps: deps,
+		registry: registry,
 		defaultSender: email.Recipient{
 			Email: defaultSenderEmail,
 			Name:  defaultSenderName,
@@ -46,12 +46,12 @@ func (s *Service) SetDebug(x bool) {
 	s.debug = x
 }
 
-func (s *Service) Dependencies() kit.Dependencies {
-	return s.deps
+func (s *Service) Registry() kit.Registry {
+	return s.registry
 }
 
-func (s *Service) SetDependencies(x kit.Dependencies) {
-	s.deps = x
+func (s *Service) SetRegistry(x kit.Registry) {
+	s.registry = x
 }
 
 func (s *Service) SetDefaultFrom(r kit.EmailRecipient) {

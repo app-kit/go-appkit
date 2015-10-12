@@ -336,7 +336,7 @@ var _ = Describe("App", func() {
 				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
 
 				// Try to authenticate user with new password.
-				user, err := app.Dependencies().UserService().AuthenticateUser(currentUser, "password", map[string]interface{}{"password": "newpassword"})
+				user, err := app.Registry().UserService().AuthenticateUser(currentUser, "password", map[string]interface{}{"password": "newpassword"})
 				Expect(err).ToNot(HaveOccurred())
 				Expect(user).ToNot(BeNil())
 			})

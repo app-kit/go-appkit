@@ -18,8 +18,8 @@ import (
 )
 
 type Service struct {
-	debug bool
-	deps  kit.Dependencies
+	debug    bool
+	registry kit.Registry
 
 	backend db.Backend
 
@@ -37,9 +37,9 @@ type Service struct {
 // Ensure UserService implements kit.UserService.
 var _ kit.UserService = (*Service)(nil)
 
-func NewService(deps kit.Dependencies, backend db.Backend, profileModel kit.UserProfile) *Service {
+func NewService(registry kit.Registry, backend db.Backend, profileModel kit.UserProfile) *Service {
 	h := Service{
-		deps: deps,
+		registry: registry,
 	}
 
 	h.AuthAdaptors = make(map[string]kit.AuthAdaptor)
@@ -94,12 +94,12 @@ func (s *Service) SetDebug(x bool) {
 	s.debug = x
 }
 
-func (s *Service) Dependencies() kit.Dependencies {
-	return s.deps
+func (s *Service) Registry() kit.Registry {
+	return s.registry
 }
 
-func (s *Service) SetDependencies(x kit.Dependencies) {
-	s.deps = x
+func (s *Service) SetRegistry(x kit.Registry) {
+	s.registry = x
 	if s.backend == nil && x.DefaultBackend() != nil {
 		s.SetBackend(x.DefaultBackend())
 	}
@@ -308,7 +308,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 	}
 
 	if err := s.SendConfirmationEmail(user); err != nil {
-		s.deps.Logger().Errorf("Could not send confirmation email: %v", err)
+		s.registry.Logger().Errorf("Could not send confirmation email: %v", err)
 	}
 
 	return nil
@@ -317,12 +317,12 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 func (s *Service) SendConfirmationEmail(user kit.User) apperror.Error {
 	// Check that an email service is configured.
 
-	mailService := s.deps.EmailService()
+	mailService := s.registry.EmailService()
 	if mailService == nil {
 		return apperror.New("no_email_service")
 	}
 
-	conf := s.deps.Config()
+	conf := s.registry.Config()
 
 	// Check that sending is enabled.
 	if !conf.UBool("users.sendEmailConfirmationEmail", true) {
@@ -364,7 +364,7 @@ func (s *Service) SendConfirmationEmail(user kit.User) apperror.Error {
 	htmlTpl := conf.UString("users.emailConfirmationEmailHtmlTpl")
 	if txtTpl != "" && htmlTpl != "" {
 		// Check that a template engine is configured.
-		engine := s.deps.TemplateEngine()
+		engine := s.registry.TemplateEngine()
 		if engine == nil {
 			return apperror.New("no_template_engine")
 		}
@@ -375,12 +375,12 @@ func (s *Service) SendConfirmationEmail(user kit.User) apperror.Error {
 		}
 		var err apperror.Error
 
-		txtContent, err = s.deps.TemplateEngine().BuildFileAndRender(txtTpl, data)
+		txtContent, err = s.registry.TemplateEngine().BuildFileAndRender(txtTpl, data)
 		if err != nil {
 			return apperror.Wrap(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
 		}
 
-		htmlContent, err = s.deps.TemplateEngine().BuildFileAndRender(htmlTpl, data)
+		htmlContent, err = s.registry.TemplateEngine().BuildFileAndRender(htmlTpl, data)
 		if err != nil {
 			return apperror.Wrap(err, "email_confirmation_tpl_error", "Could not render email confirmation tpl")
 		}
@@ -409,7 +409,7 @@ To confirm your email address, please visit <a href="%v">this link</a>.
 		return err
 	}
 
-	s.deps.Logger().WithFields(logrus.Fields{
+	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.email_confirmation_mail_sent",
 		"email":   user.GetEmail(),
 		"user_id": user.GetID(),
@@ -465,7 +465,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, apperror.Error) {
 	q := s.Tokens.Q().Filter("user_id", userId).Filter("type", "email_confirmation")
 	s.Tokens.Backend().DeleteMany(q)
 
-	s.deps.Logger().WithFields(logrus.Fields{
+	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.email_confirmed",
 		"email":   user.GetEmail(),
 		"user_id": user.GetID(),
@@ -477,7 +477,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, apperror.Error) {
 func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 	// Check that an email service is configured.
 
-	mailService := s.deps.EmailService()
+	mailService := s.registry.EmailService()
 	if mailService == nil {
 		return apperror.New("no_email_service")
 	}
@@ -492,7 +492,7 @@ func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 	}
 	token := tokenItem.GetToken()
 
-	conf := s.deps.Config()
+	conf := s.registry.Config()
 
 	// Build the confirmation url.
 
@@ -530,7 +530,7 @@ func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 	htmlTpl := conf.UString("users.passwordResetHtmlTpl")
 	if txtTpl != "" && htmlTpl != "" {
 		// Check that a template engine is configured.
-		engine := s.deps.TemplateEngine()
+		engine := s.registry.TemplateEngine()
 		if engine == nil {
 			return apperror.New("no_template_engine")
 		}
@@ -542,12 +542,12 @@ func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 		}
 		var err apperror.Error
 
-		txtContent, err = s.deps.TemplateEngine().BuildFileAndRender(txtTpl, data)
+		txtContent, err = s.registry.TemplateEngine().BuildFileAndRender(txtTpl, data)
 		if err != nil {
 			return apperror.Wrap(err, "password_reset_tpl_error", "Could not render password reset tpl")
 		}
 
-		htmlContent, err = s.deps.TemplateEngine().BuildFileAndRender(htmlTpl, data)
+		htmlContent, err = s.registry.TemplateEngine().BuildFileAndRender(htmlTpl, data)
 		if err != nil {
 			return apperror.Wrap(err, "password_reset_tpl_error", "Could not render password reset tpl")
 		}
@@ -578,7 +578,7 @@ The link will be valid for %v hours.
 		return err
 	}
 
-	s.deps.Logger().WithFields(logrus.Fields{
+	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.password_reset_requested",
 		"email":   user.GetEmail(),
 		"user_id": user.GetID(),
@@ -641,7 +641,7 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, apperror.E
 	// Delete token.
 	s.Tokens.Backend().Delete(tokenItem)
 
-	s.deps.Logger().WithFields(logrus.Fields{
+	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.password_reset",
 		"user_id": user.GetID(),
 	}).Debugf("Password for user %v was reset", user.GetID())

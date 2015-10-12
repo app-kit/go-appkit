@@ -8,14 +8,14 @@ but with an efficient and compiled language in the backend.
 
 **Main features:**
 
-* [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...) and with *migrations system*.
-* Different frontends REST, ([JSONAPI](http://jsonapi.org/), websockets with [WAMP](http://wamp-proto.org/) (under development).
-* Arbitrary client side queries with full power of DukeDB.
-* Subscribe to model updates, insertions and deletions on the client with PubSub with WAMP or long polling. *Still under development*.
+* [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...) and with a *migrations system*.
+* Different frontends REST, [JSONAPI](http://jsonapi.org/), websockets with [WAMP](http://wamp-proto.org/) (under development).
+* Arbitrary **client side queries with full power of DukeDB**.
+* Subscribe to model updates, insertions and deletions on the client with **PubSub** with WAMP or long polling. *Still under development*.
 * Full user system with user registration, password reset, notification emails...
 * User *Authentication* (password and OAUTH included, easily extendable).
 * User *Authorization*: RBAC system with roles and permissions.
-* Easy to use Server side rendering of javascript apps (Ember, AngularJS, ...) with PhantomJS.
+* Easy to use **server side rendering of javascript apps** (Ember, AngularJS, ...) with PhantomJS.
 * Easily extendable CLI.
 * File storage with different backends (File system included, easily extendable to Amazon S3 etc).
 * Caching system with different caches (File system, in memory and REDIS included, easily extendable).
@@ -37,8 +37,9 @@ but with an efficient and compiled language in the backend.
   * [Caching](https://github.com/theduke/go-appkit#Concepts.caching)
   * [Registry and Services](https://github.com/theduke/go-appkit#Concepts.registry)
 2. [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
-  * [Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
-  * [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
+  * [Setup](https://github.com/theduke/go-appkit#Gettingstarted.setup)
+  * [Example: Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
+  * [Example: Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
 3. [Documentation](https://github.com/theduke/go-appkit#docs)
   * [Resources](https://github.com/theduke/go-appkit#docs.resources)
 4. [Additional Information](https://github.com/theduke/go-appkit#additional)
@@ -51,7 +52,7 @@ but with an efficient and compiled language in the backend.
 
 The API can be accessed through various frontends, and you can quite easily implement your own if the available ones do not fit your requirements.
 
-By default, when you start your Appkit server, you will have a REST frontend and a [JSONAPI](http://jsonapi.org) frontend. Soon, there will also be support for 
+By default, when you start your Appkit server, you will have a REST frontend and a [JSONAPI](http://jsonapi.org) frontend. Soon, there will also be support for websockets via the [WAMP protocol](http://wamp-proto.org/).
 
 #### REST
 
@@ -355,15 +356,29 @@ This gives you the power to implement your own service if the default does not f
 
 * `app.Registry().DefaultBackend() | returns dukedb.Backend`
 * `app.Registry().Backend("postgres") | returns dukedb.Backend`
+
+* `app.Registry().Resource("todos") | returns appkit.Resource`
+
 * `app.Registry().UserService() | returns appkit.UserServvice`
 * `app.Registry().FileService() | returns appkit.FileService`
+* `app.Registry().EmailService() | returns appkit.EmailService`
+
 * `app.Registry().DefaultCache() | returns appkit.Cache`
 * `app.Registry().Cache("fs") | returns appkit.Cache`
-* `app.Registry().Resource("todos") | returns appkit.Resource`
+
+* `app.Registry().TemplateEngine() | returns appkit.TemplateEngine`
+
+* `app.Registry().Config() | returns appkit.Config`
+
+* `app.Registry().Logger() | returns *logrus.Logger`
 
 
 <a name="Gettingstarted"></a>
 ## Getting started
+
+
+<a name="Gettingstarted.setup"></a>
+### Setup
 
 You should first read over the *Models*, *Resources* and *Methods* section in [Concepts](https://github.com/theduke/go-appkit#Concepts), and 
 then check out the [Todo example](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo) to familiarize yourself with the way Appkit works.
@@ -551,7 +566,7 @@ by tying projects and todos to users.
 
 **The changes required are minimal.**
 
-You just can embed the *UserModel* base struct in your models, and alter the resources registration to use the  *users.UserResource* mixin.
+You just can embed the *UserModel* base struct in your models, and alter the resources registration to use the  *resources.UserResource* mixin.
 
 By doing that, your project and todo models with belong to a user, and create, update and delete operations will be  restricted to admins and owners of the model.
 
@@ -614,8 +629,8 @@ func BuildApp() appkit.App {
 	app.RegisterBackend(backend)
 
 	// Set up resources.
-	app.RegisterResource(resources.NewResource(&Project{}, &users.UserResource{}, true))
-	app.RegisterResource(resources.NewResource(&Todo{}, &users.UserResource{}, true))
+	app.RegisterResource(resources.NewResource(&Project{}, &resources.UserResource{}, true))
+	app.RegisterResource(resources.NewResource(&Todo{}, &resources.UserResource{}, true))
 
 	return app
 }
