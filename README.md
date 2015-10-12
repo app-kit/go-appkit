@@ -8,8 +8,10 @@ but with an efficient and compiled language in the backend.
 
 **Main features:**
 
-* [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...)
-* Different frontends ([JSONAPI](http://jsonapi.org/), [WAMP](http://wamp-proto.org/) (under development).
+* [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...) and with *migrations system*.
+* Different frontends REST, ([JSONAPI](http://jsonapi.org/), websockets with [WAMP](http://wamp-proto.org/) (under development).
+* Arbitrary client side queries with full power of DukeDB.
+* Subscribe to model updates, insertions and deletions on the client with PubSub with WAMP or long polling. *Still under development*.
 * Full user system with user registration, password reset, notification emails...
 * User *Authentication* (password and OAUTH included, easily extendable).
 * User *Authorization*: RBAC system with roles and permissions.
@@ -19,16 +21,21 @@ but with an efficient and compiled language in the backend.
 * Caching system with different caches (File system, in memory and REDIS included, easily extendable).
 * [Scaffolding CLI](https://github.com/theduke/go-appkitcli) similar to Yeoman for quick setup and development.
 * **Optional** light weight CMS with menu system and pages with an Admin frontend written in EmberJS.
-
+* Ember CLI addon for easy integration into the [Ember JS framework](emberjs.com).
 
 ## TOC
 
 1. [Concepts](https://github.com/theduke/go-appkit#Concepts)
+  * [Frontends](https://github.com/theduke/go-appkit#Concepts.Frontends)
   * [Models](https://github.com/theduke/go-appkit#Concepts.Models)
   * [Resources](https://github.com/theduke/go-appkit#Concepts.Resources)
   * [Methods](https://github.com/theduke/go-appkit#Concepts.Methods)
+  * [DukeDB, backends and client side queries](https://github.com/theduke/go-appkit#Concepts.dukedb)
   * [User system](https://github.com/theduke/go-appkit#Concepts.Usersystem)
   * [File storage](https://github.com/theduke/go-appkit#Concepts.Filestorage)
+  * [Server side rendering](https://github.com/theduke/go-appkit#Concepts.serversiderendering)
+  * [Caching](https://github.com/theduke/go-appkit#Concepts.caching)
+  * [Registry and Services](https://github.com/theduke/go-appkit#Concepts.registry)
 2. [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
   * [Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
   * [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
@@ -39,6 +46,50 @@ but with an efficient and compiled language in the backend.
 <a name="Concepts"></a>
 ## Concepts
 
+<a name="Concepts.Frontends"></a>
+### Frontends
+
+The API can be accessed through various frontends, and you can quite easily implement your own if the available ones do not fit your requirements.
+
+By default, when you start your Appkit server, you will have a REST frontend and a [JSONAPI](http://jsonapi.org) frontend. Soon, there will also be support for 
+
+#### REST
+
+With the rest frontend, you can access the API with simple HTTP calls.
+
+* POST */api/method/query*: Query for resources.
+* POST */api/method/create*: Create a model.
+* POST */api/method/update*: Update a model.
+* POST */api/method/delete*: Delete a model.
+
+* POST */api/method/my.method*: Your custom methods.
+
+#### JSONAPI
+
+[JSONAPI](http://jsonapi.org) is a specification for a CRUD api with well defined support for 
+relationships.
+
+Ember uses JSONAPI by default starting with version 1.13.
+
+* GET */api/users*: Query for resources.
+* POST */api/users*: Create a new model.
+* PATCH */api/users/ID*: Update a model
+* DELETE */api/users/ID*: Delete a model
+
+Other methods can be accessed in the same way as specified for REST.
+
+#### Websockets via WAMP
+
+[WAMP](http://wamp-proto.org/) is a websocket sub-protocol that supports RPC and PubSub.
+
+You can use it inside your browser apps with [Autobahn JS](http://autobahn.ws/js/).
+
+Wamp is a powerful protocol that allows fast and efficient communication with the api,
+and has very nice support for PubSub which enables efficient live updates on the client.
+
+**WAMP support is still under development**.
+
+
 <a name="Concepts.Models"></a>
 ### Models
 
@@ -47,10 +98,10 @@ The API revolves about models which are just GO structs.
 For Appkit to understand your models, your structs need to implement a few interfaces.
 
 * Collection() string: return a name for your model collection. Eg "todos" for your 'Todo' struct.
-GetID() interface{}: Return the id
-SetID(id interface{}) error: Set the ID. Return an error if the given ID is invalid or nil otherwise.
-GetStrID() string: Return a string version of the ID. Empty string if no ID is set yet.
-SetStrID(id string) error: Set the ID from a string version of the ID. Return error if given ID is invalid, or nil otherwise.
+* GetID() interface{}: Return the id
+* SetID(id interface{}) error: Set the ID. Return an error if the given ID is invalid or nil otherwise.
+* GetStrID() string: Return a string version of the ID. Empty string if no ID is set yet.
+* SetStrID(id string) error: Set the ID from a string version of the ID. Return error if given ID is invalid, or nil otherwise.
 
 DukeDB offers embeddable base structs that implement all interfaces except collection: *dukedb.IntIDModel* if your models use an integer ID or *dukedb.StrIDModel* for models with a string ID (like MongoDB uses).
 
@@ -89,18 +140,226 @@ There are many hooks you can implement on your resource to control behaviour, fo
 
 You can also alter the default CRUD operations by implementing some of these hooks.
 
-You can find all available hooks in the [Resources documentation](https://github.com/theduke/go-appkit#docs.resources)
-
 There are also several supplied resource implementations for common use cases.
+
+You can find more information in the [Resources documentation](https://github.com/theduke/go-appkit#docs.resources)
+
 
 <a name="Concepts.Methods"></a>
 ### Methods
 
+All API operations that do not correspond to simple CRUD operations are exposed in the form of methods.
+
+Methods can be registered directly from your resources with the [Methods() hook](https://github.com/theduke/go-appkit#docs.resources.hooks.methods), or with the app.
+
+Methods can be *blocking* or *non-blocking*.
+
+When a method is blocking, all other method call by the same user 
+will wait until the blocking method is finished. 
+
+This might be neccessary when you, for example, create a new model and then
+retrieve a list of models.
+When the create method blocks, the list method will only run once the 
+creation has finished, and will therefore include the new model. 
+
+Example of a simple method that returns the count of a certain model.
+```go
+import(
+	"github.com/theduke/go-appkit/api/methods"
+)
+
+countMethod := &methods.Method{
+	Name: "todos.count",
+	Blocking: false,
+	Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		count, err := a.Resource("todos").Q().Count()
+		if err != nil {
+			return appkit.NewErrorResponse("db_error", err)
+		}
+
+		return &kit.AppResponse{
+			Data: map[string]interface{}{"count": count},
+		}
+	},
+}
+
+app.RegisterMethod(countMethod)
+```
+
+The method is now available with:
+```
+GET localhost:8000/method/todos.count
+
+# Response:
+{
+	data: {
+		count: 210
+	}
+}
+```
+
+<a name="Concepts.dukedb"></a>
+### DukeDB, backends and client side queries
+
+Appkit uses the [DukeDB ORM](https://github.com/theduke/go-dukedb) which allows to use your database of choice.
+
+The recommended and currently best supported database is PostgreSQL (also MySQL), with MongoDB support coming soon.
+
+#### Backends
+
+Appkit makes it easy to mix several backends.
+
+For example, you could store most of your models in PostgreSQL, 
+but the sessions in memory.
+
+To make a resource use a certain backend:
+```go
+backend := app.Registry().Backend("memory")
+app.Resource("sessions").SetBackend(backend)
+```
+
+#### Client side queries
+
+A great feature are client side queries, which allow you to use the full power of ORM queries right from your client, without writing any server side logic.
+
+For example, you can do:
+
+```
+GET /api/todos?query=xxx
+
+# Query is serialized json:
+{
+  limit: 20,
+  offset: 10,
+  filters: {
+    intField: {$gt: 25},
+   type: {$in: ["a",  "b"}
+  },
+  joins: ["realtionA"],
+  fields: ["fieldA", "fieldB", "relationA.fieldX"],
+  order: ["fieldA", "-relationA.fieldX"]
+}
+```
+
+The filters support all [MongoDB style query operators](http://docs.mongodb.org/manual/reference/operator/query/).
+
 <a name="Concepts.Usersystem"></a>
 ### User system
 
+Appkit comes with a full-fledged user system that supports user signup, password reset, email activation, **authentication** and **authorization**.
+
+You can easily create users from the client with simple api calls.
+
+#### Authentication
+
+Once a user is signed up, the client can login and create a session with simple REST or RPC calls.
+
+Once a session token is retrieved, all subsequent requests must add a *Authorization: token* header that identifies the client.
+
+#### Authorization
+
+The auth system is based on [RBAC](https://en.wikipedia.org/wiki/Role-based_access_control).
+
+You can create roles assign permissions to roles.
+Each user can have multiple roles.
+
+In your server logic, you can easily check if the current user has a certain role or permission, 
+allowing easy access control.
+
+#### User management
+
+The system comes with support for welcome mails, email confirmation, and password resets.
+
 <a name="Concepts.Filestorage"></a>
 ### File storage
+
+Appkit comes with a system for storing uploaded files.
+
+The system is *storage agnostic*.
+A filesystem storage is used by default, but you can easily implement your own storage solution that could, for example, use Amazon S3.
+
+Files information is also stored in the database, and you can easily implement models that have files attached to them.
+
+Files can be either public with no access control, or restricted access based on user roles/permissions.
+
+#### Serving files
+
+Files can be accessed via the http route:
+```
+GET /files/ID/file-name.txt
+```
+
+#### Serving images/thumbnails
+
+Appkit also comes with a system for generating thumbnails or applying some filters to images.
+
+To serve an image scaled to a width and height, and a grayscale filter applied, use:
+```
+GET /images/ID/file-name?width=500&height=200&filters=grayscale
+```
+
+<a name="Concepts.serversiderendering"></a>
+### Server side rendering
+
+A common annoyance with modern javascript web applications is the lack of support for delivering fully rendered responses, since all rendering is done in the browser.
+
+This also makes it hard to do SEO, since the crawlers can not properly crawl your website, and can not identify removed pages since no 404 responses can be delivered.
+
+Appkit allows you to very easily enable server side rendering, which will render your application on the server by using [PhantomJS](http://phantomjs.org).
+
+The response will then be *cached* and fully delivered to the client.
+You can let your frontend application take over control after the first user interaction (eg. click on a link).
+
+To enable server side rendering, add this section to your config.yaml:
+```yaml
+frontend:
+  indexTpl: public/index.html
+serverRenderer:
+  enabled: true
+  cache: fs
+  cacheLifetime: 3600
+```
+
+On the client side, inside your app, you have to report once the rendering of the route has finished.
+This way you can also set the HTTP status code.
+
+All you have to do, once the page is fully rendered (by using, for example, your frontend routers afterRender hook):
+```javascript
+window.serverRenderer = {
+	status: 200
+};
+```
+
+<a name="Concepts.caching"></a>
+### Caching
+
+Appkit comes with a caching system that supports various caches.
+
+If you do not want to use the included ones, it is easy to implement your own cache.
+
+The included ones are:
+* Filesystem (cache entries are stored in files on disk)
+* Memory (in memory cache)
+* **[Redis](http://redis.io)** (recommended!)
+
+
+<a name="Concepts.registry"></a>
+### Registry and Services
+
+The registry gives you access to all parts of your application.
+It can be accessed within your methods and resources.
+
+The functionality is split into services, which must implement the respective interface.
+
+This gives you the power to implement your own service if the default does not fit your needs.
+
+* `app.Registry().DefaultBackend() | returns dukedb.Backend`
+* `app.Registry().Backend("postgres") | returns dukedb.Backend`
+* `app.Registry().UserService() | returns appkit.UserServvice`
+* `app.Registry().FileService() | returns appkit.FileService`
+* `app.Registry().DefaultCache() | returns appkit.Cache`
+* `app.Registry().Cache("fs") | returns appkit.Cache`
+* `app.Registry().Resource("todos") | returns appkit.Resource`
 
 
 <a name="Gettingstarted"></a>
@@ -733,7 +992,7 @@ AfterUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Err
 Run code after updates.
 
 
-<a name="docs.resources.deleteoverview"></a>
+<a name="docs.resources.hooks.deleteoverview"></a>
 ##### Delete
 
 <a name="docs.resources.hooks.apidelete"></a>
