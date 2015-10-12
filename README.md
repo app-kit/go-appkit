@@ -10,12 +10,14 @@ but with an efficient and compiled language in the backend.
 
 * [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...)
 * Different frontends ([JSONAPI](http://jsonapi.org/), [WAMP](http://wamp-proto.org/) (under development).
-* Full user and permission system with password and OAUTH authentication (easily extendable), *roles* and *permissions*.
-* Server side rendering of javascript apps (Ember, AngularJS, ...) with PhantomJS.
+* Full user system with user registration, password reset, notification emails...
+* User *Authentication* (password and OAUTH included, easily extendable).
+* User *Authorization*: RBAC system with roles and permissions.
+* Easy to use Server side rendering of javascript apps (Ember, AngularJS, ...) with PhantomJS.
 * Easily extendable CLI.
 * File storage with different backends (File system included, easily extendable to Amazon S3 etc).
 * Caching system with different caches (File system, in memory and REDIS included, easily extendable).
-* [Scaffolding CLI](https://github.com/theduke/go-appkit-cli) similar to Yeoman for quick setup and development.
+* [Scaffolding CLI](https://github.com/theduke/go-appkitcli) similar to Yeoman for quick setup and development.
 * **Optional** light weight CMS with menu system and pages with an Admin frontend written in EmberJS.
 
 
@@ -544,19 +546,19 @@ Here you can find all the available hooks you can implement on your resources.
   * [ApiFind](https://github.com/theduke/go-appkit#docs.resources.hooks.apifind)
   * [ApiAlterQuery](https://github.com/theduke/go-appkit#docs.resources.hooks.apialterquery)
   * [ApiAfterFind](https://github.com/theduke/go-appkit#docs.resources.hooks.apiafterfind)
-* [Create](https://github.com/theduke/go-appkit#docs.resources.hooks.create)
+* [Create](https://github.com/theduke/go-appkit#docs.resources.hooks.createoverview)
   * [Create](https://github.com/theduke/go-appkit#docs.resources.hooks.create)
   * [ApiCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.apicreate)
   * [BeforeCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.beforecreate)
   * [AllowCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.allowcreate)
   * [AfterCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.aftercreate)
-* [Update](https://github.com/theduke/go-appkit#docs.resources.hooks.update)
+* [Update](https://github.com/theduke/go-appkit#docs.resources.hooks.updateoverview)
   * [ApiUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.apiupdate)
   * [Update](https://github.com/theduke/go-appkit#docs.resources.hooks.update)
   * [BeforeUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.beforeupdate)
   * [AllowUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.allowupdate)
   * [AfterUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.afterupdate)
-* [Delete](https://github.com/theduke/go-appkit#docs.resources.hooks.delete)
+* [Delete](https://github.com/theduke/go-appkit#docs.resources.hooks.deleteoverview)
   * [ApiDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.apidelete)
   * [Delete](https://github.com/theduke/go-appkit#docs.resources.hooks.delete)
   * [BeforeDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.beforedelete)
@@ -633,7 +635,7 @@ ApiAfterFind(res kit.Resource, obj []kit.Model, user kit.User) apperror.Error
 Execute code after find, for example to alter model data.
 
 
-<a name="docs.resources.create"></a>
+<a name="docs.resources.createoverview"></a>
 ##### Create
 
 <a name="docs.resources.hooks.apicreate"></a>
@@ -682,7 +684,7 @@ AfterCreate(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 Run code after creation, for example to create related models.
 
 
-<a name="docs.resources.update"></a>
+<a name="docs.resources.updateoverview"></a>
 ##### Update
 
 <a name="docs.resources.hooks.apiupdate"></a>
@@ -731,7 +733,7 @@ AfterUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Err
 Run code after updates.
 
 
-<a name="docs.resources.delete"></a>
+<a name="docs.resources.deleteoverview"></a>
 ##### Delete
 
 <a name="docs.resources.hooks.apidelete"></a>
