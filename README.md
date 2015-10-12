@@ -20,13 +20,13 @@ but with an efficient and compiled language in the backend.
 ## TOC
 
 * [Concepts](https://github.com/theduke/go-appkit#Concepts)
-..* [Models](https://github.com/theduke/go-appkit#Concepts.Models)
-..* [Resources](https://github.com/theduke/go-appkit#Concepts.Resources)
-..* [User system](https://github.com/theduke/go-appkit#Concepts.Usersystem)
-..* [File storage](https://github.com/theduke/go-appkit#Concepts.Filestorage)
+⋅⋅* [Models](https://github.com/theduke/go-appkit#Concepts.Models)
+⋅⋅* [Resources](https://github.com/theduke/go-appkit#Concepts.Resources)
+⋅⋅* [User system](https://github.com/theduke/go-appkit#Concepts.Usersystem)
+⋅⋅* [File storage](https://github.com/theduke/go-appkit#Concepts.Filestorage)
 * [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
-..* [Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
-..* [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
+⋅⋅* [Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
+⋅⋅* [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
 
 <a name="Concepts"></a>
 ## Concepts
@@ -55,7 +55,9 @@ go get github.com/theduke/go-appkit
 ### Examples
 
 The examples use a **non-persistent in memory backend**.
+
 You can use all backends supported by [DukeDB](https://github.com/theduke/go-dukedb) (the recommended one is PostgreSQL).
+
 To use a different backend, refer to the [Backends section](https://github.com/theduke/go-appkit#Backends).
 
 <a name="Gettingstarted.Minimaltodo"></a>
