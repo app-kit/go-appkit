@@ -2,7 +2,6 @@ package app
 
 import (
 	"github.com/Sirupsen/logrus"
-	"github.com/olebedev/config"
 	db "github.com/theduke/go-dukedb"
 
 	kit "github.com/theduke/go-appkit"
@@ -10,7 +9,7 @@ import (
 
 type Registry struct {
 	logger          *logrus.Logger
-	config          *config.Config
+	config          kit.Config
 	defaultCache    kit.Cache
 	caches          map[string]kit.Cache
 	defaultBackend  db.Backend
@@ -42,11 +41,11 @@ func (d *Registry) SetLogger(l *logrus.Logger) {
 	d.logger = l
 }
 
-func (d *Registry) Config() *config.Config {
+func (d *Registry) Config() kit.Config {
 	return d.config
 }
 
-func (d *Registry) SetConfig(c *config.Config) {
+func (d *Registry) SetConfig(c kit.Config) {
 	d.config = c
 }
 

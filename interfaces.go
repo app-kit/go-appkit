@@ -7,7 +7,6 @@ import (
 
 	"github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
-	"github.com/olebedev/config"
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 )
@@ -659,8 +658,8 @@ type Registry interface {
 	Logger() *logrus.Logger
 	SetLogger(*logrus.Logger)
 
-	Config() *config.Config
-	SetConfig(*config.Config)
+	Config() Config
+	SetConfig(cfg Config)
 
 	DefaultCache() Cache
 	SetDefaultCache(cache Cache)
@@ -699,6 +698,74 @@ type Registry interface {
 	SetTemplateEngine(TemplateEngine)
 }
 
+type Config interface {
+	GetData() interface{}
+
+	// ENV returns the current env.
+	ENV() string
+
+	Debug() bool
+
+	// TmpDir returns an absolute path to the used tmp directory.
+	TmpDir() string
+
+	// DataDir returns an absolute path to the used data directory.
+	DataDir() string
+
+	Get(path string) (Config, error)
+
+	// Bool returns a bool value stored at path, or an error if not found or not a  bool.
+	Bool(path string) (bool, error)
+
+	// UBool returns a bool value stored at path, the supplied default value or false.
+	UBool(path string, defaults ...bool) bool
+
+	// Float64 returns the float64 value stored at path, or an error if not found or wrong type.
+	Float64(path string) (float64, error)
+
+	// UFloat64 returns a float64 value stored at path, the supplied default, or 0.
+	UFloat64(path string, defaults ...float64) float64
+
+	// Int returns the int value stored at path, or an error if not found or wrong type.
+	Int(path string) (int, error)
+
+	// UInt returns an int value stored at path, the supplied default, or 0.
+	UInt(path string, defaults ...int) int
+
+	// List returns the list stored at path, or an error if not found or wrong type.
+	List(path string) ([]interface{}, error)
+
+	// UList returns the list value stored at path, the supplied default, or nil.
+	UList(path string, defaults ...[]interface{}) []interface{}
+
+	// Map returns the map stored at path, or an error if not found or wrong type.
+	Map(path string) (map[string]interface{}, error)
+
+	// UMap returns the map stored at path, the supplied default, or nil.
+	UMap(path string, defaults ...map[string]interface{}) map[string]interface{}
+
+	// String returns the string value stored at path, or an error if not found or wrong type.
+	String(path string) (string, error)
+
+	// UString returns the string value stored at path, the supplied default, or "".
+	UString(path string, defaults ...string) string
+
+	// Path returns the absolute version of a file system path stored at config path, or an error if not found or wrong type.
+	// If the path in the config  is relative, it will be prefixed with either
+	// the config.rootPath or the working directory.
+	Path(string) (string, error)
+
+	// UPath returns the absolute version of a file system path stored at config path, the supplied default, or "".
+	// If the path in the config  is relative, it will be prefixed with either
+	// the config.rootPath or the working directory.
+	UPath(path string, defaults ...string) string
+
+	// Set updates a config value to the specified value.
+	// If the path is already set, and you supply a different value type, an
+	// error will be returned.
+	Set(path string, val interface{}) error
+}
+
 /**
  * Frontend interfaces.
  */
@@ -723,9 +790,6 @@ type Frontend interface {
  */
 
 type App interface {
-	ENV() string
-	SetENV(string)
-
 	Debug() bool
 	SetDebug(bool)
 
@@ -734,11 +798,9 @@ type App interface {
 	Logger() *logrus.Logger
 	SetLogger(*logrus.Logger)
 
-	Config() *config.Config
-	SetConfig(*config.Config)
+	Config() Config
+	SetConfig(Config)
 	ReadConfig(path string)
-
-	TmpDir() string
 
 	Router() *httprouter.Router
 

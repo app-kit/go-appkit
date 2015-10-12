@@ -30,12 +30,8 @@ import (
 )
 
 type App struct {
-	env   string
-	debug bool
+	registry kit.Registry
 
-	logger *logrus.Logger
-
-	registry  kit.Registry
 	frontends map[string]kit.Frontend
 
 	methods map[string]kit.Method
@@ -118,7 +114,7 @@ func (a *App) defaultCache() {
 	// Build cache.
 	dir := a.Config().UString("caches.fs.dir")
 	if dir == "" {
-		dir = a.TmpDir() + "/" + "cache"
+		dir = a.Config().TmpDir() + "/" + "cache"
 	}
 	fsCache, err := fs.New(dir)
 	if err != nil {
@@ -144,19 +140,19 @@ func (a *App) defaultFileService(b db.Backend) {
 }
 
 func (a *App) ENV() string {
-	return a.env
+	return a.Config().ENV()
 }
 
 func (a *App) SetENV(x string) {
-	a.env = x
+	a.Config().Set("env", x)
 }
 
 func (a *App) Debug() bool {
-	return a.debug
+	return a.Config().Debug()
 }
 
 func (a *App) SetDebug(x bool) {
-	a.debug = x
+	a.Config().Set("debug", x)
 }
 
 func (a *App) Registry() kit.Registry {
@@ -164,11 +160,10 @@ func (a *App) Registry() kit.Registry {
 }
 
 func (a *App) Logger() *logrus.Logger {
-	return a.logger
+	return a.registry.Logger()
 }
 
 func (a *App) SetLogger(x *logrus.Logger) {
-	a.logger = x
 	a.registry.SetLogger(x)
 }
 
@@ -176,19 +171,15 @@ func (a *App) Router() *httprouter.Router {
 	return a.router
 }
 
-func (a *App) TmpDir() string {
-	return a.registry.Config().UString("tmpDir", "tmp")
-}
-
 /**
  * Config.
  */
 
-func (a *App) Config() *config.Config {
+func (a *App) Config() kit.Config {
 	return a.registry.Config()
 }
 
-func (a *App) SetConfig(x *config.Config) {
+func (a *App) SetConfig(x kit.Config) {
 	a.registry.SetConfig(x)
 }
 
@@ -197,7 +188,7 @@ func (a *App) ReadConfig(path string) {
 		path = "config.yaml"
 	}
 
-	var cfg *config.Config
+	var cfg kit.Config
 
 	if f, err := os.Open(path); err != nil {
 		a.Logger().Infof("Could not find or read config at '%v' - Using default settings\n", path)
@@ -207,45 +198,56 @@ func (a *App) ReadConfig(path string) {
 		if err != nil {
 			a.Logger().Panicf("Could not read config at '%v': %v\n", path, err)
 		} else {
-			cfg, err = config.ParseYaml(string(content))
+			rawCfg, err := config.ParseYaml(string(content))
 			if err != nil {
 				panic("Malformed config file " + path + ": " + err.Error())
 			}
+
+			cfg = NewConfig(rawCfg.Root)
 		}
 	}
 
 	if cfg == nil {
-		defaultConfig := "ENV: dev\ntmpDir: tmp"
-
-		c, _ := config.ParseYaml(defaultConfig)
-		cfg = c
+		cfg = NewConfig(map[string]interface{}{
+			"env":      "dev",
+			"debug":    true,
+			"tmpPath":  "tmp",
+			"dataPath": "data",
+		})
 	}
 
-	cfg.Env()
+	// Read environment variables.
+	cfg.ENV()
 
 	// Set default values if not present.
-	env := cfg.UString("ENV", "dev")
-	if env == "dev" {
+	env, _ := cfg.String("ENV")
+	if env == "" {
 		a.Logger().Info("No environment specified, defaulting to 'dev'")
-		a.debug = true
+		cfg.Set("env", "dev")
 	}
-	a.env = env
 
 	if envCfg, err := cfg.Get(env); err == nil {
-		cfg = envCfg
+		cfg = NewConfig(envCfg.GetData())
 		cfg.Set("ENV", env)
 	}
 
 	// Fill in default values into the config and ensure they are valid.
 
+	// If debug is not explicitly set, set it to false, or to true if
+	// environment is dev.
+	_, err := cfg.Bool("debug")
+	if err != nil {
+		cfg.Set("debug", env == "dev")
+	}
+
 	// Ensure a tmp directory exists and is readable.
-	tmpDir := cfg.UString("tmpDir", "tmp")
+	tmpDir := cfg.TmpDir()
 	if err := os.MkdirAll(tmpDir, 0777); err != nil {
 		a.Logger().Panicf("Could not read or create tmp dir at '%v': %v", tmpDir, err)
 	}
 
 	// Ensure a data directory exists and is readable.
-	dataDir := cfg.UString("dataDir", "data")
+	dataDir := cfg.UPath("dataDir", "data")
 	if err := os.MkdirAll(dataDir, 0777); err != nil {
 		a.Logger().Panicf("Could not read or create data dir at '%v': %v", tmpDir, err)
 	}
@@ -264,7 +266,7 @@ func (a *App) PrepareForRun() {
 	a.PrepareBackends()
 
 	// Auto migrate if enabled or not explicitly disabled and env is debug.
-	if auto, err := a.Config().Bool("autoRunMigrations"); (err == nil && auto) || (err != nil && a.env == "dev") {
+	if auto, err := a.Config().Bool("autoRunMigrations"); (err == nil && auto) || (err != nil && a.ENV() == "dev") {
 		if err := a.MigrateAllBackends(false); err != nil {
 			a.Logger().Errorf("Migration FAILED: %v\n", err)
 		}
@@ -412,7 +414,7 @@ func (a *App) Crawl() {
 	hosts := []string{host}
 	startUrls := []string{"http://" + host + "/"}
 	crawler := crawler.New(concurrentRequests, hosts, startUrls)
-	crawler.Logger = a.logger
+	crawler.Logger = a.Logger()
 
 	crawler.Run()
 }
@@ -506,7 +508,7 @@ func (a *App) RegisterEmailService(s kit.EmailService) {
 	if s.Registry() == nil {
 		s.SetRegistry(a.registry)
 	}
-	s.SetDebug(a.debug)
+	s.SetDebug(a.Debug())
 	a.registry.SetEmailService(s)
 }
 
@@ -585,7 +587,7 @@ func (a *App) RegisterResource(res kit.Resource) {
 		res.SetRegistry(a.registry)
 	}
 
-	res.SetDebug(a.debug)
+	res.SetDebug(a.Debug())
 
 	// Allow a resource to register custom http routes and methods.
 	if res.Hooks() != nil {
@@ -626,7 +628,7 @@ func (a *App) RegisterUserService(s kit.UserService) {
 		s.SetRegistry(a.registry)
 	}
 
-	s.SetDebug(a.debug)
+	s.SetDebug(a.Debug())
 
 	a.RegisterResource(s.UserResource())
 	a.RegisterResource(s.SessionResource())
@@ -653,7 +655,7 @@ func (a *App) RegisterFileService(f kit.FileService) {
 	if f.Registry() == nil {
 		f.SetRegistry(a.registry)
 	}
-	f.SetDebug(a.debug)
+	f.SetDebug(a.Debug())
 
 	a.RegisterResource(r)
 	a.registry.SetFileService(f)

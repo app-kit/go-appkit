@@ -86,7 +86,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	// Either no cache or url not yet cached, so render it.
 
 	// First, ensure that the tmp directory exists.
-	tmpDir := path.Join(app.TmpDir(), "phantom")
+	tmpDir := path.Join(app.Config().TmpDir(), "phantom")
 	if ok, _ := utils.FileExists(tmpDir); !ok {
 		if err := os.MkdirAll(tmpDir, 0777); err != nil {
 			return &kit.AppResponse{

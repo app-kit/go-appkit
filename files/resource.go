@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 	"strings"
 	"sync"
@@ -129,12 +130,14 @@ type FilesResource struct {
 }
 
 func getTmpPath(res kit.Resource) string {
-	tmpPath := res.Registry().Config().UString("tmpDirUploads")
+	c := res.Registry().Config()
+	tmpPath := c.UPath("tmpUploadDir")
 	if tmpPath == "" {
-		tmpPath = res.Registry().Config().UString("tmpDir")
-		if tmpPath != "" {
-			tmpPath += string(os.PathSeparator) + "uploads"
+		tmpPath = c.TmpDir()
+		if tmpPath == "" {
+			panic("config.TmpDir() empty")
 		}
+		tmpPath = path.Join(tmpPath, "uploads")
 	}
 
 	return tmpPath
