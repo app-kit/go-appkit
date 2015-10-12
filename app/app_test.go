@@ -19,7 +19,6 @@ import (
 
 	kit "github.com/theduke/go-appkit"
 	. "github.com/theduke/go-appkit/app"
-	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/users"
 	"github.com/theduke/go-appkit/users/auth/oauth"
 )
@@ -94,10 +93,6 @@ func buildApp() kit.App {
 	appSecret := "cb91c245199a3d3b19fdccbe0c7f93a0"
 	fbService := oauth.NewFacebook(appId, appSecret)
 	userService.AuthAdaptor("oauth").(*oauth.AuthAdaptorOauth).RegisterService(fbService)
-
-	// Build file service.
-	fileHandler := files.NewFileServiceWithFs(nil, "data")
-	app.RegisterFileService(fileHandler)
 
 	// Persist log messages in logMessages.
 	app.Logger().Hooks.Add(LoggerHook{})
@@ -200,6 +195,8 @@ var _ = Describe("App", func() {
 	})
 
 	Describe("Usersystem", func() {
+		skipUser := true
+
 		Describe("Password system", func() {
 			It("Should create user with password auth", func() {
 				js := `{
@@ -246,9 +243,15 @@ var _ = Describe("App", func() {
 				Expect(logEntry.Data["action"]).To(Equal("users.email_confirmation_mail_sent"))
 				Expect(logEntry.Data["user_id"]).To(Equal(user.GetID()))
 				Expect(logEntry.Data["email"]).To(Equal(user.GetEmail()))
+
+				skipUser = false
 			})
 
 			It("Should create session for user with password auth", func() {
+				if skipUser {
+					Skip("Previous error")
+				}
+
 				js := `{
 						"data": {},
 						"meta": {"user": "user1@appkit.com", "adaptor": "password", "auth-data": {"password": "test"}}
@@ -282,6 +285,10 @@ var _ = Describe("App", func() {
 			})
 
 			It("Should resend confirmation email", func() {
+				if skipUser {
+					Skip("Previous error")
+				}
+
 				js := `{"data": {}}`
 				status, _, err := client.PostJson("/api/method/users.send-confirmation-email", js)
 				Expect(err).ToNot(HaveOccurred())
@@ -297,6 +304,10 @@ var _ = Describe("App", func() {
 			})
 
 			It("Should confirm email", func() {
+				if skipUser {
+					Skip("Previous error")
+				}
+
 				js := fmt.Sprintf(`{"data": {"token": "%v"}}`, currentToken)
 				status, _, err := client.PostJson("/api/method/users.confirm-email", js)
 				Expect(err).ToNot(HaveOccurred())
@@ -311,6 +322,10 @@ var _ = Describe("App", func() {
 			})
 
 			It("Should send password reset email", func() {
+				if skipUser {
+					Skip("Previous error")
+				}
+
 				js := fmt.Sprintf(`{"data": {"user": "%v"}}`, currentUser.GetEmail())
 				status, _, err := client.PostJson("/api/method/users.request-password-reset", js)
 				Expect(err).ToNot(HaveOccurred())
@@ -326,6 +341,10 @@ var _ = Describe("App", func() {
 			})
 
 			It("Should reset password", func() {
+				if skipUser {
+					Skip("Previous error")
+				}
+
 				js := fmt.Sprintf(`{"data": {"token": "%v", "password": "newpassword"}}`, currentToken)
 				status, _, err := client.PostJson("/api/method/users.password-reset", js)
 				Expect(err).ToNot(HaveOccurred())
@@ -345,6 +364,8 @@ var _ = Describe("App", func() {
 
 	Describe("Oauth Facebook", func() {
 		userToken := "CAACatoQKRyQBAGzhi73KqSvwTWLip7UG60VUZBdjRhZAEYi71ZAYrtqtKu4d5ib6sVdd8u8K8HeGdg6mBZCqlL4WNkxOxQAmVZA6KzKzCaqZCoxvDGlXLZBvQ5n3KUXgGqtfUSOpmKM4RSd2tx6mTCtXHrHEnpWhyfP7aXErCE0oJFC8uGXLOhzSpComqhvelgZD"
+
+		skipUser := true
 
 		It("Should create user with facebook connect", func() {
 			js := `{
@@ -374,9 +395,15 @@ var _ = Describe("App", func() {
 			Expect(logEntry.Data["action"]).To(Equal("users.email_confirmation_mail_sent"))
 			Expect(logEntry.Data["user_id"]).To(Equal(user.GetID()))
 			Expect(logEntry.Data["email"]).To(Equal(user.GetEmail()))
+
+			skipUser = false
 		})
 
 		It("Should create session for user with facebook connect", func() {
+			if skipUser {
+				Skip("Previous error")
+			}
+
 			js := `{
 					"data": {},
 					"meta": {"adaptor": "oauth", "auth-data": {"service": "facebook", "access_token": "%v"}}
