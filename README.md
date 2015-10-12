@@ -30,9 +30,9 @@ but with an efficient and compiled language in the backend.
 2. [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
   * [Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
   * [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
-3. [Documentation](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
+3. [Documentation](https://github.com/theduke/go-appkit#docs)
   * [Resources](https://github.com/theduke/go-appkit#docs.resources)
-4. [Additional Information]()
+4. [Additional Information](https://github.com/theduke/go-appkit#additional)
 
 <a name="Concepts"></a>
 ## Concepts
