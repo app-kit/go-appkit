@@ -18,6 +18,7 @@ func GetUserMigrations(service kit.UserService) []db.Migration {
 				"user_roles",
 				"users",
 				"sessions",
+				"user_tokens",
 				"users_auth_passwords",
 				"users_auth_oauth"); err != nil {
 				return err
