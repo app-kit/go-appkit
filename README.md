@@ -584,7 +584,7 @@ Methods(kit.Resource) []kit.Method
 Supply methods connected with your resource (See [Methods](https://github.com/theduke/go-appkit#Concepts.Methods)).
 
 
-<a name="docs.resources.find"></a>
+<a name="docs.resources.hooks.find"></a>
 ##### Find
 
 <a name="docs.resources.hooks.allowfind"></a>
