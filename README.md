@@ -32,6 +32,7 @@ but with an efficient and compiled language in the backend.
   * [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
 3. [Documentation](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
   * [Resources](https://github.com/theduke/go-appkit#docs.resources)
+4. [Additional Information]()
 
 <a name="Concepts"></a>
 ## Concepts
@@ -654,7 +655,7 @@ AfterDelete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 Run code after deletion, for example to clean up related resources.
 
 
-
+<a name="additional"></a>
 ## Additional Information
 
 ### Warning
@@ -662,6 +663,11 @@ Run code after deletion, for example to clean up related resources.
 This project is still under heavy development.
 
 *Use with caution.*
+
+### Changelog
+
+https://raw.githubusercontent.com/theduke/go-appkit/master/CHANGELOG.txt
+
 
 ### Versioning
 
