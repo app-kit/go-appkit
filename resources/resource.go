@@ -431,10 +431,8 @@ func (res *Resource) ApiDelete(id string, r kit.Request) kit.Response {
 	}
 }
 
-/**
- * Read only resource hooks template
- */
-
+// ReadOnlyResource is a resource mixin that prevents all create/update/delete
+// actions via the API.
 type ReadOnlyResource struct{}
 
 func (r ReadOnlyResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
@@ -468,42 +466,6 @@ func (AdminResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User)
 	return user != nil && (user.HasRole("admin") || user.HasPermission(res.Collection()+".delete"))
 }
 
-// UserResource is a resource mixin that restricts create, read and update operations to
-// admins, users with the permission action_collectionname (see AdminResource) or
-// users that own the model.
-// This can only be used for models that implement the appkit.UserModel interface.
-type UserResource struct{}
-
-func (UserResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
-	if user == nil {
-		return false
-	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
-		return true
-	}
-	return user.HasRole("admin") || user.HasPermission(res.Collection()+".create")
-}
-
-func (UserResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
-	if user == nil {
-		return false
-	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
-		return true
-	}
-	return user.HasRole("admin") || user.HasPermission(res.Collection()+".update")
-}
-
-func (UserResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
-	if user == nil {
-		return false
-	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
-		return true
-	}
-	return user.HasRole("admin") || user.HasPermission(res.Collection()+".delete")
-}
-
 // LoggedInResource is a resource mixin that restricts create, read and update operations to
 // logged in users.
 type LoggedInResource struct{}
@@ -518,4 +480,20 @@ func (LoggedInResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Mod
 
 func (LoggedInResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
 	return user != nil
+}
+
+// PublicWriteResource is a resource mixin that allows create/update/delete
+// to all API users, event without an account.
+type PublicWriteResource struct{}
+
+func (PublicWriteResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
+	return true
+}
+
+func (PublicWriteResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
+	return true
+}
+
+func (PublicWriteResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
+	return true
 }

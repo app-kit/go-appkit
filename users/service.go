@@ -209,7 +209,7 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 	tokenItem.SetToken(token)
 	tokenItem.SetUserID(userId)
 
-	if err := s.Tokens.Create(tokenItem, nil); err != nil {
+	if err := s.Tokens.Backend().Create(tokenItem); err != nil {
 		return nil, apperror.Wrap(err, "token_create_error", "Could not save token to database")
 	}
 
@@ -496,6 +496,14 @@ func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 
 	// Build the confirmation url.
 
+	url := conf.UString("url")
+	if url == "" {
+		return &apperror.Err{
+			Code:    "no_url_set",
+			Message: "Config must specify url",
+		}
+	}
+
 	resetPath := conf.UString("users.passwordResetPath")
 	if resetPath == "" {
 		return &apperror.Err{
@@ -510,7 +518,7 @@ func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 			Message: "users.passwordResetPath does not contain {token} placeholder",
 		}
 	}
-	resetUrl := conf.UString("url") + "/" + strings.Replace(resetPath, "{token}", token, -1)
+	resetUrl := url + "/" + strings.Replace(resetPath, "{token}", token, -1)
 
 	// Render email.
 
@@ -609,12 +617,12 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, apperror.E
 		return nil, apperror.Wrap(err, "token_query_error", "")
 	}
 	if rawToken == nil {
-		return nil, apperror.New("invalid_token")
+		return nil, apperror.New("token_invalid", true)
 	}
 
 	tokenItem := rawToken.(kit.UserToken)
 	if !tokenItem.IsValid() {
-		return nil, apperror.New("expired_token")
+		return nil, apperror.New("token_expired", true)
 	}
 
 	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
@@ -622,7 +630,7 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, apperror.E
 		return nil, apperror.Wrap(err, "user_query_error", "")
 	}
 	if rawUser == nil {
-		return nil, apperror.New("invalid_user")
+		return nil, apperror.New("user_invalid", true)
 	}
 	user := rawUser.(kit.User)
 

@@ -15,6 +15,53 @@ import (
 	"github.com/theduke/go-appkit/utils"
 )
 
+// UserResource is a resource mixin that restricts create, read and update operations to
+// admins, users with the permission action_collectionname (see AdminResource) or
+// users that own the model.
+// This can only be used for models that implement the appkit.UserModel interface.
+type UserResource struct{}
+
+func (UserResource) AllowFind(res kit.Resource, model kit.Model, user kit.User) bool {
+	if user == nil {
+		return false
+	}
+	if model.(kit.UserModel).GetUserID() == user.GetID() {
+		return true
+	}
+	return user.HasRole("admin")
+}
+
+func (UserResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
+	if user == nil {
+		return false
+	}
+	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+		return true
+	}
+	return user.HasRole("admin") || user.HasPermission(res.Collection()+".create")
+}
+
+func (UserResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
+	if user == nil {
+		return false
+	}
+	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+		return true
+	}
+	return user.HasRole("admin") || user.HasPermission(res.Collection()+".update")
+}
+
+func (UserResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
+	if user == nil {
+		return false
+	}
+	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+		return true
+	}
+	return user.HasRole("admin") || user.HasPermission(res.Collection()+".delete")
+}
+
+// randomToken creates a random alphanumeric string with a length of 32.
 func randomToken() string {
 	n := 32
 
@@ -252,12 +299,12 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 
 			data, ok := r.GetData().(map[string]interface{})
 			if !ok {
-				return kit.NewErrorResponse("invalid_data", "Expected data dict with 'user' key")
+				return kit.NewErrorResponse("invalid_data", "Expected data dict with 'user' key", true)
 			}
 
 			userIdentifier, ok := data["user"].(string)
 			if !ok {
-				return kit.NewErrorResponse("invalid_data", "Expected data dict with 'user' string key")
+				return kit.NewErrorResponse("invalid_data", "Expected data dict with 'user' string key", true)
 			}
 
 			rawUser, err := res.Q().Filter("email", userIdentifier).Or("username", userIdentifier).First()
@@ -265,7 +312,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 				return &kit.AppResponse{Error: err}
 			}
 			if rawUser == nil {
-				return kit.NewErrorResponse("unknown_user", fmt.Sprintf("The user %v does not exist", userIdentifier))
+				return kit.NewErrorResponse("unknown_user", fmt.Sprintf("The user %v does not exist", userIdentifier), true)
 			}
 
 			user := rawUser.(kit.User)
@@ -273,7 +320,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			err = deps.UserService().SendPasswordResetEmail(user)
 			if err != nil {
 				deps.Logger().Errorf("Could not send password reset email for user %v: %v", user, err)
-				return kit.NewErrorResponse("reset_email_send_failed", "Could not send the reset password mail.")
+				return kit.NewErrorResponse("reset_email_send_failed", "Could not send the reset password mail.", true)
 			}
 
 			return &kit.AppResponse{
@@ -312,7 +359,11 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 
 			user, err := deps.UserService().ResetPassword(token, newPw)
 			if err != nil {
-				return kit.NewErrorResponse("password_reset_failed", "Could not reset the password.", true)
+				if err.IsPublic() {
+					return &kit.AppResponse{Error: err}
+				} else {
+					return kit.NewErrorResponse("password_reset_failed", "Could not reset the password.", true)
+				}
 			}
 
 			return &kit.AppResponse{
