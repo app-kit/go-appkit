@@ -15,52 +15,6 @@ import (
 	"github.com/theduke/go-appkit/utils"
 )
 
-// UserResource is a resource mixin that restricts create, read and update operations to
-// admins, users with the permission action_collectionname (see AdminResource) or
-// users that own the model.
-// This can only be used for models that implement the appkit.UserModel interface.
-type UserResource struct{}
-
-func (UserResource) AllowFind(res kit.Resource, model kit.Model, user kit.User) bool {
-	if user == nil {
-		return false
-	}
-	if model.(kit.UserModel).GetUserID() == user.GetID() {
-		return true
-	}
-	return user.HasRole("admin")
-}
-
-func (UserResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool {
-	if user == nil {
-		return false
-	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
-		return true
-	}
-	return user.HasRole("admin") || user.HasPermission(res.Collection()+".create")
-}
-
-func (UserResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {
-	if user == nil {
-		return false
-	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
-		return true
-	}
-	return user.HasRole("admin") || user.HasPermission(res.Collection()+".update")
-}
-
-func (UserResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool {
-	if user == nil {
-		return false
-	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
-		return true
-	}
-	return user.HasRole("admin") || user.HasPermission(res.Collection()+".delete")
-}
-
 // randomToken creates a random alphanumeric string with a length of 32.
 func randomToken() string {
 	n := 32
