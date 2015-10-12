@@ -2,6 +2,7 @@
 
 This project aims to provide an application framework for developing 
 web applications and APIs in the GO language.
+
 The endgoal is to provide a complete framework similar to [Meteor](https://www.meteor.com/),
 but with an efficient and compiled language in the backend.
 
@@ -63,7 +64,9 @@ To use a different backend, refer to the [Backends section](https://github.com/t
 <a name="Gettingstarted.Minimaltodo"></a>
 #### Minimal Todo Example
 
-The following example shows how to create a very simple todo application, where projects and todos can be created by users without an account. To see how to employ the user system, refer to the next section.
+The following example shows how to create a very simple todo application, where projects and todos can be created by users without an account. 
+
+To see how to employ the user system, refer to the next section.
 
 Save this code into a file "todo.go" or just download the [file](https://github.com/theduke/go-appkit/tree/master/examples/todo-minimal.go)
 
@@ -131,13 +134,15 @@ func main() {
 ```
 
 **That's it.** 
+
 You now have a working CLI that can launch a server with a [JSONAPI](http://jsonapi.org/) frontend (on localhost:8000 by default).
+
 After starting the server, you can perform CRUD operations for projects and todos.
 
-Run the server:
+##### Run the server:
 `go run todo.go`
 
-* Create a new project.
+##### Create a new project.
 
 ```
 POST http://localhost:8000/api/projects
@@ -161,7 +166,7 @@ POST http://localhost:8000/api/projects
 }
 ```
 
-* Create a new todo:
+##### Create a new todo:
 
 ```
 POST http://localhost:8000/api/todos
@@ -183,19 +188,19 @@ POST http://localhost:8000/api/todos
 }
 ```
 
-* Find all projects.
+##### Find all projects.
 
 ```
 GET localhost:8000/api/projects
 ```
 
-* Find all todos of a project.
+##### Find all todos of a project.
 
 ```
 GET localhost:8000/api/todos?filters=projectId:1
 ```
 
-* Set todo as finished.
+##### Set todo as finished.
 
 ```
 POST http://localhost:8000/api/todos/1
@@ -209,6 +214,8 @@ POST http://localhost:8000/api/todos/1
 }
 ```
 
+
+
 <a name="Gettingstarted.TodoWithUsers"></a>
 #### Todo with user system
 
@@ -216,7 +223,8 @@ This example is largely equivalent to the previous one, but it employs Appkit's 
 by tying projects and todos to users.
 
 **The changes required are minimal.**
-You just can embed the UserModel base struct in your models, and alter the resources registration to use the  users.UserResource mixin.
+
+You just can embed the *UserModel* base struct in your models, and alter the resources registration to use the  *users.UserResource* mixin.
 
 By doing that, your project and todo models with belong to a user, and create, update and delete operations will be  restricted to admins and owners of the model.
 
@@ -292,13 +300,15 @@ func main() {
 ```
 
 Before you can create and update projects and todos, you need to create a user.
+
 After that, you must create a session for the user, which will give you an auth token that you must supply
 in the 'Authentication:' header.
 
 The authentication system allows for different authentication adapters.
+
 The default is a password adaptor.
 
-* Create a user.
+##### Create a user.
 
 ```
 POST http://localhost:8000/users
@@ -319,7 +329,7 @@ POST http://localhost:8000/users
 
 ```
 
-* Log  in by creating a session.
+##### Log  in by creating a session.
 
 ```
 POST http://localhost:8000/sessions
@@ -341,31 +351,38 @@ POST http://localhost:8000/sessions
 ...
 ```
 
-* CRUD operations.
+##### CRUD operations.
 
 Now that you have a user and a session token, you can start creating projects and todos like before.
 All you need to do is add an `Authentication: my_token` header to the requests and use the requests 
 from  the previous example one to one.
+
+
 
 ## Additional Information
 
 ### Warning
 
 This project is still under heavy development.
+
 *Use with caution.*
 
 ### Versioning
 
 This project uses [SEMVER](http://semver.org).
+
 All compatability breaking changes will result in a new version.
+
 Respective versions can be found in the respository branch.
 
 ### Contributing
 
 All contributions are highly welcome.
+
 Just create an issue or a pull request on Github.
 
 ### License
 
 This project is under the MIT License.
+
 For Details, see LICENSE.txt
