@@ -10,7 +10,7 @@ but with an efficient and compiled language in the backend.
 
 * [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...)
 * Different frontends ([JSONAPI](http://jsonapi.org/), [WAMP](http://wamp-proto.org/) (under development).
-* Full user system with password and OAUTH authentication (easily extendable).
+* Full user and permission system with password and OAUTH authentication (easily extendable), *roles* and *permissions*.
 * Server side rendering of javascript apps (Ember, AngularJS, ...) with PhantomJS.
 * Easily extendable CLI.
 * File storage with different backends (File system included, easily extendable to Amazon S3 etc).
@@ -69,10 +69,9 @@ func (Todo) Collection() string {
 ### Resources
 
 Your models are exposed via the API in the form of resources.
+Each resources is tied to a model, and has an optional resource struct that controls the behaviour of your resource.
 
-You register all your resources with the app.
-
-Register a resource with your app:
+To register a resource with your app:
 ```go
 type Todo struct {
   ...
@@ -84,13 +83,13 @@ app.RegisterResource(&Todo{}, &TodoResource)
 ```
 
 
-There are many hooks you can implement on your resource to control the behaviour of your resource, for example to restrict access or to run code before or after creation, deletion, etc.
+There are many hooks you can implement on your resource to control behaviour, for example to restrict access or to run code before or after creation, deletion, etc.
 
 You can also alter the default CRUD operations by implementing some of these hooks.
 
 You can find all available hooks in the [Resources documentation](https://github.com/theduke/go-appkit#docs.resources)
 
-
+There are also several supplied resource implementations for common use cases.
 
 <a name="Concepts.Methods"></a>
 ### Methods
@@ -431,6 +430,109 @@ from  the previous example one to one.
 <a name="docs.resources"></a>
 ### Resources
 
+* [Resource implementations](https://github.com/theduke/go-appkit#docs.resources.implementations)
+* [Hooks](https://github.com/theduke/go-appkit#docs.resources.hooks)
+
+<a name="docs.resources.implementations"></a>
+#### Resource implementations
+
+The package contains several resource implementations that fulfill common needs, making it unneccessary to implement the  hooks yourself.
+
+* [ReadOnlyResource](https://github.com/theduke/go-appkit#docs.resources.implementations.readonly)
+* [AdminResource](https://github.com/theduke/go-appkit#docs.resources.implementations.admin)
+* [LoggedInResource](https://github.com/theduke/go-appkit#docs.resources.implementations.loggedin)
+* [PublicWriteResource](https://github.com/theduke/go-appkit#docs.resources.implementations.publicwrite)
+* [UserResource](https://github.com/theduke/go-appkit#docs.resources.implementations.user)
+
+<a name="docs.resources.implementations.readonly"></a>
+##### ReadOnlyResource
+
+This resource only allows READ operations via the API, no create, update or delete.
+
+```go
+import(
+  ...
+  "github.com/theduke/go-appkit/resources"
+  ...
+)
+
+app.RegisterResource(&Model{}, &resources.ReadOnlyResource{})
+```
+
+<a name="docs.resources.implementations.admin"></a>
+##### AdminResource
+
+This resource restricts create, read and update operations to users with the 'admin' role, or with the permission 'collectionname.create/update/delete'.
+
+```go
+import(
+  ...
+  "github.com/theduke/go-appkit/resources"
+  ...
+)
+
+app.RegisterResource(&Model{}, &resources.AdminResource{})
+```
+
+<a name="docs.resources.implementations.loggedin"></a>
+##### LoggedInResource
+
+This resource restricts create, read and update operations to logged in users.
+**This is the default behaviour used if you do not supply your own resource struct.**
+
+```go
+import(
+  ...
+  "github.com/theduke/go-appkit/resources"
+  ...
+)
+
+app.RegisterResource(&Model{}, &resources.LoggedInResource{})
+```
+
+<a name="docs.resources.implementations.publicwrite"></a>
+##### PublicWriteResource
+
+This resource allows all create/update/delete operations for all api users, even without authentication.
+
+```go
+import(
+  ...
+  "github.com/theduke/go-appkit/resources"
+  ...
+)
+
+app.RegisterResource(&Model{}, &resources.PublicWriteResource{})
+```
+
+<a name="docs.resources.implementations.user"></a>
+##### UserResource
+
+This resource restricts create, read and update operations to **users that OWN a model**, have the admin role, or the 'collection.create/read/update' permission.
+
+For this to work, your model has to implement the *appkit.UserModel* interface.
+
+**This is the default behaviour used if you do not supply your own resource struct.**
+
+```go
+import(
+  ...
+  "github.com/theduke/go-appkit/resources"
+  "github.com/theduke/go-appkit/users"
+  ...
+)
+
+type Model struct {
+  dukedb.IntIDModel
+  users.IntUserModel
+}
+
+app.RegisterResource(&Model{}, &resources.UserResource{})
+```
+
+<a name="docs.resources.hooks"></a>
+#### Hooks
+
 Here you can find all the available hooks you can implement on your resources.
 
 * General
@@ -461,10 +563,10 @@ Here you can find all the available hooks you can implement on your resources.
   * AllowDelete
   * AfterDelete
 
-<a name="docs.resources.general"></a>
-#### General
+<a name="docs.resources.hooks.general"></a>
+##### General
 
-##### HttpRoutes
+###### HttpRoutes
 
 ```go
 HttpRoutes(kit.Resource)(kit.Resource) []kit.HttpRoute
