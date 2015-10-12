@@ -15,7 +15,8 @@ but with an efficient and compiled language in the backend.
 * Easily extendable CLI.
 * File storage with different backends (File system included, easily extendable to Amazon S3 etc).
 * Caching system with different caches (File system, in memory and REDIS included, easily extendable).
-* Optional CMS with menu system and pages with an Admin frontend written in EmberJS.
+* [Scaffolding CLI](https://github.com/theduke/go-appkit-cli) similar to Yeoman for quick setup and development.
+* **Optional** light weight CMS with menu system and pages with an Admin frontend written in EmberJS.
 
 
 ## TOC
@@ -23,6 +24,7 @@ but with an efficient and compiled language in the backend.
 1. [Concepts](https://github.com/theduke/go-appkit#Concepts)
   * [Models](https://github.com/theduke/go-appkit#Concepts.Models)
   * [Resources](https://github.com/theduke/go-appkit#Concepts.Resources)
+  * [Methods](https://github.com/theduke/go-appkit#Concepts.Methods)
   * [User system](https://github.com/theduke/go-appkit#Concepts.Usersystem)
   * [File storage](https://github.com/theduke/go-appkit#Concepts.Filestorage)
 2. [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
@@ -35,8 +37,15 @@ but with an efficient and compiled language in the backend.
 <a name="Concepts.Models"></a>
 ### Models
 
+The API revolves about models which are just GO structs.
+
+For Appkit to understand your models, your structs need to implement a few interfaces.
+
 <a name="Concepts.Resources"></a>
 ### Resources
+
+<a name="Concepts.Methods"></a>
+### Methods
 
 <a name="Concepts.Usersystem"></a>
 ### User system
@@ -48,9 +57,18 @@ but with an efficient and compiled language in the backend.
 <a name="Gettingstarted"></a>
 ## Getting started
 
+You should first read over the *Models*, *Resources* and *Methods* section in [Concepts](https://github.com/theduke/go-appkit#Concepts), and 
+then check out the [Todo example](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo) to familiarize yourself with the way Appkit works.
+
 ```bash
-go get github.com/theduke/go-dukedb
-go get github.com/theduke/go-appkit
+go get github.com/theduke/go-appkit-cli
+go install github.com/theduke/go-appkit-cli/appkit
+
+appkit bootstrap --backend="postgres" myproject
+
+cd myproject/myproject
+
+go run main.go
 ```
 
 ### Examples
