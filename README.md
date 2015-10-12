@@ -14,6 +14,7 @@ but with an efficient and compiled language in the backend.
 * Easily extendable CLI.
 * File storage with different backends (File system included, easily extendable to Amazon S3 etc).
 * Caching system with different caches (File system, in memory and REDIS included, easily extendable).
+* Optional CMS with menu system and pages with an Admin frontend written in EmberJS.
 
 
 ## TOC
