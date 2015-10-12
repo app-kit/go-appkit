@@ -61,8 +61,8 @@ You should first read over the *Models*, *Resources* and *Methods* section in [C
 then check out the [Todo example](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo) to familiarize yourself with the way Appkit works.
 
 ```bash
-go get github.com/theduke/go-appkit-cli
-go install github.com/theduke/go-appkit-cli/appkit
+go get github.com/theduke/go-appkitcli
+go install github.com/theduke/go-appkitcli/appkit
 
 appkit bootstrap --backend="postgres" myproject
 
