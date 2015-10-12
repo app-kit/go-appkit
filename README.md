@@ -19,12 +19,12 @@ but with an efficient and compiled language in the backend.
 
 ## TOC
 
-* [Concepts](https://github.com/theduke/go-appkit#Concepts)
+1. [Concepts](https://github.com/theduke/go-appkit#Concepts)
 ⋅⋅* [Models](https://github.com/theduke/go-appkit#Concepts.Models)
 ⋅⋅* [Resources](https://github.com/theduke/go-appkit#Concepts.Resources)
 ⋅⋅* [User system](https://github.com/theduke/go-appkit#Concepts.Usersystem)
 ⋅⋅* [File storage](https://github.com/theduke/go-appkit#Concepts.Filestorage)
-* [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
+2. [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
 ⋅⋅* [Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
 ⋅⋅* [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
 
