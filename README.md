@@ -108,6 +108,7 @@ You can find all available hooks in the [Resources documentation](https://github
 You should first read over the *Models*, *Resources* and *Methods* section in [Concepts](https://github.com/theduke/go-appkit#Concepts), and 
 then check out the [Todo example](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo) to familiarize yourself with the way Appkit works.
 
+After that, run these  commands to **create a new Appkit project:**
 ```bash
 go get github.com/theduke/go-appkitcli
 go install github.com/theduke/go-appkitcli/appkit
