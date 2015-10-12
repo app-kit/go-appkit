@@ -535,37 +535,38 @@ app.RegisterResource(&Model{}, &resources.UserResource{})
 
 Here you can find all the available hooks you can implement on your resources.
 
-* General
-  * HttpRoutes
-  * Methods
-* Find
-  * AllowFind
-  * ApiFindOne
-  * ApiFind
-  * ApiAlterQuery
-  * ApiAfterFind
-* Create
-  * Create
-  * ApiCreate
-  * BeforeCreate
-  * AllowCreate
-  * AfterCreate
-* Update
-  * ApiUpdate
-  * Update
-  * BeforeUpdate
-  * AllowUpdate
-  * AfterUpdate
-* Delete
-  * ApiDelete
-  * Delete
-  * BeforeDelete
-  * AllowDelete
-  * AfterDelete
+* [General](https://github.com/theduke/go-appkit#docs.resources.hooks.general)
+  * [HttpRoutes](https://github.com/theduke/go-appkit#docs.resources.hooks.httproutes)
+  * [Methods](https://github.com/theduke/go-appkit#docs.resources.hooks.methods)
+* [Find](https://github.com/theduke/go-appkit#docs.resources.hooks.find)
+  * [AllowFind](https://github.com/theduke/go-appkit#docs.resources.hooks.allowfind)
+  * [ApiFindOne](https://github.com/theduke/go-appkit#docs.resources.hooks.apifindone)
+  * [ApiFind](https://github.com/theduke/go-appkit#docs.resources.hooks.apifind)
+  * [ApiAlterQuery](https://github.com/theduke/go-appkit#docs.resources.hooks.apialterquery)
+  * [ApiAfterFind](https://github.com/theduke/go-appkit#docs.resources.hooks.apiafterfind)
+* [Create](https://github.com/theduke/go-appkit#docs.resources.hooks.create)
+  * [Create](https://github.com/theduke/go-appkit#docs.resources.hooks.create)
+  * [ApiCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.apicreate)
+  * [BeforeCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.beforecreate)
+  * [AllowCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.allowcreate)
+  * [AfterCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.aftercreate)
+* [Update](https://github.com/theduke/go-appkit#docs.resources.hooks.update)
+  * [ApiUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.apiupdate)
+  * [Update](https://github.com/theduke/go-appkit#docs.resources.hooks.update)
+  * [BeforeUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.beforeupdate)
+  * [AllowUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.allowupdate)
+  * [AfterUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.afterupdate)
+* [Delete](https://github.com/theduke/go-appkit#docs.resources.hooks.delete)
+  * [ApiDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.apidelete)
+  * [Delete](https://github.com/theduke/go-appkit#docs.resources.hooks.delete)
+  * [BeforeDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.beforedelete)
+  * [AllowDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.allowdelete)
+  * [AfterDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.afterdelete)
 
 <a name="docs.resources.hooks.general"></a>
 ##### General
 
+<a name="docs.resources.hooks.httproutes"></a>
 ###### HttpRoutes
 
 ```go
@@ -573,7 +574,8 @@ HttpRoutes(kit.Resource)(kit.Resource) []kit.HttpRoute
 ```
 Supply http route connected with your resource
 
-##### Methods
+<a name="docs.resources.hooks.methods"></a>
+###### Methods
 
 ```go
 Methods(kit.Resource) []kit.Method
@@ -583,9 +585,10 @@ Supply methods connected with your resource (See [Methods](https://github.com/th
 
 
 <a name="docs.resources.find"></a>
-#### Find
+##### Find
 
-##### AllowFind
+<a name="docs.resources.hooks.allowfind"></a>
+###### AllowFind
 
 ```go
 AllowFind(res kit.Resource, model kit.Model, user kit.User) bool
@@ -593,7 +596,8 @@ AllowFind(res kit.Resource, model kit.Model, user kit.User) bool
 
 Restrict what users may retrieve a model
 
-##### ApiFindOne
+<a name="docs.resources.hooks.apifindone"></a>
+###### ApiFindOne
 
 ```go
 ApiFindOne(res kit.Resource, rawId string, r kit.Request) kit.Response
@@ -601,7 +605,8 @@ ApiFindOne(res kit.Resource, rawId string, r kit.Request) kit.Response
 
 Overwrite the FindOne behaviour.
 
-##### ApiFind
+<a name="docs.resources.hooks.apifind"></a>
+###### ApiFind
 
 ```go
 ApiFind(res kit.Resource, query db.Query, r kit.Request) kit.Response
@@ -609,7 +614,8 @@ ApiFind(res kit.Resource, query db.Query, r kit.Request) kit.Response
 
 Overwrite the Find behaviour.
 
-##### ApiAlterQuery
+<a name="docs.resources.hooks.apialterquery"></a>
+###### ApiAlterQuery
 
 ```go
 ApiAterQuery(res kit.Resource, query db.Query, r kit.Request) apperror.Error
@@ -617,7 +623,8 @@ ApiAterQuery(res kit.Resource, query db.Query, r kit.Request) apperror.Error
 
 Alter a find query before it is executed. For example to restrict fields based on the users permissions.
 
-##### ApiAfterFind
+<a name="docs.resources.hooks.apiafterfind"></a>
+###### ApiAfterFind
 
 ```go
 ApiAfterFind(res kit.Resource, obj []kit.Model, user kit.User) apperror.Error
@@ -627,9 +634,10 @@ Execute code after find, for example to alter model data.
 
 
 <a name="docs.resources.create"></a>
-#### Create
+##### Create
 
-##### ApiCreate
+<a name="docs.resources.hooks.apicreate"></a>
+###### ApiCreate
 
 ```go
 ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
@@ -637,7 +645,8 @@ ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
 
 Overwrite the ApiCreate behaviour.
 
-#####  Create
+<a name="docs.resources.hooks.create"></a>
+###### Create
 
 ```go
 Create(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
@@ -645,7 +654,8 @@ Create(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 
 Overwrite the default Create behaviour.
 
-#####  BeforeCreate
+<a name="docs.resources.hooks.beforecreate"></a>
+###### BeforeCreate
 
 ```go
 BeforeCreate(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
@@ -653,7 +663,8 @@ BeforeCreate(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 
 Run code before creating a model. Allows to abort creation by returning an error.
 
-#####  AllowCreate
+<a name="docs.resources.hooks.allowcreate"></a>
+######  AllowCreate
 
 ```go
 AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool
@@ -661,7 +672,8 @@ AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool
 
 Access control for creation, for example to restrict creation to certain user roles.
 
-#####  AfterCreate
+<a name="docs.resources.hooks.aftercreate"></a>
+######  AfterCreate
 
 ```go
 AfterCreate(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
@@ -671,9 +683,10 @@ Run code after creation, for example to create related models.
 
 
 <a name="docs.resources.update"></a>
-#### Update
+##### Update
 
-#####  ApiUpdate
+<a name="docs.resources.hooks.apiupdate"></a>
+######  ApiUpdate
 
 ```go
 ApiUpdate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
@@ -681,7 +694,8 @@ ApiUpdate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
 
 Overwrite the ApiUpdate behaviour.
 
-#####  Update
+<a name="docs.resources.hooks.update"></a>
+######  Update
 
 ```go
 Update(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
@@ -689,7 +703,8 @@ Update(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 
 Overwrite the Update behaviour.
 
-#####  BeforeUpdate
+<a name="docs.resources.hooks.beforeupdate"></a>
+###### BeforeUpdate
 
 ```go
 BeforeUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Error
@@ -697,7 +712,8 @@ BeforeUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Er
 
 Run code before update. Allows to abort update by returning an error.
 
-##### AllowUpdate
+<a name="docs.resources.hooks.allowupdate"></a>
+###### AllowUpdate
 
 ```go
 AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool
@@ -705,7 +721,8 @@ AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool
 
 Restrict update operations, for example to restrict updates to the models owner or admins.
 
-#####  AfterUpdate
+<a name="docs.resources.hooks.afterupdate"></a>
+###### AfterUpdate
 
 ```go
 AfterUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Error
@@ -715,9 +732,10 @@ Run code after updates.
 
 
 <a name="docs.resources.delete"></a>
-#### Delete
+##### Delete
 
-#####  ApiDelete
+<a name="docs.resources.hooks.apidelete"></a>
+######  ApiDelete
 
 ```go
 ApiDelete(res kit.Resource, id string, r kit.Request) kit.Response
@@ -725,7 +743,8 @@ ApiDelete(res kit.Resource, id string, r kit.Request) kit.Response
 
 Overwrite te ApiDelete behaviour.
 
-##### Delete
+<a name="docs.resources.hooks.delete"></a>
+###### Delete
 
 ```go
 Delete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
@@ -733,7 +752,8 @@ Delete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 
 Overwrite the Delete behaviour.
 
-#####  BeforeDelete
+<a name="docs.resources.hooks.beforedelete"></a>
+###### BeforeDelete
 
 ```go
 BeforeDelete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
@@ -741,7 +761,8 @@ BeforeDelete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
 
 Run code before deleting. Allows to abort deletion by returning an error.
 
-#####  AllowDelete
+<a name="docs.resources.hooks.allowdelete"></a>
+######  AllowDelete
 
 ```go
 AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool
@@ -749,6 +770,7 @@ AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool
 
 Restrict delete operations. For example to only allow admins to delete.
 
+<a name="docs.resources.hooks.afterdelete"></a>
 #####  AfterDelete
 
 ```go
