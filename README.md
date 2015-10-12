@@ -30,6 +30,8 @@ but with an efficient and compiled language in the backend.
 2. [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
   * [Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
   * [Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
+3. [Documentation](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
+  * [Resources](https://github.com/theduke/go-appkit#docs.resources)
 
 <a name="Concepts"></a>
 ## Concepts
@@ -41,8 +43,53 @@ The API revolves about models which are just GO structs.
 
 For Appkit to understand your models, your structs need to implement a few interfaces.
 
+* Collection() string: return a name for your model collection. Eg "todos" for your 'Todo' struct.
+GetID() interface{}: Return the id
+SetID(id interface{}) error: Set the ID. Return an error if the given ID is invalid or nil otherwise.
+GetStrID() string: Return a string version of the ID. Empty string if no ID is set yet.
+SetStrID(id string) error: Set the ID from a string version of the ID. Return error if given ID is invalid, or nil otherwise.
+
+DukeDB offers embeddable base structs that implement all interfaces except collection: *dukedb.IntIDModel* if your models use an integer ID or *dukedb.StrIDModel* for models with a string ID (like MongoDB uses).
+
+```go
+type Todo struct {
+  dukedb.IntIDModel
+  
+  Name string
+  ...
+}
+
+func (Todo) Collection() string {
+  return "todos"
+}
+```
+
 <a name="Concepts.Resources"></a>
 ### Resources
+
+Your models are exposed via the API in the form of resources.
+
+You register all your resources with the app.
+
+Register a resource with your app:
+```go
+type Todo struct {
+  ...
+}
+
+type TodoResource struct {}
+
+app.RegisterResource(&Todo{}, &TodoResource)
+```
+
+
+There are many hooks you can implement on your resource to control the behaviour of your resource, for example to restrict access or to run code before or after creation, deletion, etc.
+
+You can also alter the default CRUD operations by implementing some of these hooks.
+
+You can find all available hooks in the [Resources documentation](https://github.com/theduke/go-appkit#docs.resources)
+
+
 
 <a name="Concepts.Methods"></a>
 ### Methods
@@ -374,6 +421,237 @@ POST http://localhost:8000/sessions
 Now that you have a user and a session token, you can start creating projects and todos like before.
 All you need to do is add an `Authentication: my_token` header to the requests and use the requests 
 from  the previous example one to one.
+
+
+<a name="docs"></a>
+## Documentation
+
+<a name="docs.resources"></a>
+### Resources
+
+Here you can find all the available hooks you can implement on your resources.
+
+* General
+  * HttpRoutes
+  * Methods
+* Find
+  * AllowFind
+  * ApiFindOne
+  * ApiFind
+  * ApiAlterQuery
+  * ApiAfterFind
+* Create
+  * Create
+  * ApiCreate
+  * BeforeCreate
+  * AllowCreate
+  * AfterCreate
+* Update
+  * ApiUpdate
+  * Update
+  * BeforeUpdate
+  * AllowUpdate
+  * AfterUpdate
+* Delete
+  * ApiDelete
+  * Delete
+  * BeforeDelete
+  * AllowDelete
+  * AfterDelete
+
+<a name="docs.resources.general"></a>
+#### General
+
+##### HttpRoutes
+
+```go
+HttpRoutes(kit.Resource)(kit.Resource) []kit.HttpRoute
+```
+Supply http route connected with your resource
+
+##### Methods
+
+```go
+Methods(kit.Resource) []kit.Method
+```
+
+Supply methods connected with your resource (See [Methods](https://github.com/theduke/go-appkit#Concepts.Methods)).
+
+
+<a name="docs.resources.find"></a>
+#### Find
+
+##### AllowFind
+
+```go
+AllowFind(res kit.Resource, model kit.Model, user kit.User) bool
+```
+
+Restrict what users may retrieve a model
+
+##### ApiFindOne
+
+```go
+ApiFindOne(res kit.Resource, rawId string, r kit.Request) kit.Response
+```
+
+Overwrite the FindOne behaviour.
+
+##### ApiFind
+
+```go
+ApiFind(res kit.Resource, query db.Query, r kit.Request) kit.Response
+```
+
+Overwrite the Find behaviour.
+
+##### ApiAlterQuery
+
+```go
+ApiAterQuery(res kit.Resource, query db.Query, r kit.Request) apperror.Error
+```
+
+Alter a find query before it is executed. For example to restrict fields based on the users permissions.
+
+##### ApiAfterFind
+
+```go
+ApiAfterFind(res kit.Resource, obj []kit.Model, user kit.User) apperror.Error
+```
+
+Execute code after find, for example to alter model data.
+
+
+<a name="docs.resources.create"></a>
+#### Create
+
+##### ApiCreate
+
+```go
+ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
+```
+
+Overwrite the ApiCreate behaviour.
+
+#####  Create
+
+```go
+Create(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
+```
+
+Overwrite the default Create behaviour.
+
+#####  BeforeCreate
+
+```go
+BeforeCreate(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
+```
+
+Run code before creating a model. Allows to abort creation by returning an error.
+
+#####  AllowCreate
+
+```go
+AllowCreate(res kit.Resource, obj kit.Model, user kit.User) bool
+```
+
+Access control for creation, for example to restrict creation to certain user roles.
+
+#####  AfterCreate
+
+```go
+AfterCreate(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
+```
+
+Run code after creation, for example to create related models.
+
+
+<a name="docs.resources.update"></a>
+#### Update
+
+#####  ApiUpdate
+
+```go
+ApiUpdate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response
+```
+
+Overwrite the ApiUpdate behaviour.
+
+#####  Update
+
+```go
+Update(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
+```
+
+Overwrite the Update behaviour.
+
+#####  BeforeUpdate
+
+```go
+BeforeUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Error
+```
+
+Run code before update. Allows to abort update by returning an error.
+
+##### AllowUpdate
+
+```go
+AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool
+```
+
+Restrict update operations, for example to restrict updates to the models owner or admins.
+
+#####  AfterUpdate
+
+```go
+AfterUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Error
+```
+
+Run code after updates.
+
+
+<a name="docs.resources.delete"></a>
+#### Delete
+
+#####  ApiDelete
+
+```go
+ApiDelete(res kit.Resource, id string, r kit.Request) kit.Response
+```
+
+Overwrite te ApiDelete behaviour.
+
+##### Delete
+
+```go
+Delete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
+```
+
+Overwrite the Delete behaviour.
+
+#####  BeforeDelete
+
+```go
+BeforeDelete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
+```
+
+Run code before deleting. Allows to abort deletion by returning an error.
+
+#####  AllowDelete
+
+```go
+AllowDelete(res kit.Resource, obj kit.Model, user kit.User) bool
+```
+
+Restrict delete operations. For example to only allow admins to delete.
+
+#####  AfterDelete
+
+```go
+AfterDelete(res kit.Resource, obj kit.Model, user kit.User) apperror.Error
+```
+
+Run code after deletion, for example to clean up related resources.
 
 
 
