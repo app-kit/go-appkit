@@ -39,7 +39,7 @@ type Session interface {
 	SetValidUntil(time.Time)
 	GetValidUntil() time.Time
 
-	IsGuest() bool
+	IsAnonymous() bool
 }
 
 type Role interface {
@@ -515,6 +515,7 @@ type UserService interface {
 
 	CreateUser(user User, adaptor string, data map[string]interface{}) apperror.Error
 	AuthenticateUser(user User, adaptor string, data map[string]interface{}) (User, apperror.Error)
+	StartSession(user User) (Session, apperror.Error)
 	VerifySession(token string) (User, Session, apperror.Error)
 
 	SendConfirmationEmail(User) apperror.Error

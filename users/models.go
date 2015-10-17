@@ -16,7 +16,7 @@ import (
 
 type StrUserModel struct {
 	User   *UserStrID
-	UserID string `db:"not-null;max:255"`
+	UserID string `db:"max:255"`
 }
 
 func (m *StrUserModel) GetUserID() interface{} {
@@ -49,7 +49,7 @@ func (m *StrUserModel) SetUser(u kit.User) {
 
 type IntUserModel struct {
 	User   *UserIntID
-	UserID uint64 `db:"not-null"`
+	UserID uint64 `db:""`
 }
 
 func (m *IntUserModel) GetUserID() interface{} {
@@ -415,7 +415,7 @@ func (t *Token) IsValid() bool {
 
 type Session struct {
 	Token string `db:"primary-key;max:150"`
-	Type  string `db:"max:100"`
+	Type  string `db:"max:10"`
 
 	StartedAt  time.Time `db:"not-null"`
 	ValidUntil time.Time `db:"not-null"`
@@ -480,7 +480,7 @@ type StrUserSession struct {
 	Session
 }
 
-func (s StrUserSession) IsGuest() bool {
+func (s StrUserSession) IsAnonymous() bool {
 	return s.UserID == ""
 }
 
@@ -489,7 +489,7 @@ type IntUserSession struct {
 	Session
 }
 
-func (s *IntUserSession) IsGuest() bool {
+func (s *IntUserSession) IsAnonymous() bool {
 	return s.UserID == 0
 }
 

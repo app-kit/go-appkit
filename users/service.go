@@ -694,32 +694,59 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 	return user, nil
 }
 
+func (s Service) StartSession(user kit.User) (kit.Session, apperror.Error) {
+	token := randomToken()
+	if token == "" {
+		return nil, apperror.New("token_creation_failed")
+	}
+
+	session := s.Sessions.CreateModel().(kit.Session)
+
+	session.SetToken(token)
+	session.SetStartedAt(time.Now())
+	session.SetValidUntil(time.Now().Add(time.Hour * 12))
+
+	if user != nil {
+		session.SetUserID(user.GetID())
+	}
+
+	err := s.Sessions.Create(session, nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return session, nil
+}
+
 func (h *Service) VerifySession(token string) (kit.User, kit.Session, apperror.Error) {
 	rawSession, err := h.Sessions.FindOne(token)
 	if err != nil {
 		return nil, nil, err
-	}
-	if rawSession == nil {
+	} else if rawSession == nil {
 		return nil, nil, apperror.New("session_not_found")
 	}
 	session := rawSession.(kit.Session)
-
-	// Load user.
-	rawUser, err := h.FindUser(session.GetUserID())
-	if err != nil {
-		return nil, nil, err
-	}
-	user := rawUser.(kit.User)
-
-	if !user.IsActive() {
-		return nil, nil, apperror.New("user_inactive")
-	}
 
 	if session.GetValidUntil().Sub(time.Now()) < 1 {
 		return nil, nil, apperror.New("session_expired")
 	}
 
-	// Prolong session
+	var user kit.User
+
+	if !session.IsAnonymous() {
+		// Load user.
+		rawUser, err := h.FindUser(session.GetUserID())
+		if err != nil {
+			return nil, nil, err
+		}
+		user := rawUser.(kit.User)
+
+		if !user.IsActive() {
+			return nil, nil, apperror.New("user_inactive")
+		}
+	}
+
+	// Prolong session.
 	session.SetValidUntil(time.Now().Add(time.Hour * 12))
 	if err := h.Sessions.Update(session, nil); err != nil {
 		return nil, nil, err

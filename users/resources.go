@@ -4,7 +4,6 @@ import (
 	"crypto/rand"
 	"fmt"
 	"math/big"
-	"time"
 
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
@@ -44,56 +43,35 @@ type SessionResourceHooks struct {
 	ApiDeleteAllowed bool
 }
 
-func StartSession(res kit.Resource, user kit.User) (kit.Session, apperror.Error) {
-	token := randomToken()
-	if token == "" {
-		return nil, apperror.New("token_creation_failed")
-	}
-
-	rawSession, err := res.Backend().CreateModel(res.Model().Collection())
-	if err != nil {
-		return nil, err
-	}
-	session := rawSession.(kit.Session)
-
-	session.SetUserID(user.GetID())
-	session.SetToken(token)
-	session.SetStartedAt(time.Now())
-	session.SetValidUntil(time.Now().Add(time.Hour * 12))
-
-	err = res.Create(session, nil)
-	if err != nil {
-		return nil, err
-	}
-
-	return session, nil
-}
-
 // ApiFindOne verifies the session and returns user and profile in meta if valid.
 func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Request) kit.Response {
 	if rawId == "" {
 		return kit.NewErrorResponse("empty_token", "Empty token")
 	}
 
-	user, session, err := res.Registry().UserService().VerifySession(rawId)
+	userService := res.Registry().UserService()
+
+	user, session, err := userService.VerifySession(rawId)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
 
 	meta := make(map[string]interface{})
 
-	userData, err := res.Backend().ModelToMap(user, true)
-	if err != nil {
-		return &kit.AppResponse{Error: apperror.New("marshal_error", true, err)}
-	}
-	meta["user"] = userData
-
-	if user.GetProfile() != nil {
-		profileData, err := res.Backend().ModelToMap(user.GetProfile(), true)
+	if user != nil {
+		userData, err := res.Backend().ModelToMap(user, true)
 		if err != nil {
-			return &kit.AppResponse{Error: apperror.New("marshal_error", true, err)}
+			return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
 		}
-		meta["profile"] = profileData
+		meta["user"] = userData
+
+		if user.GetProfile() != nil {
+			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true)
+			if err != nil {
+				return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
+			}
+			meta["profile"] = profileData
+		}
 	}
 
 	return &kit.AppResponse{
@@ -109,6 +87,8 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 
 	meta := r.GetMeta()
 
+	isAnonymous, _ := meta.Bool("anonymous")
+
 	// Find user.
 	userIdentifier := meta.String("user")
 	var user kit.User
@@ -118,7 +98,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 			Filter("username", userIdentifier).Or("email", userIdentifier).First()
 
 		if err != nil {
-			return &kit.AppResponse{Error: apperror.Wrap(err, "user_query_error", "")}
+			return &kit.AppResponse{Error: err}
 		} else if rawUser == nil {
 			return kit.NewErrorResponse("user_not_found", "Username/Email does not exist ", true)
 		}
@@ -127,43 +107,45 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 	}
 
 	adaptor := meta.String("adaptor")
-	if adaptor == "" {
-		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.")
+	data, _ := meta.Map("auth-data")
+
+	if !isAnonymous {
+		if adaptor == "" {
+			return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.", true)
+		}
+
+		if data == nil {
+			kit.NewErrorResponse("no_or_invalid_auth_data", "Expected 'auth-data' dictionary in metadata.")
+		}
+
+		var err apperror.Error
+		user, err = userService.AuthenticateUser(user, adaptor, data)
+		if err != nil {
+			return &kit.AppResponse{Error: err}
+		}
 	}
 
-	rawData, ok := meta.Get("auth-data")
-	if !ok {
-		kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.")
-	}
-	data, ok := rawData.(map[string]interface{})
-	if !ok {
-		kit.NewErrorResponse("invalid_auth_data", "Invalid auth data: expected dict")
-	}
-
-	user, err := userService.AuthenticateUser(user, adaptor, data)
-	if err != nil {
-		return &kit.AppResponse{Error: err}
-	}
-
-	session, err := StartSession(res, user)
+	session, err := userService.StartSession(user)
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
 
 	responseMeta := make(map[string]interface{})
 
-	userData, err := res.Backend().ModelToMap(user, true)
-	if err != nil {
-		return &kit.AppResponse{Error: apperror.New("marshal_error", true, err)}
-	}
-	responseMeta["user"] = userData
-
-	if user.GetProfile() != nil {
-		profileData, err := res.Backend().ModelToMap(user.GetProfile(), true)
+	if !isAnonymous {
+		userData, err := res.Backend().ModelToMap(user, true)
 		if err != nil {
-			return &kit.AppResponse{Error: apperror.New("marshal_error", true, err)}
+			return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
 		}
-		responseMeta["profile"] = profileData
+		responseMeta["user"] = userData
+
+		if user.GetProfile() != nil {
+			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true)
+			if err != nil {
+				return &kit.AppResponse{Error: apperror.New("marshal_error", true, err)}
+			}
+			responseMeta["profile"] = profileData
+		}
 	}
 
 	return &kit.AppResponse{
