@@ -223,7 +223,8 @@ func (a *App) ReadConfig(path string) {
 	env, _ := cfg.String("ENV")
 	if env == "" {
 		a.Logger().Info("No environment specified, defaulting to 'dev'")
-		cfg.Set("env", "dev")
+		cfg.Set("ENV", "dev")
+		env = "dev"
 	}
 
 	if envCfg, err := cfg.Get(env); err == nil {
@@ -534,21 +535,19 @@ func (a *App) TemplateEngine() kit.TemplateEngine {
 
 func (a *App) RegisterMethod(method kit.Method) {
 	if _, exists := a.methods[method.GetName()]; exists {
-		a.Logger().Warn("Overwriting already registered method '%v'.", method.GetName())
+		a.Logger().Warnf("Overwriting already registered method '%v'.", method.GetName())
 	}
 
 	a.methods[method.GetName()] = method
 }
 
 func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, apperror.Error) {
-	/*
-		if r.GetSession() == nil {
-			return nil, &apperror.Err{
-				Code:    "no_session",
-				Message: "Can't run a method without a session",
-			}
+	if r.GetSession() == nil {
+		return nil, &apperror.Err{
+			Code:    "no_session",
+			Message: "Can't run a method without a session",
 		}
-	*/
+	}
 
 	method := a.methods[name]
 	if method == nil {

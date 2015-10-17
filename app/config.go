@@ -37,7 +37,7 @@ func (c Config) Get(path string) (kit.Config, error) {
 }
 
 func (c Config) ENV() string {
-	return c.UString("env", "dev")
+	return c.UString("ENV", "dev")
 }
 
 func (c Config) Debug() bool {
