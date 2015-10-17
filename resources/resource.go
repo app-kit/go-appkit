@@ -192,11 +192,13 @@ func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
 
 	user := r.GetUser()
 	if allowFind, ok := res.hooks.(AllowFindHook); ok {
+		finalItems := make([]kit.Model, 0)
 		for _, item := range result {
-			if !allowFind.AllowFind(res, item, user) {
-				return kit.NewErrorResponse("permission_denied", "")
+			if allowFind.AllowFind(res, item, user) {
+				finalItems = append(finalItems, item)
 			}
 		}
+		result = finalItems
 	}
 
 	response := &kit.AppResponse{
