@@ -67,6 +67,32 @@ func (c *Context) SetString(key, val string) {
 	c.Data[key] = val
 }
 
+func (c Context) Bool(key string) (bool, error) {
+	val, ok := c.Get(key)
+	if !ok {
+		return false, errors.New("inexistant_key")
+	}
+
+	if boolVal, ok := val.(bool); ok {
+		return boolVal, nil
+	} else {
+		return false, errors.New("type_mismatch")
+	}
+}
+
+func (c Context) Map(key string) (map[string]interface{}, error) {
+	val, ok := c.Get(key)
+	if !ok {
+		return nil, errors.New("inexistant_key")
+	}
+
+	if mapVal, ok := val.(map[string]interface{}); ok {
+		return mapVal, nil
+	} else {
+		return nil, errors.New("type_mismatch")
+	}
+}
+
 // Retrieve an int value from the context.
 // Will auto-convert string values.
 func (c *Context) Int(key string) (int, error) {
