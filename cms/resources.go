@@ -75,6 +75,18 @@ func (PageResource) Methods(res kit.Resource) []kit.Method {
 	return []kit.Method{publish}
 }
 
+func (PageResource) AllowFind(res kit.Resource, obj kit.Model, user kit.User) bool {
+	if p, ok := obj.(*PageIntID); ok && p.Published {
+		return true
+	} else if p, ok := obj.(*PageStrID); ok && p.Published {
+		return true
+	}
+
+	u := obj.(kit.UserModel)
+
+	return user != nil && (u.GetUserID() == user.GetID() || user.HasRole("admin"))
+}
+
 func (PageResource) BeforeUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Error {
 	return nil
 }

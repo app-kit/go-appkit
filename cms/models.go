@@ -208,6 +208,49 @@ type CommentIntID struct {
  * Pages.
  */
 
+/**
+ * Components.
+ */
+
+type PageComponent struct {
+	// Component type.
+	Type string `db:"max:255;not-null"`
+
+	// Explicative name for the content.
+	Name string `db:"not-null"`
+
+	// Data for the component.
+	Data string `db:""`
+
+	// Weight for sorting.
+	Weight int
+
+	// Whether to show the component.
+	Enabled bool
+}
+
+func (PageComponent) Collection() string {
+	return "page_components"
+}
+
+type PageComponentStrID struct {
+	db.StrIDModel
+	PageComponent
+
+	PageID string `db:"not-null"`
+
+	Files []*files.FileStrID `db:"m2m:pages_component_files"`
+}
+
+type PageComponentIntID struct {
+	db.IntIDModel
+	PageComponent
+
+	PageID uint64 `db:"not-null"`
+
+	Files []*files.FileIntID `db:"m2m:pages_component_files"`
+}
+
 type Page struct {
 	// CreatedAt and UpdatedAt.
 	db.TimeStampedModel
@@ -235,6 +278,9 @@ type Page struct {
 	// Summary for top of the page, seo, etc.
 	Summary string
 
+	// Layout to use to display the page.
+	Layout string `db:"max:255"`
+
 	// The actual content.
 	Content string `db:"not-null;"`
 }
@@ -258,6 +304,9 @@ type PageStrID struct {
 
 	// Tags.
 	Tags []*TagStrID `db:"m2m:pages_tags"`
+
+	// Components.
+	Components []*PageComponentStrID `db:"belongs-to:ID:PageID"`
 }
 
 func (p PageStrID) BeforeDelete(b db.Backend) error {
@@ -291,6 +340,9 @@ type PageIntID struct {
 
 	// Tags.
 	Tags []*TagIntID `db:"m2m:pages_tags"`
+
+	// Components.
+	Components []*PageComponentIntID `db:"belongs-to:ID:PageID"`
 }
 
 func (p PageIntID) BeforeDelete(b db.Backend) error {

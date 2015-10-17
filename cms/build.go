@@ -16,6 +16,7 @@ func Build(backend db.Backend, app kit.App, integerIds bool) {
 		backend.RegisterModel(&MenuIntID{})
 		backend.RegisterModel(&MenuItemIntID{})
 		backend.RegisterModel(&CommentIntID{})
+		backend.RegisterModel(&PageComponentIntID{})
 		backend.RegisterModel(&PageIntID{})
 
 		app.RegisterResource(resources.NewResource(&TagIntID{}, nil, true))
@@ -31,6 +32,7 @@ func Build(backend db.Backend, app kit.App, integerIds bool) {
 		backend.RegisterModel(&MenuStrID{})
 		backend.RegisterModel(&MenuItemStrID{})
 		backend.RegisterModel(&CommentStrID{})
+		backend.RegisterModel(&PageComponentStrID{})
 		backend.RegisterModel(&PageStrID{})
 
 		app.RegisterResource(resources.NewResource(&TagStrID{}, nil, true))
