@@ -739,7 +739,7 @@ func (h *Service) VerifySession(token string) (kit.User, kit.Session, apperror.E
 		if err != nil {
 			return nil, nil, err
 		}
-		user := rawUser.(kit.User)
+		user = rawUser.(kit.User)
 
 		if !user.IsActive() {
 			return nil, nil, apperror.New("user_inactive")
