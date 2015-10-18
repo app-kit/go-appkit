@@ -20,6 +20,7 @@ import (
 	"github.com/theduke/go-appkit/crawler"
 	"github.com/theduke/go-appkit/files"
 	"github.com/theduke/go-appkit/resources"
+	"github.com/theduke/go-appkit/tasks"
 	"github.com/theduke/go-appkit/users"
 
 	"github.com/theduke/go-appkit/frontends/jsonapi"
@@ -105,12 +106,28 @@ func (a *App) Defaults() {
 	a.RegisterAfterMiddleware(RequestLoggerMiddleware)
 
 	// Register fs cache.
-	a.defaultCache()
+	a.BuildDefaultCache()
 
 	a.RegisterFrontend(jsonapi.New(a))
 }
 
-func (a *App) defaultCache() {
+func (a *App) BuildDefaultTaskService(b db.Backend) {
+	if !a.Config().UBool("tasks.enabled", false) {
+		return
+	}
+
+	s := tasks.NewService(a.registry, b)
+	max := a.Config().UInt("tasks.maximumConcurrentTasks", 10)
+	s.SetMaximumConcurrentTasks(max)
+
+	if err := s.Run(); err != nil {
+		panic("Could not start task runner: " + err.Error())
+	}
+
+	a.registry.SetTaskService(s)
+}
+
+func (a *App) BuildDefaultCache() {
 	// Build cache.
 	dir := a.Config().UString("caches.fs.dir")
 	if dir == "" {
@@ -123,12 +140,12 @@ func (a *App) defaultCache() {
 	a.RegisterCache(fsCache)
 }
 
-func (a *App) defaultUserService(b db.Backend) {
+func (a *App) BuildDefaultUserService(b db.Backend) {
 	s := users.NewService(nil, b, nil)
 	a.RegisterUserService(s)
 }
 
-func (a *App) defaultFileService(b db.Backend) {
+func (a *App) BuildDefaultFileService(b db.Backend) {
 	// Register file service with fs backend.
 
 	dir := a.Config().UString("files.dir")
@@ -450,10 +467,13 @@ func (a *App) RegisterBackend(b db.Backend) {
 	// If no backend was registered before, create a default UserService and FileService.
 	if isDefault {
 		if a.UserService() == nil {
-			a.defaultUserService(b)
+			a.BuildDefaultUserService(b)
 		}
 		if a.FileService() == nil {
-			a.defaultFileService(b)
+			a.BuildDefaultFileService(b)
+		}
+		if a.registry.TaskService() == nil {
+			a.BuildDefaultTaskService(b)
 		}
 	}
 }

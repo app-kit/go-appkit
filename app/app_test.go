@@ -304,7 +304,7 @@ var _ = Describe("App", func() {
 			})
 
 			It("Should confirm email", func() {
-				if skipUser {
+				if skipUser || currentToken == "" {
 					Skip("Previous error")
 				}
 
