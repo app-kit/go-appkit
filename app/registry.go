@@ -20,6 +20,7 @@ type Registry struct {
 	resourceService kit.ResourceService
 	userService     kit.UserService
 	templateEngine  kit.TemplateEngine
+	taskService     kit.TaskService
 }
 
 // Ensure Registry implements kit.Registry.
@@ -157,4 +158,12 @@ func (d *Registry) TemplateEngine() kit.TemplateEngine {
 
 func (d *Registry) SetTemplateEngine(e kit.TemplateEngine) {
 	d.templateEngine = e
+}
+
+func (d *Registry) TaskService() kit.TaskService {
+	return d.taskService
+}
+
+func (d *Registry) SetTaskService(s kit.TaskService) {
+	d.taskService = s
 }

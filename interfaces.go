@@ -20,6 +20,119 @@ type Model interface {
 }
 
 /**
+ * Taskrunner system.
+ */
+
+// TaskHandler functions are called to handle a task.
+// On success, return (nil, false).
+// On error, return an error, and true if the task may be retried, or false
+// otherwise.
+type TaskHandler func(registry Registry, data interface{}) (result interface{}, err apperror.Error, canRetry bool)
+
+// TaskSpec is a task specification that defines an executable task.
+type TaskSpec interface {
+	// GetName returns a unique name for the task.
+	GetName() string
+
+	// GetAllowedRetries returns the number of allowed retries.
+	GetAllowedRetries() int
+
+	// GetRetryInterval returns the time that must pass before a
+	// retry is attempted.
+	GetRetryInterval() time.Duration
+
+	// GetHandler returns the TaskHandler function that will execute the task.
+	GetHandler() TaskHandler
+}
+
+// Task represents a single task to be executed.
+type Task interface {
+	// GetID returns the unique task id.
+	GetStrID() string
+
+	// GetName Returns the name of the task (see @TaskSpec).
+	GetName() string
+	SetName(name string)
+
+	// GetData returns the data associated with the task.
+	GetData() interface{}
+	SetData(data interface{})
+
+	// GetResult returns the result data omitted by the task.
+	GetResult() interface{}
+
+	// SetResult sets the result data omitted by the task.
+	SetResult(result interface{})
+
+	GetUserID() interface{}
+	SetUserID(id interface{})
+
+	GetRunAt() *time.Time
+	SetRunAt(t *time.Time)
+
+	// TryCount returns the number of times the task has been tried.
+	GetTryCount() int
+	SetTryCount(count int)
+
+	SetCreatedAt(t time.Time)
+	GetCreatedAt() time.Time
+
+	// StartedAt returns a time if the task was started, or zero value otherwise.
+	GetStartedAt() *time.Time
+	SetStartedAt(t *time.Time)
+
+	// FinishedAt returns the time the task was finished, or zero value.
+	GetFinishedAt() *time.Time
+	SetFinishedAt(t *time.Time)
+
+	IsRunning() bool
+	SetIsRunning(flag bool)
+
+	IsComplete() bool
+	SetIsComplete(flag bool)
+
+	IsSuccess() bool
+	SetIsSuccess(flag bool)
+
+	// GetError returns the error that occured on the last try, or nil if none.
+	GetError() apperror.Error
+	SetError(err apperror.Error)
+
+	// Returns the log messages the last task run produced.
+	GetLog() string
+	SetLog(log string)
+}
+
+type TaskRunner interface {
+	SetRegistry(registry Registry)
+	Registry() Registry
+
+	SetBackend(backend db.Backend)
+	Backend() db.Backend
+
+	SetMaximumConcurrenTasks(count int)
+	MaximumConcurrenTasks() int
+
+	SetTaskCheckInterval(duration time.Duration)
+	GetTaskCheckInterval() time.Duration
+
+	RegisterTask(spec TaskSpec)
+
+	// GetTaskSpecs returns a slice with all registered tasks.
+	GetTaskSpecs() map[string]TaskSpec
+
+	Run() apperror.Error
+
+	Shutdown() chan bool
+}
+
+type TaskService interface {
+	QueueTask(name string, data interface{}) (id string, err apperror.Error)
+
+	GetTask(id string) (Task, apperror.Error)
+}
+
+/**
  * User interfaces.
  */
 
@@ -682,6 +795,9 @@ type Registry interface {
 	Resources() map[string]Resource
 	AddResource(res Resource)
 	SetResources(map[string]Resource)
+
+	TaskService() TaskService
+	SetTaskService(service TaskService)
 
 	EmailService() EmailService
 	SetEmailService(EmailService)
