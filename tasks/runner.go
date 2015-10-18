@@ -78,11 +78,11 @@ func (r *Runner) Backend() db.Backend {
 	return r.backend
 }
 
-func (r *Runner) SetMaximumConcurrenTasks(count int) {
+func (r *Runner) SetMaximumConcurrentTasks(count int) {
 	r.maximumConcurrentTasks = count
 }
 
-func (r *Runner) MaximumConcurrenTasks() int {
+func (r *Runner) MaximumConcurrentTasks() int {
 	return r.maximumConcurrentTasks
 }
 

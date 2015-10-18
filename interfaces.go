@@ -110,8 +110,8 @@ type TaskRunner interface {
 	SetBackend(backend db.Backend)
 	Backend() db.Backend
 
-	SetMaximumConcurrenTasks(count int)
-	MaximumConcurrenTasks() int
+	SetMaximumConcurrentTasks(count int)
+	MaximumConcurrentTasks() int
 
 	SetTaskCheckInterval(duration time.Duration)
 	GetTaskCheckInterval() time.Duration
