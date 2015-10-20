@@ -6,6 +6,10 @@ web applications and APIs in the GO language.
 The endgoal is to provide a complete framework similar to [Meteor](https://www.meteor.com/),
 but with an efficient and compiled language in the backend.
 
+## Warning
+
+**This project is still in a very early development phase and not ready for production use.**
+
 **Main features:**
 
 * [DukeDB ORM](https://github.com/theduke/go-dukedb) supporting different databases (PostgreSQL, MySQL,  MongoDB, ...) and with a *migrations system*.
