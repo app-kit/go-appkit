@@ -1,9 +1,12 @@
 package utils
 
 import (
+	"crypto/md5"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"math"
 	"os"
 	"path"
 
@@ -138,4 +141,34 @@ func ListFiles(path string) ([]string, apperror.Error) {
 	}
 
 	return files, nil
+}
+
+func BuildFileMD5Hash(path string) (string, apperror.Error) {
+	file, err := os.Open(path)
+	if err != nil {
+		return "", apperror.Wrap(err, "file_open_error")
+	}
+	defer file.Close()
+
+	// calculate the file size
+	info, _ := file.Stat()
+	filesize := info.Size()
+	var filechunk float64 = 8192
+	blocks := uint64(math.Ceil(float64(filesize) / filechunk))
+
+	hash := md5.New()
+
+	for i := uint64(0); i < blocks; i++ {
+		blocksize := int(math.Min(filechunk, float64(filesize-int64(i*uint64(filechunk)))))
+		buf := make([]byte, blocksize)
+
+		_, err := file.Read(buf)
+		if err != nil {
+			return "", apperror.Wrap(err, "file_read_error")
+		}
+
+		io.WriteString(hash, string(buf)) // append into the hash
+	}
+
+	return hex.EncodeToString(hash.Sum(nil)), nil
 }
