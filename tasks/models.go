@@ -16,6 +16,8 @@ type Task struct {
 
 	CreatedAt time.Time
 
+	Cancelled bool
+
 	Result interface{} `db:"marshal"`
 
 	TryCount int
@@ -81,6 +83,14 @@ func (t *Task) SetResult(result interface{}) {
 
 func (t *Task) GetCreatedAt() time.Time {
 	return t.CreatedAt
+}
+
+func (t *Task) IsCancelled() bool {
+	return t.Cancelled
+}
+
+func (t *Task) SetIsCancelled(x bool) {
+	t.Cancelled = x
 }
 
 func (t *Task) SetCreatedAt(tm time.Time) {

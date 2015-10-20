@@ -176,9 +176,10 @@ func (r *Runner) startNewTasks() {
 	tasks, err := r.backend.Q(r.taskModel.Collection()).
 		Filter("Complete", false).
 		Filter("Running", false).
+		Filter("Cancelled", false).
 		AndQ(db.Or(
 		db.Eq("RunAt", nil),
-		db.Gte("RunAt", time.Now()))).
+		db.Lte("RunAt", time.Now()))).
 		Limit(r.maximumConcurrentTasks - len(r.activeTasks)).
 		Find()
 

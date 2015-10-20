@@ -80,6 +80,9 @@ type Task interface {
 	GetProgress() int
 	SetProgress(p int)
 
+	IsCancelled() bool
+	SetIsCancelled(flag bool)
+
 	// TryCount returns the number of times the task has been tried.
 	GetTryCount() int
 	SetTryCount(count int)
