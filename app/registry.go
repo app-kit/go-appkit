@@ -8,6 +8,7 @@ import (
 )
 
 type Registry struct {
+	app             kit.App
 	logger          *logrus.Logger
 	config          kit.Config
 	defaultCache    kit.Cache
@@ -21,6 +22,8 @@ type Registry struct {
 	userService     kit.UserService
 	templateEngine  kit.TemplateEngine
 	taskService     kit.TaskService
+
+	values map[string]interface{}
 }
 
 // Ensure Registry implements kit.Registry.
@@ -31,7 +34,16 @@ func NewRegistry() kit.Registry {
 		caches:    make(map[string]kit.Cache),
 		backends:  make(map[string]db.Backend),
 		resources: make(map[string]kit.Resource),
+		values:    make(map[string]interface{}),
 	}
+}
+
+func (d *Registry) App() kit.App {
+	return d.app
+}
+
+func (d *Registry) SetApp(x kit.App) {
+	d.app = x
 }
 
 func (d *Registry) Logger() *logrus.Logger {
@@ -166,4 +178,12 @@ func (d *Registry) TaskService() kit.TaskService {
 
 func (d *Registry) SetTaskService(s kit.TaskService) {
 	d.taskService = s
+}
+
+func (d *Registry) Get(name string) interface{} {
+	return d.values[name]
+}
+
+func (d *Registry) Set(name string, val interface{}) {
+	d.values[name] = val
 }
