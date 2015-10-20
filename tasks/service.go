@@ -30,22 +30,17 @@ func NewService(reg kit.Registry, b db.Backend) *Service {
 	return s
 }
 
-func (s *Service) QueueTask(name string, data interface{}) (string, apperror.Error) {
-	rawTask, err := s.backend.CreateModel(s.taskModel.Collection())
-	if err != nil {
-		return "", err
-	}
-
-	task := rawTask.(kit.Task)
-
+func (s *Service) Queue(task kit.Task) apperror.Error {
 	task.SetCreatedAt(time.Now())
-	task.SetName(name)
-	task.SetData(data)
 
-	if err = s.backend.Create(task); err != nil {
-		return "", err
+	if task.GetName() == "" {
+		return apperror.New("task_name_empty", "Can't queue a task without a name")
 	}
-	return task.GetStrID(), nil
+
+	if err := s.backend.Create(task); err != nil {
+		return err
+	}
+	return nil
 }
 
 func (s *Service) GetTask(id string) (kit.Task, apperror.Error) {

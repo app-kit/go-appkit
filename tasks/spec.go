@@ -7,10 +7,11 @@ import (
 )
 
 type TaskSpec struct {
-	Name           string
-	AllowedRetries int
-	RetryInterval  time.Duration
-	Handler        kit.TaskHandler
+	Name              string
+	AllowedRetries    int
+	RetryInterval     time.Duration
+	Handler           kit.TaskHandler
+	OnCompleteHandker kit.TaskOnCompleteHandler
 }
 
 // GetName returns a unique name for the task.
@@ -32,4 +33,8 @@ func (s TaskSpec) GetRetryInterval() time.Duration {
 // GetHandler returns the TaskHandler function that will execute the task.
 func (s TaskSpec) GetHandler() kit.TaskHandler {
 	return s.Handler
+}
+
+func (s TaskSpec) GetOnCompleteHandler() kit.TaskOnCompleteHandler {
+	return s.OnCompleteHandker
 }

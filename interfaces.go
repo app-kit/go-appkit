@@ -27,7 +27,9 @@ type Model interface {
 // On success, return (nil, false).
 // On error, return an error, and true if the task may be retried, or false
 // otherwise.
-type TaskHandler func(registry Registry, data interface{}) (result interface{}, err apperror.Error, canRetry bool)
+type TaskHandler func(registry Registry, task Task, progressChan chan Task) (result interface{}, err apperror.Error, canRetry bool)
+
+type TaskOnCompleteHandler func(registry Registry, task Task)
 
 // TaskSpec is a task specification that defines an executable task.
 type TaskSpec interface {
@@ -43,6 +45,8 @@ type TaskSpec interface {
 
 	// GetHandler returns the TaskHandler function that will execute the task.
 	GetHandler() TaskHandler
+
+	GetOnCompleteHandler() TaskOnCompleteHandler
 }
 
 // Task represents a single task to be executed.
@@ -54,9 +58,18 @@ type Task interface {
 	GetName() string
 	SetName(name string)
 
+	GetUserID() interface{}
+	SetUserID(id interface{})
+
+	GetRunAt() *time.Time
+	SetRunAt(t *time.Time)
+
 	// GetData returns the data associated with the task.
 	GetData() interface{}
 	SetData(data interface{})
+
+	GetPriority() int
+	SetPriority(priority int)
 
 	// GetResult returns the result data omitted by the task.
 	GetResult() interface{}
@@ -64,11 +77,8 @@ type Task interface {
 	// SetResult sets the result data omitted by the task.
 	SetResult(result interface{})
 
-	GetUserID() interface{}
-	SetUserID(id interface{})
-
-	GetRunAt() *time.Time
-	SetRunAt(t *time.Time)
+	GetProgress() int
+	SetProgress(p int)
 
 	// TryCount returns the number of times the task has been tried.
 	GetTryCount() int
@@ -127,7 +137,7 @@ type TaskRunner interface {
 }
 
 type TaskService interface {
-	QueueTask(name string, data interface{}) (id string, err apperror.Error)
+	Queue(task Task) apperror.Error
 
 	GetTask(id string) (Task, apperror.Error)
 }

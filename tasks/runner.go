@@ -27,6 +27,9 @@ type Runner struct {
 
 	activeTasks map[string]kit.Task
 
+	// progressChan can be used by tasks to report their progress.
+	progressChan chan kit.Task
+
 	// finishedChan is used by goroutines that handle a task to signal task completion.
 	finishedChan chan kit.Task
 
@@ -50,6 +53,7 @@ func NewRunner(reg kit.Registry, b db.Backend, model kit.Model) *Runner {
 		maximumConcurrentTasks: 20,
 		taskCheckInterval:      time.Duration(5) * time.Second,
 		activeTasks:            make(map[string]kit.Task),
+		progressChan:           make(chan kit.Task),
 		finishedChan:           make(chan kit.Task),
 		shutdownChan:           make(chan chan bool),
 	}
@@ -146,6 +150,13 @@ func (r *Runner) run() {
 			}
 
 			select {
+			case task := <-r.progressChan:
+				// Update task progress in goroutine to avoid blocking.
+				go func(task kit.Task) {
+					// Not checking for error since we can't do anything about it anyway.
+					r.backend.Update(task)
+				}(task)
+
 			case task := <-r.finishedChan:
 				r.finishTask(task)
 
@@ -204,7 +215,7 @@ func (r *Runner) runTask(task kit.Task) apperror.Error {
 		len(r.activeTasks))
 
 	go func(task kit.Task) {
-		result, err, canRetry := spec.GetHandler()(r.registry, task.GetData())
+		result, err, canRetry := spec.GetHandler()(r.registry, task, r.progressChan)
 
 		now := time.Now()
 		task.SetFinishedAt(&now)
@@ -249,6 +260,13 @@ func (r *Runner) finishTask(task kit.Task) {
 	}
 
 	delete(r.activeTasks, task.GetStrID())
+
+	// Call onComplete handler if specified.
+	spec := r.tasks[task.GetName()]
+	onComplete := spec.GetOnCompleteHandler()
+	if onComplete != nil {
+		go onComplete(r.registry, task)
+	}
 }
 
 func (r *Runner) Shutdown() chan bool {

@@ -8,14 +8,15 @@ import (
 )
 
 type Task struct {
-	Name string `db:"not-null"`
-
-	Data   interface{} `db:"marshal"`
-	Result interface{} `db:"marshal"`
+	Name     string      `db:"not-null"`
+	Data     interface{} `db:"marshal"`
+	RunAt    *time.Time
+	Priority int
+	Progress int
 
 	CreatedAt time.Time
 
-	RunAt *time.Time
+	Result interface{} `db:"marshal"`
 
 	TryCount int
 
@@ -41,6 +42,22 @@ func (t Task) GetName() string {
 
 func (t *Task) SetName(name string) {
 	t.Name = name
+}
+
+func (t *Task) GetPriority() int {
+	return t.Priority
+}
+
+func (t *Task) SetPriority(x int) {
+	t.Priority = x
+}
+
+func (t *Task) GetProgress() int {
+	return t.Progress
+}
+
+func (t *Task) SetProgress(x int) {
+	t.Progress = x
 }
 
 // GetData returns the data associated with the task.
@@ -151,7 +168,7 @@ type TaskIntID struct {
 	db.IntIDModel
 	Task
 
-	UserID int64
+	UserID uint64
 }
 
 // Ensure that TaskIntID implements appkit.Task.
@@ -162,7 +179,7 @@ func (t TaskIntID) GetUserID() interface{} {
 }
 
 func (t TaskIntID) SetUserID(id interface{}) {
-	t.UserID = id.(int64)
+	t.UserID = id.(uint64)
 }
 
 type TaskStrID struct {
