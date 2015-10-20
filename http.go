@@ -197,9 +197,20 @@ func (r *AppResponse) SetRawDataReader(reader io.ReadCloser) {
 }
 
 // All arguments are passed to apperror.New(). Check apperror docs for more info.
-func NewErrorResponse(code string, args ...interface{}) *AppResponse {
-	return &AppResponse{
-		Error: apperror.New(code, args...),
+func NewErrorResponse(args ...interface{}) *AppResponse {
+	if len(args) == 0 {
+		panic("Must supply at least an apperror.Error or a string (error code)")
+	}
+
+	firstArg := args[0]
+	if err, ok := firstArg.(apperror.Error); ok {
+		return &AppResponse{Error: err}
+	} else if code, ok := firstArg.(string); ok {
+		return &AppResponse{
+			Error: apperror.New(code, args[1:]...),
+		}
+	} else {
+		panic("Invalid first argument: must be apperror.Error or string (error code)")
 	}
 }
 
