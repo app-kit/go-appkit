@@ -45,8 +45,14 @@ type File struct {
 	// Can be used for sorting.
 	Weight int
 
+	// Hash is an MD5 hash of the file contents.
+	Hash string `db:"max:50"`
+
 	// Can be used for categorization.
 	Type string `db:"max:200"`
+
+	// Stores any additional data required.
+	Data map[string]interface{} `db:"marshal"`
 }
 
 func (f *File) Collection() string {
@@ -183,6 +189,22 @@ func (f *File) GetHeight() int {
 
 func (f *File) SetHeight(x int) {
 	f.Height = x
+}
+
+func (f *File) GetHash() string {
+	return f.Hash
+}
+
+func (f *File) SetHash(x string) {
+	f.Hash = x
+}
+
+func (f *File) GetData() map[string]interface{} {
+	return f.Data
+}
+
+func (f *File) SetData(x map[string]interface{}) {
+	f.Data = x
 }
 
 type FileStrID struct {

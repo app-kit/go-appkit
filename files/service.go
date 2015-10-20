@@ -12,6 +12,7 @@ import (
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/files/backends/fs"
 	"github.com/theduke/go-appkit/resources"
+	"github.com/theduke/go-appkit/utils"
 	db "github.com/theduke/go-dukedb"
 )
 
@@ -22,7 +23,7 @@ type FileService struct {
 	resource       kit.Resource
 	backends       map[string]kit.FileBackend
 	defaultBackend kit.FileBackend
-	model          interface{}
+	model          kit.Model
 }
 
 // Ensure FileService implements FileService interface.
@@ -99,12 +100,24 @@ func (h *FileService) SetDefaultBackend(name string) {
 	h.defaultBackend = h.backends[name]
 }
 
-func (h *FileService) Model() interface{} {
+func (h *FileService) Model() kit.Model {
 	return h.model
 }
 
-func (h *FileService) SetModel(x interface{}) {
+func (h *FileService) SetModel(x kit.Model) {
 	h.model = x
+}
+
+func (h FileService) BuildFileFromPath(bucket, path string, deleteFile bool) (kit.File, apperror.Error) {
+	file := h.New()
+	file.SetTmpPath(path)
+	file.SetBucket(bucket)
+
+	if err := h.BuildFile(file, nil, false, deleteFile); err != nil {
+		return nil, err
+	}
+
+	return file, nil
 }
 
 func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFile bool) apperror.Error {
@@ -162,6 +175,14 @@ func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFi
 		return apperror.New("path_is_directory")
 	}
 
+	// Build the hash.
+	hash, err2 := utils.BuildFileMD5Hash(filePath)
+	if err2 != nil {
+		return err2
+	}
+
+	file.SetHash(hash)
+
 	pathParts := strings.Split(filePath, string(os.PathSeparator))
 	fullName := pathParts[len(pathParts)-1]
 	nameParts := strings.Split(fullName, ".")
@@ -188,9 +209,12 @@ func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFi
 		file.SetIsImage(true)
 		file.SetWidth(int(imageInfo.Width))
 		file.SetHeight(int(imageInfo.Height))
+	} else {
+
 	}
 
 	// Store the file in the backend.
+
 	backendId, writer, err2 := file.Writer(true)
 	if err2 != nil {
 		return apperror.Wrap(err2, "file_backend_error")
@@ -214,7 +238,13 @@ func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFi
 	file.SetBackendID(backendId)
 
 	// Persist file to db.
-	err2 = h.resource.Create(file, user)
+	file.SetTmpPath("")
+
+	if file.GetStrID() != "" {
+		err2 = h.resource.Update(file, user)
+	} else {
+		err2 = h.resource.Create(file, user)
+	}
 	if err2 != nil {
 		// Delete file from backend again.
 		backend.DeleteFile(file)
@@ -297,7 +327,7 @@ func (h *FileService) DeleteByID(id interface{}, user kit.User) apperror.Error {
 	if err != nil {
 		return err
 	} else if f == nil {
-		return apperror.New("file_id_does_not_exist")
+		return apperror.New("not_found")
 	}
 
 	return h.Delete(f.(kit.File), user)
