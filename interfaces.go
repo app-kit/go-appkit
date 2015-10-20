@@ -95,8 +95,8 @@ type Task interface {
 	SetIsSuccess(flag bool)
 
 	// GetError returns the error that occured on the last try, or nil if none.
-	GetError() apperror.Error
-	SetError(err apperror.Error)
+	GetError() string
+	SetError(err string)
 
 	// Returns the log messages the last task run produced.
 	GetLog() string
@@ -552,8 +552,8 @@ type FileService interface {
 	DefaultBackend() FileBackend
 	SetDefaultBackend(string)
 
-	Model() interface{}
-	SetModel(interface{})
+	Model() Model
+	SetModel(model Model)
 
 	// Given a file instance with a specified bucket, read the file from filePath, upload it
 	// to the backend and then store it in the database.
@@ -563,6 +563,8 @@ type FileService interface {
 	// If deleteDir is true, the directory holding the file will be deleted
 	// also.
 	BuildFile(file File, user User, deleteDir, deleteFile bool) apperror.Error
+
+	BuildFileFromPath(bucket, path string, deleteFile bool) (File, apperror.Error)
 
 	// Resource callthroughs.
 	// The following methods map resource methods for convenience.
@@ -707,6 +709,12 @@ type File interface {
 	GetHeight() int
 	SetHeight(int)
 
+	GetHash() string
+	SetHash(hash string)
+
+	GetData() map[string]interface{}
+	SetData(data map[string]interface{})
+
 	// Get a reader for the file.
 	// Might return an error if the file does not exist in the backend,
 	// or it is not connected to a backend.
@@ -769,6 +777,9 @@ type FileBackend interface {
  */
 
 type Registry interface {
+	App() App
+	SetApp(app App)
+
 	Logger() *logrus.Logger
 	SetLogger(*logrus.Logger)
 
@@ -813,6 +824,9 @@ type Registry interface {
 
 	TemplateEngine() TemplateEngine
 	SetTemplateEngine(TemplateEngine)
+
+	Get(name string) interface{}
+	Set(name string, val interface{})
 }
 
 type Config interface {
