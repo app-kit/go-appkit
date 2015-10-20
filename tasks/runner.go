@@ -48,7 +48,7 @@ func NewRunner(reg kit.Registry, b db.Backend, model kit.Model) *Runner {
 		tasks:                  make(map[string]kit.TaskSpec),
 		taskModel:              model,
 		maximumConcurrentTasks: 20,
-		taskCheckInterval:      time.Duration(1) * time.Second,
+		taskCheckInterval:      time.Duration(5) * time.Second,
 		activeTasks:            make(map[string]kit.Task),
 		finishedChan:           make(chan kit.Task),
 		shutdownChan:           make(chan chan bool),
@@ -108,7 +108,7 @@ func (r *Runner) GetTaskSpecs() map[string]kit.TaskSpec {
 }
 
 func (r *Runner) Run() apperror.Error {
-	r.registry.Logger().Debug("TaskRunner: Launching task runner")
+	r.registry.Logger().Debugf("TaskRunner: Launching task runner (max tasks: %v)", r.maximumConcurrentTasks)
 	go r.run()
 	return nil
 }
@@ -137,11 +137,12 @@ func (r *Runner) run() {
 			}
 		} else {
 			diff := time.Now().Sub(lastTaskCheck)
-			if len(r.activeTasks) < r.maximumConcurrentTasks && diff >= time.Duration(r.taskCheckInterval)*time.Second {
+			if len(r.activeTasks) < r.maximumConcurrentTasks && diff >= r.taskCheckInterval {
 				// At least r.taskCheckInterval seconds have passed since the last
 				// check, AND less than the maximum concurrent tasks are running,
 				// so retrieve new tasks.
 				r.startNewTasks()
+				lastTaskCheck = time.Now()
 			}
 
 			select {
@@ -152,7 +153,7 @@ func (r *Runner) run() {
 				r.shutdownCompleteChan = c
 				r.registry.Logger().Infof("TaskRunner: Shutting down - waiting for %v remaining tasks to finish", len(r.activeTasks))
 
-			case <-time.After(time.Duration(100)):
+			case <-time.After(time.Duration(10) * time.Millisecond):
 				// NoOp. Continue loop.
 			}
 		}
@@ -211,14 +212,13 @@ func (r *Runner) runTask(task kit.Task) apperror.Error {
 		task.SetIsRunning(false)
 
 		if err != nil {
-			task.SetError(err)
+			task.SetError(err.Error())
 
 			if !canRetry || task.GetTryCount() >= spec.GetAllowedRetries() {
 				task.SetIsComplete(true)
 			} else {
-				runAt := new(time.Time)
-				*runAt = time.Now().Add(spec.GetRetryInterval())
-				task.SetRunAt(runAt)
+				runAt := time.Now().Add(spec.GetRetryInterval())
+				task.SetRunAt(&runAt)
 			}
 		} else {
 			task.SetIsComplete(true)
@@ -240,6 +240,8 @@ func (r *Runner) finishTask(task kit.Task) {
 			secs := task.GetFinishedAt().Sub(*task.GetStartedAt()).Seconds()
 			r.registry.Logger().Debugf("TaskRunner: Task %v completed successfully (%v secs)", task.GetStrID(), secs)
 		}
+	} else {
+		r.Registry().Logger().Debugf("TaskRunner: Task %v(%v) failed, will retry: %v", task.GetStrID(), task.GetName(), task.GetError())
 	}
 
 	if err := r.backend.Update(task); err != nil {

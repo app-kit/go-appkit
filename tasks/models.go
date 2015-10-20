@@ -3,7 +3,6 @@ package tasks
 import (
 	"time"
 
-	"github.com/theduke/go-apperror"
 	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
 )
@@ -27,7 +26,7 @@ type Task struct {
 	Complete bool
 	Success  bool
 
-	Error apperror.Error
+	Error string
 	Log   string
 }
 
@@ -131,11 +130,11 @@ func (t *Task) SetIsComplete(flag bool) {
 }
 
 // GetError returns the error that occured on the last try, or nil if none.
-func (t Task) GetError() apperror.Error {
+func (t Task) GetError() string {
 	return t.Error
 }
 
-func (t *Task) SetError(err apperror.Error) {
+func (t *Task) SetError(err string) {
 	t.Error = err
 }
 
