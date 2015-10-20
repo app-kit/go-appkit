@@ -295,8 +295,6 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 			if err2 != nil {
 				return nil, apperror.Wrap(err2, "assing_relationship_models_error")
 			}
-
-			fmt.Printf("item: %+v\n", model)
 		}
 
 		// Handle m2m field.

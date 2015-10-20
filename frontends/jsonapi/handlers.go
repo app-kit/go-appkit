@@ -17,7 +17,7 @@ func HandleOptions(a kit.App, r kit.Request) (kit.Response, bool) {
 
 func HandleWrap(collection string, handler kit.RequestHandler) kit.RequestHandler {
 	return func(a kit.App, r kit.Request) (kit.Response, bool) {
-		r.GetContext().Set("collection", collection)
+		r.GetContext().Set("collection", strings.Replace(collection, "-", "_", -1))
 		return handler(a, r)
 	}
 }
@@ -36,7 +36,7 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 		var err apperror.Error
 		query, err = db.ParseJsonQuery(collection, []byte(jsonQuery))
 		if err != nil {
-			return nil, apperror.Wrap(err, "invalid_query", "", true)
+			return nil, apperror.Wrap(err, "invalid_query", "", false)
 		}
 	}
 

@@ -1,6 +1,8 @@
 package jsonapi
 
 import (
+	"strings"
+
 	"github.com/Sirupsen/logrus"
 	"github.com/theduke/go-apperror"
 
@@ -50,6 +52,8 @@ func (f *Frontend) Init() apperror.Error {
 
 	resources := f.app.Registry().Resources()
 	for name := range resources {
+		name = strings.Replace(name, "_", "-", -1)
+
 		f.app.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name, HandleOptions)
 		f.app.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name+"/:id", HandleOptions)
 
