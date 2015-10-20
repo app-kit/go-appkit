@@ -56,7 +56,7 @@ type App struct {
 var _ kit.App = (*App)(nil)
 
 func NewApp(cfgPaths ...string) *App {
-	app := App{
+	app := &App{
 		registry:          NewRegistry(),
 		frontends:         make(map[string]kit.Frontend),
 		methods:           make(map[string]kit.Method),
@@ -67,6 +67,7 @@ func NewApp(cfgPaths ...string) *App {
 
 		shutDownChannel: make(chan bool),
 	}
+	app.registry.SetApp(app)
 
 	// Configure logger.
 	app.SetLogger(&logrus.Logger{
@@ -86,7 +87,7 @@ func NewApp(cfgPaths ...string) *App {
 
 	app.Defaults()
 
-	return &app
+	return app
 }
 
 func (a *App) Defaults() {
@@ -119,10 +120,6 @@ func (a *App) BuildDefaultTaskService(b db.Backend) {
 	s := tasks.NewService(a.registry, b)
 	max := a.Config().UInt("tasks.maximumConcurrentTasks", 10)
 	s.SetMaximumConcurrentTasks(max)
-
-	if err := s.Run(); err != nil {
-		panic("Could not start task runner: " + err.Error())
-	}
 
 	a.registry.SetTaskService(s)
 }
@@ -300,6 +297,14 @@ func (a *App) PrepareForRun() {
 
 func (a *App) Run() {
 	a.PrepareForRun()
+
+	if service := a.Registry().TaskService(); service != nil {
+		if runner, ok := service.(kit.TaskRunner); ok {
+			if err := runner.Run(); err != nil {
+				panic("Could not start task runner: " + err.Error())
+			}
+		}
+	}
 
 	if a.notFoundHandler == nil {
 		a.notFoundHandler = notFoundHandler
@@ -562,19 +567,20 @@ func (a *App) RegisterMethod(method kit.Method) {
 }
 
 func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, apperror.Error) {
-	if r.GetSession() == nil {
-		return nil, &apperror.Err{
-			Code:    "no_session",
-			Message: "Can't run a method without a session",
-		}
-	}
-
 	method := a.methods[name]
 	if method == nil {
 		return nil, &apperror.Err{
 			Code:    "unknown_method",
 			Message: fmt.Sprintf("The method %v does not exist", name),
 		}
+	}
+
+	if r.GetSession() == nil {
+		session, err := a.UserService().StartSession(r.GetUser())
+		if err != nil {
+			return nil, err
+		}
+		r.SetSession(session)
 	}
 
 	instance := NewMethodInstance(method, r, responder)
