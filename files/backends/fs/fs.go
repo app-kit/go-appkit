@@ -229,7 +229,7 @@ func (fs Fs) FileIDs(bucket string) ([]string, apperror.Error) {
 }
 
 func (fs Fs) HasFile(f kit.File) (bool, apperror.Error) {
-	return fs.HasFileById(f.GetBucket(), f.GetFullName())
+	return fs.HasFileById(f.GetBucket(), f.GetBackendID())
 }
 
 func (fs Fs) HasFileById(bucket, id string) (bool, apperror.Error) {
@@ -244,7 +244,7 @@ func (fs Fs) HasFileById(bucket, id string) (bool, apperror.Error) {
 }
 
 func (fs Fs) DeleteFile(f kit.File) apperror.Error {
-	return fs.DeleteFileById(f.GetBucket(), f.GetFullName())
+	return fs.DeleteFileById(f.GetBucket(), f.GetBackendID())
 }
 
 func (fs Fs) DeleteFileById(bucket, id string) apperror.Error {
@@ -277,7 +277,11 @@ func (fs Fs) ReaderById(bucket, id string) (io.ReadCloser, apperror.Error) {
 }
 
 func (fs Fs) Writer(f kit.File, create bool) (string, io.WriteCloser, apperror.Error) {
-	return fs.WriterById(f.GetBucket(), f.GetFullName(), create)
+	id := f.GetBackendID()
+	if create {
+		id = f.GetFullName()
+	}
+	return fs.WriterById(f.GetBucket(), id, create)
 }
 
 func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser, apperror.Error) {
