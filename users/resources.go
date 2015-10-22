@@ -59,14 +59,14 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 	meta := make(map[string]interface{})
 
 	if user != nil {
-		userData, err := res.Backend().ModelToMap(user, true)
+		userData, err := res.Backend().ModelToMap(user, true, false)
 		if err != nil {
 			return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
 		}
 		meta["user"] = userData
 
 		if user.GetProfile() != nil {
-			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true)
+			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true, false)
 			if err != nil {
 				return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
 			}
@@ -133,14 +133,14 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 	responseMeta := make(map[string]interface{})
 
 	if !isAnonymous {
-		userData, err := res.Backend().ModelToMap(user, true)
+		userData, err := res.Backend().ModelToMap(user, true, false)
 		if err != nil {
 			return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
 		}
 		responseMeta["user"] = userData
 
 		if user.GetProfile() != nil {
-			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true)
+			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true, false)
 			if err != nil {
 				return &kit.AppResponse{Error: apperror.New("marshal_error", true, err)}
 			}
@@ -174,12 +174,10 @@ type UserResourceHooks struct {
 }
 
 func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
-	registry := res.Registry()
-
 	sendConfirmationEmail := &methods.Method{
 		Name:     "users.send-confirmation-email",
 		Blocking: false,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 			user := r.GetUser()
 			if user == nil {
 				return kit.NewErrorResponse("not_authenticated", "")
@@ -203,7 +201,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	confirmEmail := &methods.Method{
 		Name:     "users.confirm-email",
 		Blocking: false,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 			data, ok := r.GetData().(map[string]interface{})
 			if !ok {
 				return kit.NewErrorResponse("invalid_data", "Expected data dict with 'token' key")
@@ -230,9 +228,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	requestPwReset := &methods.Method{
 		Name:     "users.request-password-reset",
 		Blocking: false,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			registry := res.Registry()
-
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 			data, ok := r.GetData().(map[string]interface{})
 			if !ok {
 				return kit.NewErrorResponse("invalid_data", "Expected data dict with 'user' key", true)
@@ -268,7 +264,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	pwReset := &methods.Method{
 		Name:     "users.password-reset",
 		Blocking: false,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 			// Verify that token is in data.
 			data, ok := r.GetData().(map[string]interface{})
 			if !ok {
@@ -290,8 +286,6 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			if newPw == "" {
 				return kit.NewErrorResponse("empty_password", "Password may not be empty", true)
 			}
-
-			registry := res.Registry()
 
 			user, err := registry.UserService().ResetPassword(token, newPw)
 			if err != nil {
@@ -315,7 +309,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	changePassword := &methods.Method{
 		Name:     "users.change-password",
 		Blocking: false,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 			// Get userId and password from request.
 			userId := utils.GetMapStringKey(r.GetData(), "userId")
 			if userId == "" {
@@ -340,7 +334,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			}
 
 			// User has the right permissions.
-			userService := res.Registry().UserService()
+			userService := registry.UserService()
 
 			// Find the user.
 			rawUser, err := userService.UserResource().FindOne(userId)

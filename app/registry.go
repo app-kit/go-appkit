@@ -8,14 +8,22 @@ import (
 )
 
 type Registry struct {
-	app             kit.App
-	logger          *logrus.Logger
-	config          kit.Config
-	defaultCache    kit.Cache
-	caches          map[string]kit.Cache
-	defaultBackend  db.Backend
-	backends        map[string]db.Backend
-	resources       map[string]kit.Resource
+	app    kit.App
+	logger *logrus.Logger
+	config kit.Config
+
+	defaultCache kit.Cache
+	caches       map[string]kit.Cache
+
+	defaultBackend db.Backend
+	backends       map[string]db.Backend
+
+	resources map[string]kit.Resource
+
+	frontends map[string]kit.Frontend
+
+	methods map[string]kit.Method
+
 	emailService    kit.EmailService
 	fileService     kit.FileService
 	resourceService kit.ResourceService
@@ -34,9 +42,15 @@ func NewRegistry() kit.Registry {
 		caches:    make(map[string]kit.Cache),
 		backends:  make(map[string]db.Backend),
 		resources: make(map[string]kit.Resource),
+		frontends: make(map[string]kit.Frontend),
+		methods:   make(map[string]kit.Method),
 		values:    make(map[string]interface{}),
 	}
 }
+
+/**
+ * App.
+ */
 
 func (d *Registry) App() kit.App {
 	return d.app
@@ -46,6 +60,10 @@ func (d *Registry) SetApp(x kit.App) {
 	d.app = x
 }
 
+/**
+ * Logger.
+ */
+
 func (d *Registry) Logger() *logrus.Logger {
 	return d.logger
 }
@@ -54,6 +72,10 @@ func (d *Registry) SetLogger(l *logrus.Logger) {
 	d.logger = l
 }
 
+/**
+ * Config.
+ */
+
 func (d *Registry) Config() kit.Config {
 	return d.config
 }
@@ -61,6 +83,10 @@ func (d *Registry) Config() kit.Config {
 func (d *Registry) SetConfig(c kit.Config) {
 	d.config = c
 }
+
+/**
+ * Caches.
+ */
 
 func (d *Registry) Cache(name string) kit.Cache {
 	return d.caches[name]
@@ -89,6 +115,10 @@ func (d *Registry) SetCaches(caches map[string]kit.Cache) {
 	d.caches = caches
 }
 
+/**
+ * Backends.
+ */
+
 func (d *Registry) DefaultBackend() db.Backend {
 	return d.defaultBackend
 }
@@ -116,6 +146,10 @@ func (d *Registry) SetBackends(backends map[string]db.Backend) {
 	d.backends = backends
 }
 
+/**
+ * Resources.
+ */
+
 func (d *Registry) Resource(name string) kit.Resource {
 	return d.resources[name]
 }
@@ -131,6 +165,58 @@ func (d *Registry) AddResource(res kit.Resource) {
 func (d *Registry) SetResources(resources map[string]kit.Resource) {
 	d.resources = resources
 }
+
+/**
+ * Frontends.
+ */
+
+func (d *Registry) Frontend(name string) kit.Frontend {
+	return d.frontends[name]
+}
+
+func (d *Registry) Frontends() map[string]kit.Frontend {
+	return d.frontends
+}
+
+func (d *Registry) AddFrontend(frontend kit.Frontend) {
+	d.frontends[frontend.Name()] = frontend
+}
+
+func (d *Registry) SetFrontends(frontends map[string]kit.Frontend) {
+	d.frontends = frontends
+}
+
+func (d *Registry) HttpFrontend() kit.HttpFrontend {
+	frontend := d.Frontend("http")
+	if frontend == nil {
+		return nil
+	}
+	return frontend.(kit.HttpFrontend)
+}
+
+/**
+ * Methods.
+ */
+
+func (d *Registry) Method(name string) kit.Method {
+	return d.methods[name]
+}
+
+func (d *Registry) Methods() map[string]kit.Method {
+	return d.methods
+}
+
+func (d *Registry) AddMethod(method kit.Method) {
+	d.methods[method.GetName()] = method
+}
+
+func (d *Registry) SetMethods(methods map[string]kit.Method) {
+	d.methods = methods
+}
+
+/**
+ * Services.
+ */
 
 func (d *Registry) EmailService() kit.EmailService {
 	return d.emailService
@@ -179,6 +265,10 @@ func (d *Registry) TaskService() kit.TaskService {
 func (d *Registry) SetTaskService(s kit.TaskService) {
 	d.taskService = s
 }
+
+/**
+ * Custom registrations.
+ */
 
 func (d *Registry) Get(name string) interface{} {
 	return d.values[name]

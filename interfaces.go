@@ -325,8 +325,8 @@ type Response interface {
 	SetRawDataReader(io.ReadCloser)
 }
 
-type RequestHandler func(App, Request) (Response, bool)
-type AfterRequestMiddleware func(App, Request, Response) bool
+type RequestHandler func(Registry, Request) (Response, bool)
+type AfterRequestMiddleware func(Registry, Request, Response) bool
 
 type HttpRoute interface {
 	Route() string
@@ -464,7 +464,7 @@ type TemplateEngine interface {
  * Method.
  */
 
-type MethodHandler func(a App, r Request, unblock func()) Response
+type MethodHandler func(registry Registry, r Request, unblock func()) Response
 
 type Method interface {
 	GetName() string
@@ -662,6 +662,12 @@ type UserService interface {
 type BucketConfig interface {
 }
 
+type ReadSeekerCloser interface {
+	io.Reader
+	io.Closer
+	io.Seeker
+}
+
 // Interface for a File stored in a database backend.
 type File interface {
 	Model
@@ -712,6 +718,9 @@ type File interface {
 	GetMime() string
 	SetMime(string)
 
+	GetMediaType() string
+	SetMediaType(t string)
+
 	GetIsImage() bool
 	SetIsImage(bool)
 
@@ -728,10 +737,25 @@ type File interface {
 	GetData() map[string]interface{}
 	SetData(data map[string]interface{})
 
+	GetType() string
+	SetType(t string)
+
+	GetWeight() int
+	SetWeight(weight int)
+
+	GetParentFile() File
+	SetParentFile(f File)
+
+	GetParentFileID() interface{}
+	SetParentFileID(id interface{})
+
+	GetRelatedFiles() []File
+	SetRelatedFiles(files []File)
+
 	// Get a reader for the file.
 	// Might return an error if the file does not exist in the backend,
 	// or it is not connected to a backend.
-	Reader() (io.ReadCloser, apperror.Error)
+	Reader() (ReadSeekerCloser, apperror.Error)
 
 	// Get a writer for the file.
 	// Might return an error if the file is not connected to a backend.
@@ -771,13 +795,16 @@ type FileBackend interface {
 	HasFile(File) (bool, apperror.Error)
 	HasFileById(bucket, id string) (bool, apperror.Error)
 
+	FileSize(file File) (int64, apperror.Error)
+	FileSizeById(bucket, id string) (int64, apperror.Error)
+
 	DeleteFile(File) apperror.Error
 	DeleteFileById(bucket, id string) apperror.Error
 
 	// Retrieve a reader for a file.
-	Reader(File) (io.ReadCloser, apperror.Error)
+	Reader(File) (ReadSeekerCloser, apperror.Error)
 	// Retrieve a reader for a file in a bucket.
-	ReaderById(bucket, id string) (io.ReadCloser, apperror.Error)
+	ReaderById(bucket, id string) (ReadSeekerCloser, apperror.Error)
 
 	// Retrieve a writer for a file in a bucket.
 	Writer(f File, create bool) (string, io.WriteCloser, apperror.Error)
@@ -794,7 +821,7 @@ type Registry interface {
 	SetApp(app App)
 
 	Logger() *logrus.Logger
-	SetLogger(*logrus.Logger)
+	SetLogger(logger *logrus.Logger)
 
 	Config() Config
 	SetConfig(cfg Config)
@@ -805,20 +832,30 @@ type Registry interface {
 	Cache(name string) Cache
 	Caches() map[string]Cache
 	AddCache(cache Cache)
-	SetCaches(map[string]Cache)
+	SetCaches(caches map[string]Cache)
 
 	DefaultBackend() db.Backend
 	SetDefaultBackend(db.Backend)
-
 	Backend(name string) db.Backend
 	Backends() map[string]db.Backend
 	AddBackend(b db.Backend)
-	SetBackends(map[string]db.Backend)
+	SetBackends(backends map[string]db.Backend)
 
 	Resource(name string) Resource
 	Resources() map[string]Resource
 	AddResource(res Resource)
-	SetResources(map[string]Resource)
+	SetResources(resources map[string]Resource)
+
+	Frontend(name string) Frontend
+	Frontends() map[string]Frontend
+	AddFrontend(frontend Frontend)
+	SetFrontends(frontends map[string]Frontend)
+	HttpFrontend() HttpFrontend
+
+	Method(name string) Method
+	Methods() map[string]Method
+	AddMethod(method Method)
+	SetMethods(methods map[string]Method)
 
 	TaskService() TaskService
 	SetTaskService(service TaskService)
@@ -917,8 +954,8 @@ type Config interface {
 type Frontend interface {
 	Name() string
 
-	App() App
-	SetApp(App)
+	Registry() Registry
+	SetRegistry(registry Registry)
 
 	Debug() bool
 	SetDebug(bool)
@@ -927,6 +964,33 @@ type Frontend interface {
 
 	Init() apperror.Error
 	Start() apperror.Error
+
+	Shutdown() (shutdownChan chan bool, err apperror.Error)
+}
+
+type HttpFrontend interface {
+	Frontend
+
+	Router() *httprouter.Router
+
+	ServeFiles(route, path string)
+
+	// Middleware methods.
+
+	RegisterBeforeMiddleware(handler RequestHandler)
+	BeforeMiddlewares() []RequestHandler
+	SetBeforeMiddlewares(middlewares []RequestHandler)
+
+	RegisterAfterMiddleware(middleware AfterRequestMiddleware)
+	AfterMiddlewares() []AfterRequestMiddleware
+	SetAfterMiddlewares(middlewares []AfterRequestMiddleware)
+
+	// HTTP related methods.
+
+	NotFoundHandler() RequestHandler
+	SetNotFoundHandler(x RequestHandler)
+
+	RegisterHttpHandler(method, path string, handler RequestHandler)
 }
 
 /**
@@ -934,6 +998,12 @@ type Frontend interface {
  */
 
 type App interface {
+	// InstanceID returns a unique ID for the app instance.
+	InstanceID() string
+
+	// SetInstanceID sets the unique instance id for the app instance.
+	SetInstanceID(id string)
+
 	Debug() bool
 	SetDebug(bool)
 
@@ -942,23 +1012,15 @@ type App interface {
 	Logger() *logrus.Logger
 	SetLogger(*logrus.Logger)
 
-	Config() Config
 	SetConfig(Config)
 	ReadConfig(path string)
 
-	Router() *httprouter.Router
-
-	PrepareBackends()
-	Run()
-	RunCli()
-
-	ServeFiles(route, path string)
-
 	// Backend methods.
-
 	RegisterBackend(backend db.Backend)
-	Backend(name string) db.Backend
-	DefaultBackend() db.Backend
+
+	// PrepareBackends prepares all backends for usage by building relationship information.
+	PrepareBackends()
+
 	MigrateBackend(name string, version int, force bool) apperror.Error
 	MigrateAllBackends(force bool) apperror.Error
 	DropBackend(name string) apperror.Error
@@ -968,28 +1030,25 @@ type App interface {
 
 	// Cache methods.
 
-	RegisterCache(c Cache)
-	Cache(name string) Cache
+	RegisterCache(cache Cache)
 
 	// UserService methods.
 
 	RegisterUserService(h UserService)
-	UserService() UserService
 
 	// FileService methods.
 
 	RegisterFileService(f FileService)
-	FileService() FileService
 
 	// Email methods.
 
 	RegisterEmailService(s EmailService)
-	EmailService() EmailService
 
 	// TemplateEngine methods.
 
 	RegisterTemplateEngine(e TemplateEngine)
-	TemplateEngine() TemplateEngine
+
+	RegisterHttpHandler(method, path string, handler RequestHandler)
 
 	// Method methods.
 
@@ -999,27 +1058,14 @@ type App interface {
 	// Resource methodds.
 
 	RegisterResource(Resource)
-	Resource(name string) Resource
-
-	// Middleware methods.
-
-	RegisterBeforeMiddleware(handler RequestHandler)
-	ClearBeforeMiddlewares()
-	BeforeMiddlewares() []RequestHandler
-
-	RegisterAfterMiddleware(middleware AfterRequestMiddleware)
-	ClearAfterMiddlewares()
-	AfterMiddlewares() []AfterRequestMiddleware
 
 	// Frontend methods.
-
 	RegisterFrontend(Frontend)
-	Frontend(name string) Frontend
 
-	// HTTP related methods.
+	// Build all default services.
+	Defaults()
 
-	NotFoundHandler() RequestHandler
-	SetNotFoundHandler(x RequestHandler)
-
-	RegisterHttpHandler(method, path string, handler RequestHandler)
+	Run()
+	RunCli()
+	Shutdown() (shutdownChan chan bool, err apperror.Error)
 }

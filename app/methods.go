@@ -218,7 +218,7 @@ func (m *methodQueue) Process() {
 
 		// Run method.
 		handler := method.method.GetHandler()
-		resp := handler(m.app, method.request, func() {
+		resp := handler(m.app.Registry(), method.request, func() {
 			method.blocked = false
 		})
 
@@ -333,7 +333,7 @@ type ResourceMethodData struct {
 	Query    db.Query
 }
 
-func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodData, apperror.Error) {
+func buildResourceMethodData(registry kit.Registry, rawData interface{}) (*ResourceMethodData, apperror.Error) {
 	if data, ok := rawData.(ResourceMethodData); ok {
 		return &data, nil
 	}
@@ -348,15 +348,15 @@ func buildResourceMethodData(app kit.App, rawData interface{}) (*ResourceMethodD
 	}
 
 	// Try to build model objects.
-	resourceName, _ := data["resource"].(string)
+	resourceName, _ := data["collection"].(string)
 	if resourceName == "" {
 		return nil, &apperror.Err{
-			Code:    "resource_missing",
-			Message: "Data must contain a 'resource' key",
+			Code:    "collection_missing",
+			Message: "Data must contain a 'collection' key",
 		}
 	}
 
-	resource := app.Resource(resourceName)
+	resource := registry.Resource(resourceName)
 	if resource == nil {
 		return nil, &apperror.Err{
 			Code:    "unknown_resource",
@@ -431,8 +431,8 @@ func createMethod() kit.Method {
 	return &Method{
 		Name:     "create",
 		Blocking: true,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+			methodData, err := buildResourceMethodData(registry, r.GetData())
 			if err != nil {
 				return &kit.AppResponse{
 					Error: err,
@@ -455,8 +455,8 @@ func updateMethod() kit.Method {
 	return &Method{
 		Name:     "update",
 		Blocking: true,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+			methodData, err := buildResourceMethodData(registry, r.GetData())
 			if err != nil {
 				return &kit.AppResponse{
 					Error: err,
@@ -479,8 +479,8 @@ func deleteMethod() kit.Method {
 	return &Method{
 		Name:     "delete",
 		Blocking: true,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+			methodData, err := buildResourceMethodData(registry, r.GetData())
 			if err != nil {
 				return &kit.AppResponse{
 					Error: err,
@@ -503,8 +503,8 @@ func queryMethod() kit.Method {
 	return &Method{
 		Name:     "query",
 		Blocking: false,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(a, r.GetData())
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+			methodData, err := buildResourceMethodData(registry, r.GetData())
 			if err != nil {
 				return &kit.AppResponse{
 					Error: err,

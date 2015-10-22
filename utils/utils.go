@@ -3,6 +3,8 @@ package utils
 import (
 	"regexp"
 	"strings"
+
+	"github.com/twinj/uuid"
 )
 
 func GetMapKey(rawData interface{}, key string) (interface{}, bool) {
@@ -88,4 +90,8 @@ func Canonicalize(str string) string {
 	str = regexp.MustCompile("[^a-z0-9\\._\\-]").ReplaceAllString(str, "")
 
 	return str
+}
+
+func UUIDv4() string {
+	return uuid.NewV4().String()
 }

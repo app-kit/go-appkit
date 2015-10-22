@@ -8,7 +8,7 @@ import (
 var RetryTaskMethod = &methods.Method{
 	Name:     "task.retry",
 	Blocking: false,
-	Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 		user := r.GetUser()
 		if user == nil {
 			return kit.NewErrorResponse("not_authenticated", true)
@@ -19,7 +19,7 @@ var RetryTaskMethod = &methods.Method{
 			return kit.NewErrorResponse("invalid_task_id", "Expected 'data' to be the task ID.", true)
 		}
 
-		backend := a.Registry().DefaultBackend()
+		backend := registry.DefaultBackend()
 		rawTask, err := backend.FindOne("tasks", taskId)
 		if err != nil {
 			return kit.NewErrorResponse(err)
@@ -57,7 +57,7 @@ var RetryTaskMethod = &methods.Method{
 var CancelTaskMethod = &methods.Method{
 	Name:     "task.cancel",
 	Blocking: false,
-	Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 		user := r.GetUser()
 		if user == nil {
 			return kit.NewErrorResponse("not_authenticated", true)
@@ -68,7 +68,7 @@ var CancelTaskMethod = &methods.Method{
 			return kit.NewErrorResponse("invalid_task_id", "Expected 'data' to be the task ID.", true)
 		}
 
-		backend := a.Registry().DefaultBackend()
+		backend := registry.DefaultBackend()
 		rawTask, err := backend.FindOne("tasks", taskId)
 		if err != nil {
 			return kit.NewErrorResponse(err)

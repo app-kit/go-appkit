@@ -11,6 +11,11 @@ import (
 	"github.com/theduke/go-appkit/users"
 )
 
+const (
+	MEDIA_TYPE_IMAGE = "image"
+	MEDIA_TYPE_VIDEO = "video"
+)
+
 /**
  * Base file.
  */
@@ -34,8 +39,9 @@ type File struct {
 	Title       string `db:"max:100"`
 	Description string `db:""`
 
-	Size int64
-	Mime string
+	Size      int64
+	Mime      string
+	MediaType string
 
 	IsImage bool
 
@@ -167,6 +173,14 @@ func (f *File) SetMime(x string) {
 	f.Mime = x
 }
 
+func (f *File) GetMediaType() string {
+	return f.MediaType
+}
+
+func (f *File) SetMediaType(x string) {
+	f.MediaType = x
+}
+
 func (f *File) GetIsImage() bool {
 	return f.IsImage
 }
@@ -207,16 +221,71 @@ func (f *File) SetData(x map[string]interface{}) {
 	f.Data = x
 }
 
+func (f *File) GetType() string {
+	return f.Type
+}
+
+func (f *File) SetType(x string) {
+	f.Type = x
+}
+
+func (f *File) GetWeight() int {
+	return f.Weight
+}
+
+func (f *File) SetWeight(x int) {
+	f.Weight = x
+}
+
 type FileStrID struct {
 	File
 	db.StrIDModel
 	users.StrUserModel
+
+	ParentFile   *FileStrID
+	ParentFileID string
+
+	RelatedFiles []*FileStrID `db:"belongs-to:ID:ParentFileID"`
 }
 
 // Ensure FileStrID implements File interface.
 var _ kit.File = (*FileStrID)(nil)
 
-func (f *FileStrID) Reader() (io.ReadCloser, apperror.Error) {
+func (f *FileStrID) GetParentFile() kit.File {
+	return f.ParentFile
+}
+
+func (f *FileStrID) SetParentFile(file kit.File) {
+	f.ParentFile = file.(*FileStrID)
+	f.ParentFileID = file.GetID().(string)
+}
+
+func (f *FileStrID) GetParentFileID() interface{} {
+	return f.ParentFileID
+}
+
+func (f *FileStrID) SetParentFileID(id interface{}) {
+	f.ParentFileID = id.(string)
+}
+
+func (f *FileStrID) GetRelatedFiles() []kit.File {
+	files := make([]kit.File, 0)
+	for _, file := range f.RelatedFiles {
+		files = append(files, file)
+	}
+
+	return files
+}
+
+func (f *FileStrID) SetRelatedFiles(rawFiles []kit.File) {
+	files := make([]*FileStrID, 0)
+	for _, file := range rawFiles {
+		files = append(files, file.(*FileStrID))
+	}
+	f.RelatedFiles = files
+}
+
+func (f *FileStrID) Reader() (kit.ReadSeekerCloser, apperror.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}
@@ -238,12 +307,51 @@ type FileIntID struct {
 	File
 	db.IntIDModel
 	users.IntUserModel
+
+	ParentFile   *FileIntID
+	ParentFileID uint64
+
+	RelatedFiles []*FileIntID `db:"belongs-to:ID:ParentFileID"`
 }
 
 // Ensure FileIntID implements File interface.
 var _ kit.File = (*FileIntID)(nil)
 
-func (f *FileIntID) Reader() (io.ReadCloser, apperror.Error) {
+func (f *FileIntID) GetParentFile() kit.File {
+	return f.ParentFile
+}
+
+func (f *FileIntID) SetParentFile(file kit.File) {
+	f.ParentFile = file.(*FileIntID)
+	f.ParentFileID = file.GetID().(uint64)
+}
+
+func (f *FileIntID) GetParentFileID() interface{} {
+	return f.ParentFileID
+}
+
+func (f *FileIntID) SetParentFileID(id interface{}) {
+	f.ParentFileID = id.(uint64)
+}
+
+func (f *FileIntID) GetRelatedFiles() []kit.File {
+	files := make([]kit.File, 0)
+	for _, file := range f.RelatedFiles {
+		files = append(files, file)
+	}
+
+	return files
+}
+
+func (f *FileIntID) SetRelatedFiles(rawFiles []kit.File) {
+	files := make([]*FileIntID, 0)
+	for _, file := range rawFiles {
+		files = append(files, file.(*FileIntID))
+	}
+	f.RelatedFiles = files
+}
+
+func (f *FileIntID) Reader() (kit.ReadSeekerCloser, apperror.Error) {
 	if f.Backend == nil {
 		return nil, nil
 	}

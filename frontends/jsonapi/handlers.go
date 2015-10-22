@@ -11,14 +11,14 @@ import (
 	kit "github.com/theduke/go-appkit"
 )
 
-func HandleOptions(a kit.App, r kit.Request) (kit.Response, bool) {
+func HandleOptions(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 	return &kit.AppResponse{}, false
 }
 
 func HandleWrap(collection string, handler kit.RequestHandler) kit.RequestHandler {
-	return func(a kit.App, r kit.Request) (kit.Response, bool) {
+	return func(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 		r.GetContext().Set("collection", strings.Replace(collection, "-", "_", -1))
-		return handler(a, r)
+		return handler(registry, r)
 	}
 }
 
@@ -197,10 +197,10 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 	return res.ApiFind(query, request), nil
 }
 
-func HandleFind(app kit.App, request kit.Request) (kit.Response, bool) {
+func HandleFind(registry kit.Registry, request kit.Request) (kit.Response, bool) {
 	collection := request.GetContext().MustString("collection")
 
-	res := app.Registry().Resource(collection)
+	res := registry.Resource(collection)
 	if res == nil || !res.IsPublic() {
 		err := &apperror.Err{
 			Code:    "unknown_resource",
@@ -229,11 +229,11 @@ func HandleFind(app kit.App, request kit.Request) (kit.Response, bool) {
 	return ConvertResponse(res.Backend(), response), false
 }
 
-func HandleFindOne(app kit.App, request kit.Request) (kit.Response, bool) {
+func HandleFindOne(registry kit.Registry, request kit.Request) (kit.Response, bool) {
 	collection := request.GetContext().MustString("collection")
 	id := request.GetContext().MustString("id")
 
-	res := app.Registry().Resource(collection)
+	res := registry.Resource(collection)
 	if res == nil || !res.IsPublic() {
 		resp := kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The resource '%v' does not exist", collection))
 		return ConvertResponse(res.Backend(), resp), false
@@ -242,14 +242,14 @@ func HandleFindOne(app kit.App, request kit.Request) (kit.Response, bool) {
 	return ConvertResponse(res.Backend(), res.ApiFindOne(id, request)), false
 }
 
-func Create(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
+func Create(registry kit.Registry, request kit.Request) (kit.Response, apperror.Error) {
 	if err := request.ParseJsonData(); err != nil {
 		return nil, err
 	}
 
 	collection := request.GetContext().MustString("collection")
 
-	res := app.Registry().Resource(collection)
+	res := registry.Resource(collection)
 	if res == nil || !res.IsPublic() {
 		return nil, &apperror.Err{
 			Code:    "unknown_resource",
@@ -270,8 +270,8 @@ func Create(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 	return response, nil
 }
 
-func HandleCreate(app kit.App, request kit.Request) (kit.Response, bool) {
-	response, err := Create(app, request)
+func HandleCreate(registry kit.Registry, request kit.Request) (kit.Response, bool) {
+	response, err := Create(registry, request)
 	if err != nil {
 		return ConvertResponse(nil, &kit.AppResponse{Error: err}), false
 	}
@@ -279,14 +279,14 @@ func HandleCreate(app kit.App, request kit.Request) (kit.Response, bool) {
 	return response, false
 }
 
-func Update(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
+func Update(registry kit.Registry, request kit.Request) (kit.Response, apperror.Error) {
 	if err := request.ParseJsonData(); err != nil {
 		return nil, err
 	}
 
 	collection := request.GetContext().MustString("collection")
 
-	res := app.Registry().Resource(collection)
+	res := registry.Resource(collection)
 	if res == nil || !res.IsPublic() {
 		return nil, &apperror.Err{
 			Code:    "unknown_resource",
@@ -304,8 +304,8 @@ func Update(app kit.App, request kit.Request) (kit.Response, apperror.Error) {
 	return ConvertResponse(res.Backend(), response), nil
 }
 
-func HandleUpdate(app kit.App, request kit.Request) (kit.Response, bool) {
-	response, err := Update(app, request)
+func HandleUpdate(registry kit.Registry, request kit.Request) (kit.Response, bool) {
+	response, err := Update(registry, request)
 	if err != nil {
 		return ConvertResponse(nil, &kit.AppResponse{Error: err}), false
 	}
@@ -313,11 +313,11 @@ func HandleUpdate(app kit.App, request kit.Request) (kit.Response, bool) {
 	return response, false
 }
 
-func HandleDelete(app kit.App, request kit.Request) (kit.Response, bool) {
+func HandleDelete(registry kit.Registry, request kit.Request) (kit.Response, bool) {
 	collection := request.GetContext().MustString("collection")
 	id := request.GetContext().MustString("id")
 
-	res := app.Registry().Resource(collection)
+	res := registry.Resource(collection)
 	if res == nil || !res.IsPublic() {
 		resp := kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The resource '%v' does not exist", collection))
 		return ConvertResponse(res.Backend(), resp), false

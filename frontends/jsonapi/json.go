@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"strings"
 
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
@@ -170,6 +171,8 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 	if data.Type == "" {
 		return nil, apperror.New("missing_model_type", true)
 	}
+
+	data.Type = strings.Replace(data.Type, "-", "_", -1)
 
 	if !backend.HasCollection(data.Type) {
 		return nil, &apperror.Err{
@@ -357,7 +360,7 @@ func BuildModel(backend db.Backend, collection string, rawData []byte) (kit.Mode
 }
 
 func ConvertModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, apperror.Error) {
-	modelData, err := backend.ModelToMap(m, true)
+	modelData, err := backend.ModelToMap(m, true, false)
 	if err != nil {
 		return nil, nil, apperror.Wrap(err, "model_convert_error", "")
 	}

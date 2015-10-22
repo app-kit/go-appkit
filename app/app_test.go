@@ -72,7 +72,7 @@ type UserProfile struct {
 func buildApp() kit.App {
 	app := NewApp("")
 
-	conf := app.Config()
+	conf := app.Registry().Config()
 	conf.Set("host", "localhost")
 	conf.Set("port", 10010)
 	conf.Set("url", "http://localhost:10010")
@@ -181,6 +181,7 @@ func (c *Client) PostJson(path string, data string) (int, *Data, error) {
 
 var _ = Describe("App", func() {
 	app := buildApp()
+	registry := app.Registry()
 	go func() {
 		app.Run()
 	}()
@@ -214,14 +215,14 @@ var _ = Describe("App", func() {
 				Expect(err).ToNot(HaveOccurred())
 				Expect(status).To(Equal(201))
 
-				rawUser, err := app.Backend("memory").FindOneBy("users", "email", "user1@appkit.com")
+				rawUser, err := registry.Backend("memory").FindOneBy("users", "email", "user1@appkit.com")
 				Expect(err).ToNot(HaveOccurred())
 				Expect(rawUser).ToNot(BeNil())
 
 				plainUser := rawUser.(kit.User)
 
 				// Find full user data with profile and roles.
-				user, err := app.UserService().FindUser(plainUser.GetID())
+				user, err := registry.UserService().FindUser(plainUser.GetID())
 				Expect(err).ToNot(HaveOccurred())
 				Expect(user).ToNot(BeNil())
 
@@ -266,14 +267,14 @@ var _ = Describe("App", func() {
 				token := GetNested(data.Data, "attributes.token").(string)
 				Expect(token).ToNot(Equal(""))
 
-				rawSession, err := app.Backend("memory").FindOne("sessions", id)
+				rawSession, err := registry.Backend("memory").FindOne("sessions", id)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(rawSession).ToNot(BeNil())
 
 				session := rawSession.(kit.Session)
 
 				userId := session.GetUserID()
-				rawUser, err := app.Backend("memory").FindOne("users", userId)
+				rawUser, err := registry.Backend("memory").FindOne("users", userId)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(rawUser).ToNot(BeNil())
 
@@ -317,7 +318,7 @@ var _ = Describe("App", func() {
 				Expect(logEntry.Data["action"]).To(Equal("users.email_confirmed"))
 				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
 
-				rawUser, err := app.Backend("memory").FindOne("users", currentUser.GetID())
+				rawUser, err := registry.Backend("memory").FindOne("users", currentUser.GetID())
 				Expect(rawUser.(kit.User).IsEmailConfirmed()).To(BeTrue())
 			})
 
@@ -355,7 +356,7 @@ var _ = Describe("App", func() {
 				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
 
 				// Try to authenticate user with new password.
-				user, err := app.Registry().UserService().AuthenticateUser(currentUser, "password", map[string]interface{}{"password": "newpassword"})
+				user, err := registry.UserService().AuthenticateUser(currentUser, "password", map[string]interface{}{"password": "newpassword"})
 				Expect(err).ToNot(HaveOccurred())
 				Expect(user).ToNot(BeNil())
 			})
@@ -379,7 +380,7 @@ var _ = Describe("App", func() {
 			Expect(err).ToNot(HaveOccurred())
 			Expect(status).To(Equal(201))
 
-			rawUser, err := app.Backend("memory").FindOneBy("users", "email", "user2@appkit.com")
+			rawUser, err := registry.Backend("memory").FindOneBy("users", "email", "user2@appkit.com")
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rawUser).ToNot(BeNil())
 
@@ -420,14 +421,14 @@ var _ = Describe("App", func() {
 			token := GetNested(data.Data, "attributes.token").(string)
 			Expect(token).ToNot(Equal(""))
 
-			rawSession, err := app.Backend("memory").FindOne("sessions", id)
+			rawSession, err := registry.Backend("memory").FindOne("sessions", id)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rawSession).ToNot(BeNil())
 
 			session := rawSession.(kit.Session)
 
 			userId := session.GetUserID()
-			rawUser, err := app.Backend("memory").FindOne("users", userId)
+			rawUser, err := registry.Backend("memory").FindOne("users", userId)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rawUser).ToNot(BeNil())
 

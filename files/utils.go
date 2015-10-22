@@ -13,7 +13,7 @@ func GetMimeType(path string) string {
 	if err != nil {
 		return ""
 	}
-	return string(output)
+	return strings.TrimSpace(string(output))
 }
 
 type ImageInfo struct {

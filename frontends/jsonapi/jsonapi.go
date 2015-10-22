@@ -10,16 +10,16 @@ import (
 )
 
 type Frontend struct {
-	app   kit.App
-	debug bool
+	registry kit.Registry
+	debug    bool
 }
 
 // Ensure Frontend implements kit.Frontend.
 var _ kit.Frontend = (*Frontend)(nil)
 
-func New(app kit.App) *Frontend {
+func New(registry kit.Registry) *Frontend {
 	return &Frontend{
-		app: app,
+		registry: registry,
 	}
 }
 
@@ -27,12 +27,12 @@ func (f *Frontend) Name() string {
 	return "jsonapi"
 }
 
-func (f *Frontend) App() kit.App {
-	return f.app
+func (f *Frontend) Registry() kit.Registry {
+	return f.registry
 }
 
-func (f *Frontend) SetApp(x kit.App) {
-	f.app = x
+func (f *Frontend) SetRegistry(x kit.Registry) {
+	f.registry = x
 }
 
 func (f *Frontend) Debug() bool {
@@ -44,33 +44,38 @@ func (f *Frontend) SetDebug(x bool) {
 }
 
 func (f *Frontend) Logger() *logrus.Logger {
-	return f.app.Registry().Logger()
+	return f.registry.Logger()
 }
 
 func (f *Frontend) Init() apperror.Error {
-	apiPrefix := f.app.Config().UString("api.prefix", "api")
+	apiPrefix := f.registry.Config().UString("api.prefix", "api")
 
-	resources := f.app.Registry().Resources()
+	httpFrontend := f.registry.HttpFrontend()
+	if httpFrontend == nil {
+		return apperror.New("http_frontend_required", "The JSONAPI frontend relies on the HTTP frontend, which was not found")
+	}
+
+	resources := f.registry.Resources()
 	for name := range resources {
 		name = strings.Replace(name, "_", "-", -1)
 
-		f.app.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name, HandleOptions)
-		f.app.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name+"/:id", HandleOptions)
+		httpFrontend.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name, HandleOptions)
+		httpFrontend.RegisterHttpHandler("OPTIONS", "/"+apiPrefix+"/"+name+"/:id", HandleOptions)
 
 		// Find.
-		f.app.RegisterHttpHandler("GET", "/"+apiPrefix+"/"+name, HandleWrap(name, HandleFind))
+		httpFrontend.RegisterHttpHandler("GET", "/"+apiPrefix+"/"+name, HandleWrap(name, HandleFind))
 
 		// FindOne.
-		f.app.RegisterHttpHandler("GET", "/"+apiPrefix+"/"+name+"/:id", HandleWrap(name, HandleFindOne))
+		httpFrontend.RegisterHttpHandler("GET", "/"+apiPrefix+"/"+name+"/:id", HandleWrap(name, HandleFindOne))
 
 		// Create.
-		f.app.RegisterHttpHandler("POST", "/"+apiPrefix+"/"+name, HandleWrap(name, HandleCreate))
+		httpFrontend.RegisterHttpHandler("POST", "/"+apiPrefix+"/"+name, HandleWrap(name, HandleCreate))
 
 		// Update.
-		f.app.RegisterHttpHandler("PATCH", "/"+apiPrefix+"/"+name+"/:id", HandleWrap(name, HandleUpdate))
+		httpFrontend.RegisterHttpHandler("PATCH", "/"+apiPrefix+"/"+name+"/:id", HandleWrap(name, HandleUpdate))
 
 		// Delete.
-		f.app.RegisterHttpHandler("DELETE", "/"+apiPrefix+"/"+name+"/:id", HandleWrap(name, HandleDelete))
+		httpFrontend.RegisterHttpHandler("DELETE", "/"+apiPrefix+"/"+name+"/:id", HandleWrap(name, HandleDelete))
 	}
 
 	return nil
@@ -79,4 +84,8 @@ func (f *Frontend) Init() apperror.Error {
 func (f *Frontend) Start() apperror.Error {
 	// Noop.
 	return nil
+}
+
+func (f *Frontend) Shutdown() (shutdownChan chan bool, err apperror.Error) {
+	return nil, nil
 }

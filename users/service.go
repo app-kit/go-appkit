@@ -2,6 +2,7 @@ package users
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -216,8 +217,29 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 	return tokenItem, nil
 }
 
-func (s *Service) FindUser(userId interface{}) (kit.User, apperror.Error) {
-	rawUser, err := s.Users.Q().Filter("id", userId).Join("Roles.Permissions").First()
+// FindUser tries to find a user based on either userID, user.Username or user.Email.
+func (s *Service) FindUser(userIdentifier interface{}) (kit.User, apperror.Error) {
+
+	or := db.Or()
+
+	modelInfo := s.backend.ModelInfo("users")
+	idType := modelInfo.GetField(modelInfo.PkField).Type
+
+	if strId, ok := userIdentifier.(string); ok {
+		or.Add(db.Eq("username", strId))
+		or.Add(db.Eq("email", userIdentifier))
+
+		if idType.Kind() == reflect.String {
+			or.Add(db.Eq("id", strId))
+		}
+	}
+
+	id, err1 := db.Convert(userIdentifier, idType)
+	if err1 == nil {
+		or.Add(db.Eq("id", id))
+	}
+
+	rawUser, err := s.Users.Q().FilterQ(or).Join("Roles.Permissions").First()
 	if err != nil {
 		return nil, err
 	} else if rawUser == nil {

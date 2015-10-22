@@ -18,7 +18,6 @@ import (
 
 	"github.com/disintegration/gift"
 	"github.com/theduke/go-apperror"
-	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/utils"
@@ -174,7 +173,7 @@ func (_ FilesResource) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request)
 	}
 }
 
-func handleUpload(a kit.App, tmpPath string, r *http.Request) ([]string, apperror.Error) {
+func handleUpload(registry kit.Registry, tmpPath string, r *http.Request) ([]string, apperror.Error) {
 	reader, err := r.MultipartReader()
 	if err != nil {
 		return nil, apperror.Wrap(err, "multipart_error")
@@ -198,7 +197,7 @@ func handleUpload(a kit.App, tmpPath string, r *http.Request) ([]string, apperro
 			continue
 		}
 
-		id := uuid.NewV4().String()
+		id := utils.UUIDv4()
 		path := tmpPath + string(os.PathSeparator) + id
 
 		if err := os.MkdirAll(path, 0777); err != nil {
@@ -229,40 +228,124 @@ func handleUpload(a kit.App, tmpPath string, r *http.Request) ([]string, apperro
 	return files, nil
 }
 
-func serveFile(w http.ResponseWriter, file kit.File, reader io.Reader) {
+func parseRangeHeader(header string) (int64, int64, apperror.Error) {
+	if !strings.HasPrefix(header, "bytes=") {
+		return 0, 0, apperror.New("invalid_range_header")
+	}
+	parts := strings.Split(header[6:], "-")
+	if len(parts) != 2 {
+		return 0, 0, apperror.New("invalid_range_header")
+	}
+
+	start, err := strconv.ParseInt(parts[0], 10, 64)
+	if err != nil {
+		return 0, 0, apperror.New("invalid_range_start")
+	}
+
+	end := int64(-1)
+	if parts[1] != "" {
+		x, err := strconv.ParseInt(parts[1], 10, 64)
+		if err != nil {
+			return 0, 0, apperror.New("invalid_range_end")
+		}
+		end = x
+	}
+
+	return start, end, nil
+}
+
+func serveFile(w http.ResponseWriter, request *http.Request, mime string, size int64, reader io.ReadSeeker) apperror.Error {
 	header := w.Header()
 
-	if file.GetMime() != "" {
-		header.Set("Content-Type", file.GetMime())
+	if mime != "" {
+		header.Set("Content-Type", mime)
 	}
-	/*
-		if file.GetSize() != 0 {
-			header.Set("Content-Length", strconv.FormatInt(file.GetSize(), 10))
+
+	if size != 0 {
+		header.Set("Content-Length", strconv.FormatInt(size, 10))
+	}
+
+	header.Set("Accept-Ranges", "bytes")
+
+	start := int64(0)
+	end := size
+
+	// Handle range requests.
+	rangeHeader := request.Header.Get("Range")
+	if rangeHeader != "" {
+		var err error
+		start, end, err = parseRangeHeader(rangeHeader)
+		if err != nil {
+			w.WriteHeader(416)
+			return apperror.Wrap(err, "file_serve_invalid_range_header")
 		}
-	*/
+		if end == -1 {
+			end = size
+		}
+	}
+
+	fmt.Printf("Header: %+v\n", request.Header)
+	fmt.Printf("range: %v | start: %v | end %v\n", rangeHeader, start, end)
+
+	if start > 0 {
+		if _, err := reader.Seek(start, 0); err != nil {
+			w.WriteHeader(500)
+			w.Write([]byte("Internal server error."))
+
+			return apperror.Wrap(err, "file_serve_seek_error")
+		}
+
+		// Write content range related headers.
+		contentRange := fmt.Sprintf("bytes %v-%v/%v", start, end, size)
+		fmt.Printf("writing content-range header: %v\n", contentRange)
+		header.Set("Content-Range", contentRange)
+		w.WriteHeader(206)
+	} else {
+		w.WriteHeader(200)
+	}
 
 	buffer := make([]byte, 1024)
 	flusher, canFlush := w.(http.Flusher)
 
-	w.WriteHeader(200)
+	pos := start
 
 	for {
 		n, err := reader.Read(buffer)
-		if err != nil {
-			break
+		if err != nil && err != io.EOF {
+			return apperror.Wrap(err, "file_server_read_error")
 		}
-		if _, err := w.Write(buffer[:n]); err != nil {
-			break
+
+		if pos+int64(n) > end {
+			fmt.Printf("Reached end of range: pos %v, read: %v, end: %v\n", pos, n, end)
+			n = int(end - pos)
+			fmt.Printf("Reduced n to %v\n", n)
 		}
-		if canFlush {
-			flusher.Flush()
+
+		pos += int64(n)
+
+		if n > 0 {
+			if _, err2 := w.Write(buffer[:n]); err2 != nil {
+				fmt.Printf("Tried to serve %v bytes from position %v\n", n, pos)
+				return apperror.Wrap(err, "file_serve_write_error", fmt.Sprintf("Error while serving %v bytes as position %v", n, pos))
+			}
+
+			if canFlush {
+				flusher.Flush()
+			}
+		}
+
+		if err == io.EOF {
+			break
 		}
 	}
+
+	return nil
 }
 
-func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File, width, height int64, filters []string, ip string) (io.Reader, apperror.Error) {
+func (r *FilesResource) getImageReader(registry kit.Registry, tmpDir string, file kit.File, width, height int64, filters []string, ip string) (reader kit.ReadSeekerCloser, size int64, err apperror.Error) {
 	if width == 0 && height == 0 && len(filters) == 0 {
-		return file.Reader()
+		reader, err = file.Reader()
+		return
 	}
 
 	// Dimensions specified.
@@ -270,14 +353,16 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 	// If so, serve it. Otherwise, create it first.
 
 	if (width == 0 || height == 0) && (file.GetWidth() == 0 || file.GetHeight() == 0) {
-		return nil, &apperror.Err{
+		err = &apperror.Err{
 			Code:    "image_dimensions_not_determined",
 			Message: fmt.Sprintf("The file with id %v does not have width/height", file.GetID()),
 		}
+		return
 	}
 
 	if width < 0 || height < 0 {
-		return nil, apperror.New("invalid_dimensions")
+		err = apperror.New("invalid_dimensions")
+		return
 	}
 
 	// If either height or width is 0, determine proper values to presserve aspect ratio.
@@ -289,14 +374,15 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 		height = int64(float64(width) * ratio)
 	}
 
-	maxWidth := app.Config().UInt("files.thumbGenerator.maxWidth", 2000)
-	maxHeight := app.Config().UInt("files.thumbGenerator.maxHeight", 2000)
+	maxWidth := registry.Config().UInt("files.thumbGenerator.maxWidth", 2000)
+	maxHeight := registry.Config().UInt("files.thumbGenerator.maxHeight", 2000)
 
 	if width > int64(maxWidth) || height > int64(maxHeight) {
-		return nil, &apperror.Err{
+		err = &apperror.Err{
 			Code:    "dimensions_exceed_maximum_limits",
 			Message: "The specified dimensions exceed the maximum limits",
 		}
+		return
 	}
 
 	thumbId := fmt.Sprintf("%v_%v_%v_%v_%v_%v.%v",
@@ -309,24 +395,26 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 		"jpeg")
 
 	if ok, _ := file.GetBackend().HasFileById("thumbs", thumbId); !ok {
-		channel, err := r.thumbnailRateLimiter.Start(ip)
+		var channel chan bool
+		channel, err = r.thumbnailRateLimiter.Start(ip)
 		if err != nil {
-			return nil, err
+			return
 		}
 		if channel != nil {
 			<-channel
 		}
 
 		// Thumb does not exist yet, so create it.
-		reader, err := file.Reader()
+		reader, err = file.Reader()
 		if err != nil {
-			return nil, err
+			return
 		}
 		defer reader.Close()
 
 		img, _, err2 := image.Decode(reader)
 		if err2 != nil {
-			return nil, apperror.Wrap(err2, "image_decode_error")
+			err = apperror.Wrap(err2, "image_decode_error")
+			return
 		}
 
 		var giftFilters []gift.Filter
@@ -351,11 +439,12 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 				n := float32(100)
 
 				if len(parts) == 2 {
-					x, err := strconv.ParseFloat(parts[1], 64)
-					if err == nil {
+					x, err2 := strconv.ParseFloat(parts[1], 64)
+					if err2 == nil {
 						n = float32(x)
 					} else {
-						panic("invalid float value for sepia filter")
+						err = apperror.New("invalid_sepia_filter_value", true)
+						return
 					}
 				}
 
@@ -368,18 +457,20 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 				n := float32(0)
 
 				if len(parts) == 2 {
-					x, err := strconv.ParseFloat(parts[1], 64)
-					if err == nil {
+					x, err2 := strconv.ParseFloat(parts[1], 64)
+					if err2 == nil {
 						n = float32(x)
 					} else {
-						panic("Invalid float value for brightness filter")
+						err = apperror.New("invalid_brightness_filter_value", true)
+						return
 					}
 				}
 
 				giftFilters = append(giftFilters, gift.Brightness(n))
 
 			default:
-				panic("Unknown filter: " + filter)
+				err = apperror.New("unknown_filter", fmt.Sprintf("Unknown filter: %v", filter), true)
+				return
 			}
 		}
 
@@ -388,9 +479,10 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 		thumb := image.NewRGBA(gift.Bounds(img.Bounds()))
 		gift.Draw(thumb, img)
 
-		_, writer, err := file.GetBackend().WriterById("thumbs", thumbId, true)
+		var writer io.WriteCloser
+		_, writer, err = file.GetBackend().WriterById("thumbs", thumbId, true)
 		if err != nil {
-			return nil, err
+			return
 		}
 		defer writer.Close()
 
@@ -399,7 +491,14 @@ func (r *FilesResource) getImageReader(app kit.App, tmpDir string, file kit.File
 		r.thumbnailRateLimiter.Finish()
 	}
 
-	return file.GetBackend().ReaderById("thumbs", thumbId)
+	backend := file.GetBackend()
+	size, err = backend.FileSizeById("thumbs", thumbId)
+	if err != nil {
+		return
+	}
+
+	reader, err = file.GetBackend().ReaderById("thumbs", thumbId)
+	return
 }
 
 func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
@@ -411,15 +510,15 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 	routes := make([]kit.HttpRoute, 0)
 
 	// Upload route.
-	uploadOptionsHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
+	uploadOptionsHandler := func(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 		header := r.GetHttpResponseWriter().Header()
 
-		allowedOrigins := a.Config().UString("fileHandler.allowedOrigins", "*")
+		allowedOrigins := registry.Config().UString("fileHandler.allowedOrigins", "*")
 		header.Set("Access-Control-Allow-Origin", allowedOrigins)
 
 		header.Set("Access-Control-Allow-Methods", "OPTIONS, POST")
 
-		allowedHeaders := a.Config().UString("accessControl.allowedHeaders")
+		allowedHeaders := registry.Config().UString("accessControl.allowedHeaders")
 		if allowedHeaders == "" {
 			allowedHeaders = "Authentication, Content-Type, Content-Range, Content-Disposition"
 		} else {
@@ -441,8 +540,8 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		panic("Empty tmp path")
 	}
 
-	uploadHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
-		if a.Config().UBool("fileHandler.requiresAuth", false) {
+	uploadHandler := func(registry kit.Registry, r kit.Request) (kit.Response, bool) {
+		if registry.Config().UBool("fileHandler.requiresAuth", false) {
 			if r.GetUser() == nil {
 				return kit.NewErrorResponse("permission_denied", ""), false
 			}
@@ -452,7 +551,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		var err apperror.Error
 
 		if err == nil {
-			files, err = handleUpload(a, tmpPath, r.GetHttpRequest())
+			files, err = handleUpload(registry, tmpPath, r.GetHttpRequest())
 			if err != nil {
 				return &kit.AppResponse{Error: err}, false
 			}
@@ -467,8 +566,8 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 	uploadRoute := kit.NewHttpRoute("/api/file-upload", "POST", uploadHandler)
 	routes = append(routes, uploadRoute)
 
-	serveFileHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
-		file, err := a.FileService().FindOne(r.GetContext().String("id"))
+	serveFileHandler := func(registry kit.Registry, r kit.Request) (kit.Response, bool) {
+		file, err := registry.FileService().FindOne(r.GetContext().String("id"))
 
 		if err != nil {
 			return &kit.AppResponse{
@@ -492,14 +591,21 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		defer reader.Close()
 
 		w := r.GetHttpResponseWriter()
-		serveFile(w, file, reader)
+
+		err = serveFile(w, r.GetHttpRequest(), file.GetMime(), file.GetSize(), reader)
+		reader.Close()
+
+		if err != nil {
+			registry.Logger().Errorf("Error while serving file %v(%v): %v", file.GetID(), file.GetBackendID(), err)
+		}
+
 		return nil, true
 	}
 	serveFileRoute := kit.NewHttpRoute("/files/:id/*rest", "GET", serveFileHandler)
 	routes = append(routes, serveFileRoute)
 
-	serveImageHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
-		file, err := a.FileService().FindOne(r.GetContext().String("id"))
+	serveImageHandler := func(registry kit.Registry, r kit.Request) (kit.Response, bool) {
+		file, err := registry.FileService().FindOne(r.GetContext().String("id"))
 		if err != nil {
 			return &kit.AppResponse{
 				Error: err,
@@ -540,7 +646,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		rawFilters := query.Get("filters")
 		filters := strings.Split(rawFilters, ",")
 
-		thumbDir := a.Config().UString("thumbnailDir")
+		thumbDir := registry.Config().UString("thumbnailDir")
 		if thumbDir == "" {
 			thumbDir = tmpPath + string(os.PathSeparator) + "thumbnails"
 		}
@@ -550,7 +656,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 			ip = httpRequest.Header.Get("X-Forwarded-For")
 		}
 
-		reader, err := hooks.getImageReader(a, thumbDir, file, width, height, filters, ip)
+		reader, size, err := hooks.getImageReader(registry, thumbDir, file, width, height, filters, ip)
 		if err != nil {
 			return &kit.AppResponse{
 				Error: err,
@@ -558,7 +664,13 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		}
 
 		w := r.GetHttpResponseWriter()
-		serveFile(w, file, reader)
+
+		err = serveFile(w, httpRequest, file.GetMime(), size, reader)
+		reader.Close()
+
+		if err != nil {
+			registry.Logger().Errorf("Error while serving image %v(%v): %v", file.GetID(), file.GetBackendID(), err)
+		}
 
 		return nil, true
 	}

@@ -3,12 +3,11 @@ package app
 import (
 	"fmt"
 	"io/ioutil"
-	"net/http"
 	"os"
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/julienschmidt/httprouter"
+
 	"github.com/olebedev/config"
 	"github.com/spf13/cobra"
 
@@ -23,7 +22,9 @@ import (
 	"github.com/theduke/go-appkit/tasks"
 	"github.com/theduke/go-appkit/users"
 
+	apphttp "github.com/theduke/go-appkit/frontends/http"
 	"github.com/theduke/go-appkit/frontends/jsonapi"
+	"github.com/theduke/go-appkit/frontends/rest"
 
 	"github.com/theduke/go-appkit/email"
 	"github.com/theduke/go-appkit/email/gomail"
@@ -31,21 +32,12 @@ import (
 )
 
 type App struct {
+	// Unique app instance ID.
+	instanceID string
+
 	registry kit.Registry
 
-	frontends map[string]kit.Frontend
-
-	methods map[string]kit.Method
-
-	beforeMiddlewares []kit.RequestHandler
-	afterMiddlewares  []kit.AfterRequestMiddleware
-
-	serverErrorHandler kit.AfterRequestMiddleware
-	notFoundHandler    kit.RequestHandler
-
 	sessionManager *SessionManager
-
-	router *httprouter.Router
 
 	Cli *cobra.Command
 
@@ -57,27 +49,12 @@ var _ kit.App = (*App)(nil)
 
 func NewApp(cfgPaths ...string) *App {
 	app := &App{
-		registry:          NewRegistry(),
-		frontends:         make(map[string]kit.Frontend),
-		methods:           make(map[string]kit.Method),
-		beforeMiddlewares: make([]kit.RequestHandler, 0),
-		afterMiddlewares:  make([]kit.AfterRequestMiddleware, 0),
-
-		router: httprouter.New(),
-
+		registry:        NewRegistry(),
 		shutDownChannel: make(chan bool),
 	}
 	app.registry.SetApp(app)
 
-	// Configure logger.
-	app.SetLogger(&logrus.Logger{
-		Out:       os.Stderr,
-		Formatter: new(logrus.TextFormatter),
-		Hooks:     make(logrus.LevelHooks),
-		Level:     logrus.DebugLevel,
-	})
-
-	app.InitCli()
+	app.BuildDefaultLogger()
 
 	configPath := "config.yaml"
 	if len(cfgPaths) > 0 {
@@ -85,9 +62,19 @@ func NewApp(cfgPaths ...string) *App {
 	}
 	app.ReadConfig(configPath)
 
+	app.InitCli()
+
 	app.Defaults()
 
 	return app
+}
+
+func (a *App) InstanceID() string {
+	return a.instanceID
+}
+
+func (a *App) SetInstanceID(x string) {
+	a.instanceID = x
 }
 
 func (a *App) Defaults() {
@@ -99,17 +86,22 @@ func (a *App) Defaults() {
 	a.RegisterMethod(deleteMethod())
 	a.RegisterMethod(queryMethod())
 
-	a.RegisterBeforeMiddleware(RequestTraceMiddleware)
-	a.RegisterBeforeMiddleware(AuthenticationMiddleware)
-
-	a.RegisterAfterMiddleware(ServerErrorMiddleware)
-	a.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
-	a.RegisterAfterMiddleware(RequestLoggerMiddleware)
-
 	// Register fs cache.
 	a.BuildDefaultCache()
 
-	a.RegisterFrontend(jsonapi.New(a))
+	a.RegisterFrontend(apphttp.New(a.registry))
+	a.RegisterFrontend(jsonapi.New(a.registry))
+	a.RegisterFrontend(rest.New(a.registry))
+}
+
+func (a *App) BuildDefaultLogger() {
+	// Configure logger.
+	a.SetLogger(&logrus.Logger{
+		Out:       os.Stderr,
+		Formatter: new(logrus.TextFormatter),
+		Hooks:     make(logrus.LevelHooks),
+		Level:     logrus.DebugLevel,
+	})
 }
 
 func (a *App) BuildDefaultTaskService(b db.Backend) {
@@ -126,9 +118,9 @@ func (a *App) BuildDefaultTaskService(b db.Backend) {
 
 func (a *App) BuildDefaultCache() {
 	// Build cache.
-	dir := a.Config().UString("caches.fs.dir")
+	dir := a.registry.Config().UString("caches.fs.dir")
 	if dir == "" {
-		dir = a.Config().TmpDir() + "/" + "cache"
+		dir = a.registry.Config().TmpDir() + "/" + "cache"
 	}
 	fsCache, err := fs.New(dir)
 	if err != nil {
@@ -179,10 +171,6 @@ func (a *App) Logger() *logrus.Logger {
 
 func (a *App) SetLogger(x *logrus.Logger) {
 	a.registry.SetLogger(x)
-}
-
-func (a *App) Router() *httprouter.Router {
-	return a.router
 }
 
 /**
@@ -288,8 +276,8 @@ func (a *App) PrepareForRun() {
 	}
 
 	// Initialize frontends.
-	for name := range a.frontends {
-		if err := a.frontends[name].Init(); err != nil {
+	for name, frontend := range a.registry.Frontends() {
+		if err := frontend.Init(); err != nil {
 			a.Logger().Panicf("Error while initializing frontend %v: %v", name, err)
 		}
 	}
@@ -298,6 +286,7 @@ func (a *App) PrepareForRun() {
 func (a *App) Run() {
 	a.PrepareForRun()
 
+	// Run taskrunner if possible.
 	if service := a.Registry().TaskService(); service != nil {
 		if runner, ok := service.(kit.TaskRunner); ok {
 			if err := runner.Run(); err != nil {
@@ -306,95 +295,17 @@ func (a *App) Run() {
 		}
 	}
 
-	if a.notFoundHandler == nil {
-		a.notFoundHandler = notFoundHandler
-	}
-
-	// Install not found handler.
-	a.router.NotFound = &HttpHandlerStruct{
-		App:     a,
-		Handler: a.notFoundHandler,
-	}
-
-	// Install handler for index.
-	indexTpl, err := getIndexTpl(a)
-	if err != nil {
-		a.Logger().Panic(err)
-	}
-
-	a.router.GET("/", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		httpHandler(w, r, params, a, func(kit.App, kit.Request) (kit.Response, bool) {
-			return &kit.AppResponse{
-				RawData: indexTpl,
-			}, false
-		})
-	})
-
-	// Serve files routes.
-	serveFiles := a.Config().UMap("serveFiles")
-	for route := range serveFiles {
-		path, ok := serveFiles[route].(string)
-		if !ok {
-			a.Logger().Error("Config error: serveFiles configuration invalid: Must be map/dictionary with paths")
-			continue
-		}
-		a.ServeFiles(route, path)
-	}
-
-	// Register route for method calls.
-	methodHandler := func(a kit.App, r kit.Request) (kit.Response, bool) {
-		r.ParseJsonData()
-
-		var response kit.Response
-
-		responder := func(r kit.Response) {
-			response = r
-		}
-
-		method := r.GetContext().String("name")
-
-		finishedChannel, err := a.RunMethod(method, r, responder, true)
-		if err != nil {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
-		}
-		<-finishedChannel
-
-		return response, false
-	}
-
-	// Handle options requests.
-	a.router.OPTIONS("/api/method/:name", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		httpHandler(w, r, params, a, func(app kit.App, r kit.Request) (kit.Response, bool) {
-			return &kit.AppResponse{}, false
-		})
-	})
-	// Handle the method request.
-	a.router.POST("/api/method/:name", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		httpHandler(w, r, params, a, methodHandler)
-	})
-
 	// Run the session manager.
 	a.sessionManager = NewSessionManager(a)
 	a.sessionManager.Run()
 
 	// Run frontends.
-	for name := range a.frontends {
-		if err := a.frontends[name].Start(); err != nil {
+
+	for name, frontend := range a.registry.Frontends() {
+		if err := frontend.Start(); err != nil {
 			a.Logger().Panicf("Could not start frontend %v: %v", name, err)
 		}
 	}
-
-	url := a.Config().UString("host", "localhost") + ":" + a.Config().UString("port", "8000")
-	a.Logger().Infof("Serving on %v", url)
-
-	go func() {
-		err2 := http.ListenAndServe(url, a.router)
-		if err2 != nil {
-			a.Logger().Panicf("Could not start server: %v\n", err)
-		}
-	}()
 
 	// Crawl on startup if enabled.
 	if a.Config().UBool("crawler.onRun", false) {
@@ -402,6 +313,10 @@ func (a *App) Run() {
 	}
 
 	<-a.shutDownChannel
+}
+
+func (a *App) Shutdown() (shutdownChan chan bool, err apperror.Error) {
+	return nil, nil
 }
 
 /**
@@ -440,21 +355,6 @@ func (a *App) Crawl() {
 	crawler.Logger = a.Logger()
 
 	crawler.Run()
-}
-
-/**
- * Serve files.
- */
-
-func (a App) ServeFiles(route string, path string) {
-	a.Logger().Debugf("Serving files from directory '%v' at route '%v'", path, route)
-
-	server := http.FileServer(http.Dir(path))
-	a.Router().GET(route+"/*path", func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		// Fix the url.
-		r.URL.Path = params.ByName("path")
-		server.ServeHTTP(w, r)
-	})
 }
 
 /**
@@ -559,15 +459,11 @@ func (a *App) TemplateEngine() kit.TemplateEngine {
  */
 
 func (a *App) RegisterMethod(method kit.Method) {
-	if _, exists := a.methods[method.GetName()]; exists {
-		a.Logger().Warnf("Overwriting already registered method '%v'.", method.GetName())
-	}
-
-	a.methods[method.GetName()] = method
+	a.registry.AddMethod(method)
 }
 
 func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response), withFinishedChannel bool) (chan bool, apperror.Error) {
-	method := a.methods[name]
+	method := a.registry.Method(name)
 	if method == nil {
 		return nil, &apperror.Err{
 			Code:    "unknown_method",
@@ -595,6 +491,19 @@ func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response)
 }
 
 /**
+ * Http routes.
+ */
+
+func (a *App) RegisterHttpHandler(method, path string, handler kit.RequestHandler) {
+	httpFrontend := a.registry.HttpFrontend()
+	if httpFrontend == nil {
+		a.Logger().Panicf("No HTTP frontend found.")
+	}
+
+	httpFrontend.RegisterHttpHandler(method, path, handler)
+}
+
+/**
  * Resources.
  */
 
@@ -616,16 +525,11 @@ func (a *App) RegisterResource(res kit.Resource) {
 
 	// Allow a resource to register custom http routes and methods.
 	if res.Hooks() != nil {
+
 		// Handle http routes.
 		if resRoutes, ok := res.Hooks().(resources.ApiHttpRoutes); ok {
 			for _, route := range resRoutes.HttpRoutes(res) {
-				// Need to wrap this in a lambda, because otherwise, the last routes
-				// handler will always be called.
-				func(route kit.HttpRoute) {
-					a.Router().Handle(route.Method(), route.Route(), func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-						httpHandler(w, r, params, a, route.Handler())
-					})
-				}(route)
+				a.RegisterHttpHandler(route.Method(), route.Route(), route.Handler())
 			}
 		}
 
@@ -688,52 +592,6 @@ func (a *App) RegisterFileService(f kit.FileService) {
 
 func (a *App) FileService() kit.FileService {
 	return a.registry.FileService()
-}
-
-/**
- * Middlewares.
- */
-
-func (a *App) RegisterBeforeMiddleware(handler kit.RequestHandler) {
-	a.beforeMiddlewares = append(a.beforeMiddlewares, handler)
-}
-
-func (a *App) ClearBeforeMiddlewares() {
-	a.beforeMiddlewares = a.beforeMiddlewares[:]
-}
-
-func (a *App) BeforeMiddlewares() []kit.RequestHandler {
-	return a.beforeMiddlewares
-}
-
-func (a *App) RegisterAfterMiddleware(middleware kit.AfterRequestMiddleware) {
-	a.afterMiddlewares = append(a.afterMiddlewares, middleware)
-}
-
-func (a *App) ClearAfterMiddlewares() {
-	a.afterMiddlewares = a.afterMiddlewares[:]
-}
-
-func (a *App) AfterMiddlewares() []kit.AfterRequestMiddleware {
-	return a.afterMiddlewares
-}
-
-/**
- * Http handlers.
- */
-
-func (a *App) NotFoundHandler() kit.RequestHandler {
-	return a.notFoundHandler
-}
-
-func (a *App) SetNotFoundHandler(x kit.RequestHandler) {
-	a.notFoundHandler = x
-}
-
-func (a *App) RegisterHttpHandler(method, path string, handler kit.RequestHandler) {
-	a.router.Handle(method, path, func(w http.ResponseWriter, r *http.Request, params httprouter.Params) {
-		httpHandler(w, r, params, a, handler)
-	})
 }
 
 /**
@@ -843,10 +701,6 @@ func (a *App) RebuildAllBackends() apperror.Error {
  * Frontends.
  */
 
-func (a *App) Frontend(name string) kit.Frontend {
-	return a.frontends[name]
-}
-
 func (a *App) RegisterFrontend(f kit.Frontend) {
-	a.frontends[f.Name()] = f
+	a.registry.AddFrontend(f)
 }

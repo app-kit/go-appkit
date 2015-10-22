@@ -203,14 +203,22 @@ func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFi
 	}
 	file.SetMime(mimeType)
 
-	// Determine image info.
-	imageInfo, err := GetImageInfo(filePath)
-	if imageInfo != nil {
+	if strings.HasPrefix(mimeType, "image") {
 		file.SetIsImage(true)
-		file.SetWidth(int(imageInfo.Width))
-		file.SetHeight(int(imageInfo.Height))
-	} else {
+		file.SetMediaType(MEDIA_TYPE_IMAGE)
 
+		// Determine image info.
+		imageInfo, err := GetImageInfo(filePath)
+		if imageInfo != nil {
+			file.SetWidth(int(imageInfo.Width))
+			file.SetHeight(int(imageInfo.Height))
+		} else {
+			h.Registry().Logger().Warningf("Could not determine image info: %v", err)
+		}
+	}
+
+	if strings.HasPrefix(mimeType, "video") {
+		file.SetMediaType(MEDIA_TYPE_VIDEO)
 	}
 
 	// Store the file in the backend.

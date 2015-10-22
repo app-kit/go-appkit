@@ -11,7 +11,6 @@ import (
 	"path"
 
 	"github.com/theduke/go-apperror"
-	"github.com/twinj/uuid"
 )
 
 func AbsPath(p string) (string, apperror.Error) {
@@ -107,10 +106,12 @@ func CopyFile(sourcePath, targetPath string) apperror.Error {
 
 // Write contents to a tmp file and return the path to the file.
 func WriteTmpFile(content []byte, name string) (string, apperror.Error) {
+	uuid := UUIDv4()
+
 	if name == "" {
-		name = uuid.NewV4().String()
+		name = uuid
 	} else if name[0] == '.' {
-		name = uuid.NewV4().String() + name
+		name = uuid + name
 	}
 
 	p := path.Join(os.TempDir(), "tmpfiles", name)

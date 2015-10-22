@@ -99,7 +99,7 @@ func (fs Fs) bucketPath(bucket string) string {
 	return fs.path + string(os.PathSeparator) + bucket
 }
 
-func (fs Fs) filePath(bucket, file string) string {
+func (fs Fs) FilePath(bucket, file string) string {
 	return fs.bucketPath(bucket) + string(os.PathSeparator) + file
 }
 
@@ -181,7 +181,7 @@ func (fs Fs) ClearBucket(bucket string) apperror.Error {
 	}
 
 	for _, file := range files {
-		if err := os.Remove(fs.filePath(bucket, file)); err != nil {
+		if err := os.Remove(fs.FilePath(bucket, file)); err != nil {
 			return apperror.Wrap(err, "delete_failed",
 				fmt.Sprintf("Could not delete file %v from bucket %v", file, bucket))
 		}
@@ -233,7 +233,7 @@ func (fs Fs) HasFile(f kit.File) (bool, apperror.Error) {
 }
 
 func (fs Fs) HasFileById(bucket, id string) (bool, apperror.Error) {
-	path := fs.filePath(bucket, id)
+	path := fs.FilePath(bucket, id)
 	if f, err := os.Open(path); err != nil {
 		// Todo: check for other errors.
 		return false, nil
@@ -243,12 +243,33 @@ func (fs Fs) HasFileById(bucket, id string) (bool, apperror.Error) {
 	}
 }
 
+func (fs Fs) FileSize(file kit.File) (int64, apperror.Error) {
+	return fs.FileSizeById(file.GetBucket(), file.GetBackendID())
+}
+
+func (fs Fs) FileSizeById(bucket, id string) (int64, apperror.Error) {
+	flag, err := fs.HasFileById(bucket, id)
+	if err != nil {
+		return -1, err
+	} else if !flag {
+		return -1, apperror.New("not_found", "File does not exist")
+	}
+
+	path := fs.FilePath(bucket, id)
+	stat, err2 := os.Stat(path)
+	if err2 != nil {
+		return -1, apperror.Wrap(err2, "stat_error")
+	}
+
+	return stat.Size(), nil
+}
+
 func (fs Fs) DeleteFile(f kit.File) apperror.Error {
 	return fs.DeleteFileById(f.GetBucket(), f.GetBackendID())
 }
 
 func (fs Fs) DeleteFileById(bucket, id string) apperror.Error {
-	path := fs.filePath(bucket, id)
+	path := fs.FilePath(bucket, id)
 	if err := os.Remove(path); err != nil {
 		return apperror.Wrap(err, "file_delete_failed",
 			fmt.Sprintf("Could not delete file %v from bucket %v", bucket, id))
@@ -257,16 +278,16 @@ func (fs Fs) DeleteFileById(bucket, id string) apperror.Error {
 	return nil
 }
 
-func (fs Fs) Reader(f kit.File) (io.ReadCloser, apperror.Error) {
+func (fs Fs) Reader(f kit.File) (kit.ReadSeekerCloser, apperror.Error) {
 	return fs.ReaderById(f.GetBucket(), f.GetBackendID())
 }
 
-func (fs Fs) ReaderById(bucket, id string) (io.ReadCloser, apperror.Error) {
+func (fs Fs) ReaderById(bucket, id string) (kit.ReadSeekerCloser, apperror.Error) {
 	if id == "" {
 		return nil, apperror.New("empty_file_id")
 	}
 
-	path := fs.filePath(bucket, id)
+	path := fs.FilePath(bucket, id)
 	f, err := os.Open(path)
 	if err != nil {
 		return nil, apperror.Wrap(err, "read_error",
@@ -304,7 +325,7 @@ func (fs Fs) WriterById(bucket, id string, create bool) (string, io.WriteCloser,
 		}
 	}
 
-	path := fs.filePath(bucket, id)
+	path := fs.FilePath(bucket, id)
 
 	// When creating, check if a file with the same name already exists,
 	// and if so, append _x to the name.

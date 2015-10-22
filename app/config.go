@@ -68,7 +68,7 @@ func (c Config) buildPath(p string) (string, error) {
 
 	root := c.UString("rootDir", wd)
 
-	fullPath := path.Join(root, p)
+	fullPath := path.Clean(path.Join(root, p))
 	return fullPath, nil
 }
 

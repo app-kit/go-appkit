@@ -38,7 +38,7 @@ func (PageResource) Methods(res kit.Resource) []kit.Method {
 	publish := &methods.Method{
 		Name:     "cms.page.publish",
 		Blocking: true,
-		Handler: func(a kit.App, r kit.Request, unblock func()) kit.Response {
+		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
 			user := r.GetUser()
 			if user == nil || !user.HasRole("admin") {
 				return kit.NewErrorResponse("permission_denied")

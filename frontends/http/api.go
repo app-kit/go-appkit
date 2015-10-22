@@ -1,7 +1,8 @@
-package app
+package http
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"html/template"
@@ -20,7 +21,6 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/julienschmidt/httprouter"
 	"github.com/theduke/go-apperror"
-	"github.com/twinj/uuid"
 
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/caches"
@@ -28,16 +28,16 @@ import (
 )
 
 type HttpHandlerStruct struct {
-	App     kit.App
-	Handler kit.RequestHandler
+	Registry kit.Registry
+	Handler  kit.RequestHandler
 }
 
 func (h *HttpHandlerStruct) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	params := new(httprouter.Params)
-	httpHandler(w, r, *params, h.App, h.Handler)
+	HttpHandler(w, r, *params, h.Registry, h.Handler)
 }
 
-func serverRenderer(app kit.App, r kit.Request) kit.Response {
+func serverRenderer(registry kit.Registry, r kit.Request) kit.Response {
 	url := r.GetHttpRequest().URL
 
 	// Build the url to query.
@@ -45,7 +45,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 		url.Scheme = "http"
 	}
 	if url.Host == "" {
-		url.Host = app.Config().UString("host", "localhost") + ":" + app.Config().UString("port", "8000")
+		url.Host = registry.Config().UString("host", "localhost") + ":" + registry.Config().UString("port", "8000")
 	}
 
 	q := url.Query()
@@ -55,14 +55,14 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	strUrl := url.String()
 
 	cacheKey := "serverrenderer_" + strUrl
-	cacheName := app.Config().UString("serverRenderer.cache")
+	cacheName := registry.Config().UString("serverRenderer.cache")
 	var cache kit.Cache
 
 	// If a cache is specified, try to retrieve it.
 	if cacheName != "" {
-		cache = app.Cache(cacheName)
+		cache = registry.Cache(cacheName)
 		if cache == nil {
-			app.Logger().Errorf("serverRenderer.cache is set to %v, but the cache is not registered with app", cacheName)
+			registry.Logger().Errorf("serverRenderer.cache is set to %v, but the cache is not registered with app", cacheName)
 		}
 	}
 
@@ -70,7 +70,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	if cache != nil {
 		item, err := cache.Get(cacheKey)
 		if err != nil {
-			app.Logger().Errorf("serverRenderer: cache retrieval error: %v", err)
+			registry.Logger().Errorf("serverRenderer: cache retrieval error: %v", err)
 		} else if item != nil {
 			// Cache item found, return response with cache item.
 			status, _ := strconv.ParseInt(item.GetTags()[0], 10, 64)
@@ -86,7 +86,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	// Either no cache or url not yet cached, so render it.
 
 	// First, ensure that the tmp directory exists.
-	tmpDir := path.Join(app.Config().TmpDir(), "phantom")
+	tmpDir := path.Join(registry.Config().TmpDir(), "phantom")
 	if ok, _ := utils.FileExists(tmpDir); !ok {
 		if err := os.MkdirAll(tmpDir, 0777); err != nil {
 			return &kit.AppResponse{
@@ -99,7 +99,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	}
 
 	// Build a unique file name.
-	filePath := path.Join(tmpDir, uuid.NewV4().String()+".html")
+	filePath := path.Join(tmpDir, utils.UUIDv4()+".html")
 
 	// Execute phantom js.
 
@@ -109,7 +109,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 
 	start := time.Now()
 
-	phantomPath := app.Config().UString("serverRenderer.phantomJsPath", "phantomjs")
+	phantomPath := registry.Config().UString("serverRenderer.phantomJsPath", "phantomjs")
 
 	args := []string{
 		"--web-security=false",
@@ -121,7 +121,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 	}
 	result, err := exec.Command(phantomPath, args...).CombinedOutput()
 	if err != nil {
-		app.Logger().Errorf("Phantomjs execution error: %v", string(result))
+		registry.Logger().Errorf("Phantomjs execution error: %v", string(result))
 
 		return &kit.AppResponse{
 			Error: apperror.Wrap(err, "phantom_execution_failed"),
@@ -130,7 +130,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 
 	// Get time taken as milliseconds.
 	timeTaken := int(time.Now().Sub(start) / time.Millisecond)
-	app.Logger().WithFields(log.Fields{
+	registry.Logger().WithFields(log.Fields{
 		"action":       "phantomjs_render",
 		"milliseconds": timeTaken,
 	}).Debugf("Rendered url %v with phantomjs", url)
@@ -150,7 +150,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 
 	// Save to cache.
 	if cache != nil {
-		lifetime := app.Config().UInt("serverRenderer.cacheLiftetime", 3600)
+		lifetime := registry.Config().UInt("serverRenderer.cacheLiftetime", 3600)
 
 		err := cache.Set(&caches.StrItem{
 			Key:       cacheKey,
@@ -159,7 +159,7 @@ func serverRenderer(app kit.App, r kit.Request) kit.Response {
 			ExpiresAt: time.Now().Add(time.Duration(lifetime) * time.Second),
 		})
 		if err != nil {
-			app.Logger().Errorf("serverRenderer: Cache persist error: %v", err)
+			registry.Logger().Errorf("serverRenderer: Cache persist error: %v", err)
 		}
 	}
 
@@ -207,8 +207,8 @@ func defaultNotFoundTpl() *template.Template {
 	return t
 }
 
-func getIndexTpl(app kit.App) ([]byte, apperror.Error) {
-	if path := app.Config().UString("frontend.indexTpl"); path != "" {
+func getIndexTpl(registry kit.Registry) ([]byte, apperror.Error) {
+	if path := registry.Config().UString("frontend.indexTpl"); path != "" {
 		f, err := os.Open(path)
 		if err != nil {
 			return nil, apperror.Wrap(err, "index_tpl_open_error",
@@ -241,24 +241,24 @@ func getIndexTpl(app kit.App) ([]byte, apperror.Error) {
 	return []byte(tpl), nil
 }
 
-func notFoundHandler(app kit.App, r kit.Request) (kit.Response, bool) {
+func notFoundHandler(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 	httpRequest := r.GetHttpRequest()
-	apiPrefix := "/" + app.Config().UString("api.prefix", "api")
+	apiPrefix := "/" + registry.Config().UString("api.prefix", "api")
 	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
 
 	// Try to render the page on the server, if enabled.
 	if !isApiRequest {
-		renderEnabled := app.Config().UBool("serverRenderer.enabled", false)
+		renderEnabled := registry.Config().UBool("serverRenderer.enabled", false)
 		noRender := strings.Contains(httpRequest.URL.String(), "no-server-render")
 
 		if renderEnabled && !noRender {
-			return serverRenderer(app, r), false
+			return serverRenderer(registry, r), false
 		}
 	}
 
 	// For non-api requests, render the default template.
 	if !isApiRequest {
-		tpl, err := getIndexTpl(app)
+		tpl, err := getIndexTpl(registry)
 		if err != nil {
 			return &kit.AppResponse{
 				Error: err,
@@ -327,17 +327,19 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 	w.Write(output)
 }
 
-func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, app kit.App, handler kit.RequestHandler) {
+func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, registry kit.Registry, handler kit.RequestHandler) {
 	// Set Access-Control headers.
 	header := w.Header()
 
-	allowedOrigins := app.Config().UString("accessControl.allowedOrigins", "*")
+	config := registry.Config()
+
+	allowedOrigins := config.UString("accessControl.allowedOrigins", "*")
 	header.Set("Access-Control-Allow-Origin", allowedOrigins)
 
-	methods := app.Config().UString("accessControl.allowedMethods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+	methods := config.UString("accessControl.allowedMethods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 	header.Set("Access-Control-Allow-Methods", methods)
 
-	allowedHeaders := app.Config().UString("accessControl.allowedHeaders", "Authentication, Content-Type")
+	allowedHeaders := config.UString("accessControl.allowedHeaders", "Authentication, Content-Type")
 	header.Set("Access-Control-Allow-Headers", allowedHeaders)
 
 	// If it is an options request, just respond with 200.
@@ -355,10 +357,10 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	contentType := r.Header.Get("Content-Type")
 	if strings.Contains(contentType, "json") {
 		if err := request.ReadHtmlBody(); err != nil {
-			app.Logger().Debugf("Could not read request html body: %v", err)
+			registry.Logger().Debugf("Could not read request html body: %v", err)
 		} else {
 			if err := request.ParseJsonData(); err != nil {
-				app.Logger().Debugf("Could not parse request json body: %v", err)
+				registry.Logger().Debugf("Could not parse request json body: %v", err)
 			}
 		}
 	}
@@ -380,9 +382,9 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	var response kit.Response
 
 	// Process all middlewares.
-	for _, middleware := range app.BeforeMiddlewares() {
+	for _, middleware := range registry.HttpFrontend().BeforeMiddlewares() {
 		var skip bool
-		response, skip = middleware(app, request)
+		response, skip = middleware(registry, request)
 		if skip {
 			return
 		} else if response != nil {
@@ -393,7 +395,7 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// Only run the handler if no middleware provided a response.
 	if response == nil {
 		skip := false
-		response, skip = handler(app, request)
+		response, skip = handler(registry, request)
 		if skip {
 			return
 		}
@@ -401,8 +403,8 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 
 	// Note: error responses are converted with the serverErrrorMiddleware middleware.
 
-	for _, middleware := range app.AfterMiddlewares() {
-		skip := middleware(app, request, response)
+	for _, middleware := range registry.HttpFrontend().AfterMiddlewares() {
+		skip := middleware(registry, request, response)
 		if skip {
 			return
 		}
@@ -439,12 +441,12 @@ func httpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
  * Request trace middlewares.
  */
 
-func RequestTraceMiddleware(a kit.App, r kit.Request) (kit.Response, bool) {
+func RequestTraceMiddleware(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 	r.GetContext().Set("startTime", time.Now())
 	return nil, false
 }
 
-func RequestTraceAfterMiddleware(app kit.App, r kit.Request, response kit.Response) bool {
+func RequestTraceAfterMiddleware(registry kit.Registry, r kit.Request, response kit.Response) bool {
 	r.GetContext().Set("endTime", time.Now())
 	return false
 }
@@ -453,20 +455,63 @@ func RequestTraceAfterMiddleware(app kit.App, r kit.Request, response kit.Respon
  * Before middlewares.
  */
 
-func AuthenticationMiddleware(a kit.App, r kit.Request) (kit.Response, bool) {
+func AuthenticationMiddleware(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 	// Handle authentication.
 	httpRequest := r.GetHttpRequest()
-	if token := httpRequest.Header.Get("Authentication"); token != "" {
-		if a.UserService() != nil {
-			user, session, err := a.UserService().VerifySession(token)
-			if err == nil {
+	userService := registry.UserService()
+
+	if userService == nil {
+		return nil, false
+	}
+
+	authHeader := httpRequest.Header.Get("Authentication")
+	if authHeader == "" {
+		return nil, false
+	}
+
+	// Check for basic auth.
+	if strings.HasPrefix(authHeader, "Basic ") {
+		str := authHeader[6:]
+		data, err := base64.StdEncoding.DecodeString(str)
+		if err != nil {
+			return kit.NewErrorResponse("invalid_basic_auth"), false
+		} else {
+			parts := strings.Split(string(data), ":")
+			if len(parts) == 2 {
+				userIdentifier := parts[0]
+				pw := parts[1]
+
+				user, err := userService.FindUser(userIdentifier)
+				if err != nil {
+					return kit.NewErrorResponse(err), false
+				} else if user == nil {
+					return kit.NewErrorResponse("unknown_user"), false
+				}
+
+				user, err = userService.AuthenticateUser(user, "password", map[string]interface{}{"password": pw})
+				if err != nil {
+					return kit.NewErrorResponse(err), false
+				}
+
 				r.SetUser(user)
-				r.SetSession(session)
-			} else {
-				return &kit.AppResponse{
-					Error: err,
-				}, false
+				return nil, false
 			}
+		}
+	}
+
+	// Check for auth token.
+	if authHeader != "" {
+		token := authHeader
+		user, session, err := userService.VerifySession(token)
+		if err == nil {
+			r.SetUser(user)
+			r.SetSession(session)
+
+			return nil, false
+		} else {
+			return &kit.AppResponse{
+				Error: err,
+			}, false
 		}
 	}
 
@@ -477,7 +522,7 @@ func AuthenticationMiddleware(a kit.App, r kit.Request) (kit.Response, bool) {
  * After middlewares.
  */
 
-func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bool {
+func ServerErrorMiddleware(registry kit.Registry, r kit.Request, response kit.Response) bool {
 	err := response.GetError()
 	if err == nil {
 		return false
@@ -500,7 +545,7 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 	}
 
 	httpRequest := r.GetHttpRequest()
-	apiPrefix := "/" + app.Config().UString("api.prefix", "api")
+	apiPrefix := "/" + registry.Config().UString("api.prefix", "api")
 	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
 
 	data := map[string]interface{}{"errors": []error{response.GetError()}}
@@ -512,11 +557,11 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 
 	tpl := defaultErrorTpl()
 
-	tplPath := app.Config().UString("frontend.errorTemplate")
+	tplPath := registry.Config().UString("frontend.errorTemplate")
 	if tplPath != "" {
 		t, err := template.ParseFiles(tplPath)
 		if err != nil {
-			app.Logger().Fatalf("Could not parse error template at '%v': %v", tplPath, err)
+			registry.Logger().Fatalf("Could not parse error template at '%v': %v", tplPath, err)
 		} else {
 			tpl = t
 		}
@@ -524,7 +569,7 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 
 	var buffer *bytes.Buffer
 	if err := tpl.Execute(buffer, data); err != nil {
-		app.Logger().Fatalf("Could not render error template: %v\n", err)
+		registry.Logger().Fatalf("Could not render error template: %v\n", err)
 		response.SetRawData([]byte("Server error"))
 	} else {
 		response.SetRawData(buffer.Bytes())
@@ -533,7 +578,7 @@ func ServerErrorMiddleware(app kit.App, r kit.Request, response kit.Response) bo
 	return false
 }
 
-func RequestLoggerMiddleware(app kit.App, r kit.Request, response kit.Response) bool {
+func RequestLoggerMiddleware(registry kit.Registry, r kit.Request, response kit.Response) bool {
 	rawStarted, ok1 := r.GetContext().Get("startTime")
 	rawFinished, ok2 := r.GetContext().Get("endTime")
 
@@ -550,7 +595,7 @@ func RequestLoggerMiddleware(app kit.App, r kit.Request, response kit.Response) 
 
 	// Log the request.
 	if response.GetError() != nil {
-		app.Logger().WithFields(log.Fields{
+		registry.Logger().WithFields(log.Fields{
 			"action":       "request",
 			"method":       method,
 			"url":          url.String(),
@@ -559,7 +604,7 @@ func RequestLoggerMiddleware(app kit.App, r kit.Request, response kit.Response) 
 			"milliseconds": timeTaken,
 		}).Errorf("%v: %v - %v - %v", response.GetHttpStatus(), method, url, response.GetError())
 	} else {
-		app.Logger().WithFields(log.Fields{
+		registry.Logger().WithFields(log.Fields{
 			"action":       "request",
 			"method":       method,
 			"url":          url.String(),
