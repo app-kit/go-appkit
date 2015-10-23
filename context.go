@@ -10,9 +10,14 @@ type Context struct {
 	Data map[string]interface{}
 }
 
-func NewContext() Context {
-	c := Context{}
-	c.Data = make(map[string]interface{})
+func NewContext(data ...map[string]interface{}) *Context {
+	c := &Context{}
+
+	if len(data) > 0 && data[0] != nil {
+		c.Data = data[0]
+	} else {
+		c.Data = make(map[string]interface{})
+	}
 
 	return c
 }
