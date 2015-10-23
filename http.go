@@ -10,8 +10,8 @@ import (
 )
 
 type AppRequest struct {
-	Context Context
-	Meta    Context
+	Context *Context
+	Meta    *Context
 
 	RawData []byte
 	Data    interface{}
@@ -48,18 +48,18 @@ func (r *AppRequest) SetSession(x Session) {
 }
 
 func (r *AppRequest) GetContext() *Context {
-	return &r.Context
+	return r.Context
 }
 
-func (r *AppRequest) SetContext(x Context) {
+func (r *AppRequest) SetContext(x *Context) {
 	r.Context = x
 }
 
-func (r *AppRequest) GetMeta() Context {
+func (r *AppRequest) GetMeta() *Context {
 	return r.Meta
 }
 
-func (r *AppRequest) SetMeta(x Context) {
+func (r *AppRequest) SetMeta(x *Context) {
 	r.Meta = x
 }
 
@@ -73,6 +73,10 @@ func (r *AppRequest) SetData(x interface{}) {
 
 func (r *AppRequest) GetRawData() []byte {
 	return r.RawData
+}
+
+func (r *AppRequest) SetRawData(data []byte) {
+	r.RawData = data
 }
 
 func (r *AppRequest) GetHttpRequest() *http.Request {
@@ -91,7 +95,7 @@ func (r *AppRequest) SetHttpResponseWriter(writer http.ResponseWriter) {
 	r.HttpResponseWriter = writer
 }
 
-func (r *AppRequest) ReadHtmlBody() apperror.Error {
+func (r *AppRequest) ReadHttpBody() apperror.Error {
 	if r.HttpRequest == nil {
 		return apperror.New("no_http_request")
 	}
@@ -128,17 +132,14 @@ func (r *AppRequest) ParseJsonData() apperror.Error {
 		return apperror.Wrap(err, "invalid_json_body", "JSON in body could not be unmarshalled")
 	}
 
-	if rawData, ok := allData["data"]; ok {
-		r.Data = rawData
-	}
-
-	if rawMeta, ok := allData["meta"]; ok {
-		if meta, ok := rawMeta.(map[string]interface{}); ok {
-			r.Meta.Data = meta
-		}
-	}
+	r.Data = allData
 
 	return nil
+}
+
+// Unserialize converts the raw request data with the given serializer.
+func (r *AppRequest) Unserialize(serializer Serializer) apperror.Error {
+	return serializer.UnserializeRequest(r.Data, r)
 }
 
 type AppResponse struct {

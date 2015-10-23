@@ -41,6 +41,8 @@ func New(registry kit.Registry) *Frontend {
 	f.RegisterBeforeMiddleware(AuthenticationMiddleware)
 
 	f.RegisterAfterMiddleware(ServerErrorMiddleware)
+	f.RegisterAfterMiddleware(SerializeResponseMiddleware)
+	f.RegisterAfterMiddleware(MarshalResponseMiddleware)
 	f.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
 	f.RegisterAfterMiddleware(RequestLoggerMiddleware)
 

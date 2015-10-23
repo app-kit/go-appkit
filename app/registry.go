@@ -24,6 +24,9 @@ type Registry struct {
 
 	methods map[string]kit.Method
 
+	defaultSerializer kit.Serializer
+	serializers       map[string]kit.Serializer
+
 	emailService    kit.EmailService
 	fileService     kit.FileService
 	resourceService kit.ResourceService
@@ -39,12 +42,13 @@ var _ kit.Registry = (*Registry)(nil)
 
 func NewRegistry() kit.Registry {
 	return &Registry{
-		caches:    make(map[string]kit.Cache),
-		backends:  make(map[string]db.Backend),
-		resources: make(map[string]kit.Resource),
-		frontends: make(map[string]kit.Frontend),
-		methods:   make(map[string]kit.Method),
-		values:    make(map[string]interface{}),
+		caches:      make(map[string]kit.Cache),
+		backends:    make(map[string]db.Backend),
+		resources:   make(map[string]kit.Resource),
+		frontends:   make(map[string]kit.Frontend),
+		methods:     make(map[string]kit.Method),
+		serializers: make(map[string]kit.Serializer),
+		values:      make(map[string]interface{}),
 	}
 }
 
@@ -146,6 +150,18 @@ func (d *Registry) SetBackends(backends map[string]db.Backend) {
 	d.backends = backends
 }
 
+func (d *Registry) AllModelInfo() map[string]*db.ModelInfo {
+	info := make(map[string]*db.ModelInfo)
+
+	for _, backend := range d.backends {
+		for name, mInfo := range backend.AllModelInfo() {
+			info[name] = mInfo
+		}
+	}
+
+	return info
+}
+
 /**
  * Resources.
  */
@@ -212,6 +228,38 @@ func (d *Registry) AddMethod(method kit.Method) {
 
 func (d *Registry) SetMethods(methods map[string]kit.Method) {
 	d.methods = methods
+}
+
+/**
+ * Serializers.
+ */
+
+func (d *Registry) DefaultSerializer() kit.Serializer {
+	return d.defaultSerializer
+}
+
+func (d *Registry) SetDefaultSerializer(s kit.Serializer) {
+	d.defaultSerializer = s
+}
+
+func (d *Registry) Serializer(name string) kit.Serializer {
+	return d.serializers[name]
+}
+
+func (d *Registry) Serializers() map[string]kit.Serializer {
+	return d.serializers
+}
+
+func (d *Registry) AddSerializer(serializer kit.Serializer) {
+	d.serializers[serializer.Name()] = serializer
+
+	if d.defaultSerializer == nil {
+		d.defaultSerializer = serializer
+	}
+}
+
+func (d *Registry) SetSerializers(serializers map[string]kit.Serializer) {
+	d.serializers = serializers
 }
 
 /**

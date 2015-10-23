@@ -25,6 +25,9 @@ import (
 	apphttp "github.com/theduke/go-appkit/frontends/http"
 	"github.com/theduke/go-appkit/frontends/jsonapi"
 	"github.com/theduke/go-appkit/frontends/rest"
+	"github.com/theduke/go-appkit/frontends/wamp"
+
+	jsonapiserializer "github.com/theduke/go-appkit/serializers/jsonapi"
 
 	"github.com/theduke/go-appkit/email"
 	"github.com/theduke/go-appkit/email/gomail"
@@ -42,19 +45,27 @@ type App struct {
 	Cli *cobra.Command
 
 	shutDownChannel chan bool
+
+	// defaults is a flag indicating whether default services, frontends, etc should be built.
+	defaults bool
 }
 
 // Ensure App implements App interface.
 var _ kit.App = (*App)(nil)
 
-func NewApp(cfgPaths ...string) *App {
+func NewPlainApp() *App {
 	app := &App{
 		registry:        NewRegistry(),
 		shutDownChannel: make(chan bool),
 	}
 	app.registry.SetApp(app)
-
 	app.BuildDefaultLogger()
+
+	return app
+}
+
+func NewApp(cfgPaths ...string) *App {
+	app := NewPlainApp()
 
 	configPath := "config.yaml"
 	if len(cfgPaths) > 0 {
@@ -64,6 +75,7 @@ func NewApp(cfgPaths ...string) *App {
 
 	app.InitCli()
 
+	app.defaults = true
 	app.Defaults()
 
 	return app
@@ -81,17 +93,30 @@ func (a *App) Defaults() {
 	// EmailService setup.
 	a.buildEmailService()
 
+	// Register fs cache.
+	a.BuildDefaultCache()
+
+	a.BuildDefaultFrontends()
+	a.BuildDefaultMethods()
+}
+
+func (a *App) BuildDefaultMethods() {
 	a.RegisterMethod(createMethod())
 	a.RegisterMethod(updateMethod())
 	a.RegisterMethod(deleteMethod())
 	a.RegisterMethod(queryMethod())
+}
 
-	// Register fs cache.
-	a.BuildDefaultCache()
-
+func (a *App) BuildDefaultFrontends() {
+	// Frontends.
 	a.RegisterFrontend(apphttp.New(a.registry))
 	a.RegisterFrontend(jsonapi.New(a.registry))
 	a.RegisterFrontend(rest.New(a.registry))
+	a.RegisterFrontend(wamp.New(a.registry))
+}
+
+func (a *App) BuildDefaultSerializers() {
+	a.RegisterSerializer(jsonapiserializer.New(a.registry.Backends()))
 }
 
 func (a *App) BuildDefaultLogger() {
@@ -281,6 +306,10 @@ func (a *App) PrepareForRun() {
 			a.Logger().Panicf("Error while initializing frontend %v: %v", name, err)
 		}
 	}
+
+	if a.defaults {
+		a.BuildDefaultSerializers()
+	}
 }
 
 func (a *App) Run() {
@@ -370,7 +399,7 @@ func (a *App) RegisterBackend(b db.Backend) {
 	a.registry.AddBackend(b)
 
 	// If no backend was registered before, create a default UserService and FileService.
-	if isDefault {
+	if isDefault && a.defaults {
 		if a.UserService() == nil {
 			a.BuildDefaultUserService(b)
 		}
@@ -703,4 +732,12 @@ func (a *App) RebuildAllBackends() apperror.Error {
 
 func (a *App) RegisterFrontend(f kit.Frontend) {
 	a.registry.AddFrontend(f)
+}
+
+/**
+ * Serializers.
+ */
+
+func (a *App) RegisterSerializer(s kit.Serializer) {
+	a.registry.AddSerializer(s)
 }

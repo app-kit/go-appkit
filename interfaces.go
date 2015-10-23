@@ -283,13 +283,21 @@ type AuthAdaptor interface {
 
 type Request interface {
 	GetContext() *Context
-	GetMeta() Context
+	SetContext(context *Context)
+
+	GetMeta() *Context
+	SetMeta(meta *Context)
 
 	GetData() interface{}
+	SetData(data interface{})
+
 	GetRawData() []byte
+	SetRawData(data []byte)
 
 	// Parse json contained in RawData and extract data and meta.
 	ParseJsonData() apperror.Error
+
+	Unserialize(serializer Serializer) apperror.Error
 
 	GetUser() User
 	SetUser(User)
@@ -300,7 +308,7 @@ type Request interface {
 	GetHttpRequest() *http.Request
 	SetHttpRequest(request *http.Request)
 
-	ReadHtmlBody() apperror.Error
+	ReadHttpBody() apperror.Error
 
 	GetHttpResponseWriter() http.ResponseWriter
 	SetHttpResponseWriter(writer http.ResponseWriter)
@@ -326,12 +334,38 @@ type Response interface {
 }
 
 type RequestHandler func(Registry, Request) (Response, bool)
-type AfterRequestMiddleware func(Registry, Request, Response) bool
+type AfterRequestMiddleware func(Registry, Request, Response) (Response, bool)
 
 type HttpRoute interface {
 	Route() string
 	Method() string
 	Handler() RequestHandler
+}
+
+/**
+ * Serializers.
+ */
+
+type Serializer interface {
+	Name() string
+
+	// SerializeModel converts a model into the target format.
+	SerializeModel(model Model) (modelData interface{}, extraModels []interface{}, err apperror.Error)
+
+	// UnserializeModel converts serialized data into a Model.
+	// collection argument is optional, but has to be supplied if the
+	// collection can not be extracted from data.
+	UnserializeModel(collection string, data interface{}) (Model, apperror.Error)
+
+	// SerializeResponse converts a response with model data into the target format.
+	SerializeResponse(response Response) (interface{}, apperror.Error)
+
+	// MustSerializeResponse serializes a response, and returns properly serialized error data
+	// if any error occurs.
+	MustSerializeResponse(response Response) interface{}
+
+	// UnserializeRequest converts request data into a request object.
+	UnserializeRequest(data interface{}, request Request) apperror.Error
 }
 
 /**
@@ -817,14 +851,22 @@ type FileBackend interface {
  */
 
 type Registry interface {
+	// App.
+
 	App() App
 	SetApp(app App)
+
+	// Logger.
 
 	Logger() *logrus.Logger
 	SetLogger(logger *logrus.Logger)
 
+	// Config.
+
 	Config() Config
 	SetConfig(cfg Config)
+
+	// Caches.
 
 	DefaultCache() Cache
 	SetDefaultCache(cache Cache)
@@ -834,6 +876,8 @@ type Registry interface {
 	AddCache(cache Cache)
 	SetCaches(caches map[string]Cache)
 
+	// Backends.
+
 	DefaultBackend() db.Backend
 	SetDefaultBackend(db.Backend)
 	Backend(name string) db.Backend
@@ -841,10 +885,17 @@ type Registry interface {
 	AddBackend(b db.Backend)
 	SetBackends(backends map[string]db.Backend)
 
+	// AllModelInfo returns the model info from all registered backends.
+	AllModelInfo() map[string]*db.ModelInfo
+
+	// Resources.
+
 	Resource(name string) Resource
 	Resources() map[string]Resource
 	AddResource(res Resource)
 	SetResources(resources map[string]Resource)
+
+	// Frontends.
 
 	Frontend(name string) Frontend
 	Frontends() map[string]Frontend
@@ -852,10 +903,24 @@ type Registry interface {
 	SetFrontends(frontends map[string]Frontend)
 	HttpFrontend() HttpFrontend
 
+	// Methods.
+
 	Method(name string) Method
 	Methods() map[string]Method
 	AddMethod(method Method)
 	SetMethods(methods map[string]Method)
+
+	// Serializers.
+
+	DefaultSerializer() Serializer
+	SetDefaultSerializer(serialzier Serializer)
+
+	Serializer(name string) Serializer
+	Serializers() map[string]Serializer
+	AddSerializer(serializer Serializer)
+	SetSerializers(serializers map[string]Serializer)
+
+	// Services.
 
 	TaskService() TaskService
 	SetTaskService(service TaskService)
@@ -1052,15 +1117,18 @@ type App interface {
 
 	// Method methods.
 
-	RegisterMethod(Method)
+	RegisterMethod(method Method)
 	RunMethod(name string, r Request, responder func(Response), withFinishedChannel bool) (chan bool, apperror.Error)
 
 	// Resource methodds.
 
-	RegisterResource(Resource)
+	RegisterResource(resource Resource)
 
 	// Frontend methods.
-	RegisterFrontend(Frontend)
+	RegisterFrontend(frontend Frontend)
+
+	// Serializer.
+	RegisterSerializer(serializer Serializer)
 
 	// Build all default services.
 	Defaults()

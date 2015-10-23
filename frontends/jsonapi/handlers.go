@@ -226,7 +226,7 @@ func HandleFind(registry kit.Registry, request kit.Request) (kit.Response, bool)
 		}
 	}
 
-	return ConvertResponse(res.Backend(), response), false
+	return response, false
 }
 
 func HandleFindOne(registry kit.Registry, request kit.Request) (kit.Response, bool) {
@@ -236,10 +236,10 @@ func HandleFindOne(registry kit.Registry, request kit.Request) (kit.Response, bo
 	res := registry.Resource(collection)
 	if res == nil || !res.IsPublic() {
 		resp := kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The resource '%v' does not exist", collection))
-		return ConvertResponse(res.Backend(), resp), false
+		return resp, false
 	}
 
-	return ConvertResponse(res.Backend(), res.ApiFindOne(id, request)), false
+	return res.ApiFindOne(id, request), false
 }
 
 func Create(registry kit.Registry, request kit.Request) (kit.Response, apperror.Error) {
@@ -257,23 +257,23 @@ func Create(registry kit.Registry, request kit.Request) (kit.Response, apperror.
 		}
 	}
 
-	model, err := BuildModel(res.Backend(), collection, request.GetRawData())
-	if err != nil {
-		return nil, err
+	model, ok := request.GetData().(kit.Model)
+	if !ok {
+		return nil, apperror.New("invalid_data_no_model", "No model data in request.")
 	}
 
 	response := res.ApiCreate(model, request)
 	if response.GetError() == nil {
 		response.SetHttpStatus(201)
 	}
-	response = ConvertResponse(res.Backend(), response)
+
 	return response, nil
 }
 
 func HandleCreate(registry kit.Registry, request kit.Request) (kit.Response, bool) {
 	response, err := Create(registry, request)
 	if err != nil {
-		return ConvertResponse(nil, &kit.AppResponse{Error: err}), false
+		return &kit.AppResponse{Error: err}, false
 	}
 
 	return response, false
@@ -294,20 +294,20 @@ func Update(registry kit.Registry, request kit.Request) (kit.Response, apperror.
 		}
 	}
 
-	model, err := BuildModel(res.Backend(), "", request.GetRawData())
-	if err != nil {
-		return nil, err
+	model, ok := request.GetData().(kit.Model)
+	if !ok {
+		return nil, apperror.New("invalid_data_no_model", "Node model data in request.")
 	}
 
 	response := res.ApiUpdate(model, request)
 
-	return ConvertResponse(res.Backend(), response), nil
+	return response, nil
 }
 
 func HandleUpdate(registry kit.Registry, request kit.Request) (kit.Response, bool) {
 	response, err := Update(registry, request)
 	if err != nil {
-		return ConvertResponse(nil, &kit.AppResponse{Error: err}), false
+		return &kit.AppResponse{Error: err}, false
 	}
 
 	return response, false
@@ -320,8 +320,8 @@ func HandleDelete(registry kit.Registry, request kit.Request) (kit.Response, boo
 	res := registry.Resource(collection)
 	if res == nil || !res.IsPublic() {
 		resp := kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The resource '%v' does not exist", collection))
-		return ConvertResponse(res.Backend(), resp), false
+		return resp, false
 	}
 
-	return ConvertResponse(res.Backend(), res.ApiDelete(id, request)), false
+	return res.ApiDelete(id, request), false
 }

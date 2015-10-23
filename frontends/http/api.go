@@ -327,12 +327,87 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 	w.Write(output)
 }
 
+func processRequest(registry kit.Registry, request kit.Request, handler kit.RequestHandler) (kit.Response, bool) {
+	// Try to parse json in body. Ignore error since body might not contain json.
+	contentType := request.GetHttpRequest().Header.Get("Content-Type")
+	if strings.Contains(contentType, "json") {
+		// Only read the HTTP body automatically for json content type requests,
+		// since some handlers might need to read it themselfes (see the files package resource).
+		if err := request.ReadHttpBody(); err != nil {
+			return kit.NewErrorResponse(err, "http_body_read_error"), false
+		} else {
+			if err := request.ParseJsonData(); err != nil {
+				return kit.NewErrorResponse(err, "invalid_json_body", true), false
+			}
+
+			// Successfully parsed json body.
+
+			// Now try to unserialize.
+
+			// Determine serializer.
+			serializer := registry.DefaultSerializer()
+
+			// Check if a custom serializer was specified.
+			if name := request.GetContext().String("request-serializer"); name != "" {
+				serializer = registry.Serializer(name)
+				if serializer == nil {
+					return kit.NewErrorResponse("unknown_serializer", fmt.Sprintf("The specified request serializer %v does not exist", name)), false
+				}
+			}
+
+			if err := request.Unserialize(serializer); err != nil {
+				return kit.NewErrorResponse(err, "request_unserialize_error", true), false
+			}
+		}
+	}
+
+	var response kit.Response
+
+	// Run before middlewares.
+	for _, middleware := range registry.HttpFrontend().BeforeMiddlewares() {
+		var skip bool
+		response, skip = middleware(registry, request)
+		if skip {
+			return nil, true
+		} else if response != nil {
+			break
+		}
+	}
+
+	// Only run the handler if no middleware provided a response.
+	if response == nil {
+		skip := false
+		response, skip = handler(registry, request)
+		if skip {
+			return nil, true
+		}
+	}
+
+	if response.GetHttpStatus() == 0 {
+		// Note: error handler middleware will set proper http status for error responses.
+		response.SetHttpStatus(200)
+	}
+
+	// Run after request middlewares.
+	// Note: error responses are converted with the serverErrrorMiddleware middleware.
+	// Note: serializing the response into the proper format is done with the SerializeResponseMiddleware.
+	for _, middleware := range registry.HttpFrontend().AfterMiddlewares() {
+		resp, skip := middleware(registry, request, response)
+		if skip {
+			return nil, true
+		} else if resp != nil {
+			response = resp
+		}
+	}
+
+	return response, false
+}
+
 func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Params, registry kit.Registry, handler kit.RequestHandler) {
-	// Set Access-Control headers.
+	config := registry.Config()
 	header := w.Header()
 
-	config := registry.Config()
-
+	// Set Access-Control headers.
 	allowedOrigins := config.UString("accessControl.allowedOrigins", "*")
 	header.Set("Access-Control-Allow-Origin", allowedOrigins)
 
@@ -353,18 +428,6 @@ func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	request.SetHttpRequest(r)
 	request.SetHttpResponseWriter(w)
 
-	// Try to parse json in body. Ignore error since body might not contain json.
-	contentType := r.Header.Get("Content-Type")
-	if strings.Contains(contentType, "json") {
-		if err := request.ReadHtmlBody(); err != nil {
-			registry.Logger().Debugf("Could not read request html body: %v", err)
-		} else {
-			if err := request.ParseJsonData(); err != nil {
-				registry.Logger().Debugf("Could not parse request json body: %v", err)
-			}
-		}
-	}
-
 	for _, param := range params {
 		request.Context.Set(param.Key, param.Value)
 	}
@@ -379,47 +442,15 @@ func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 		}
 	}
 
-	var response kit.Response
-
-	// Process all middlewares.
-	for _, middleware := range registry.HttpFrontend().BeforeMiddlewares() {
-		var skip bool
-		response, skip = middleware(registry, request)
-		if skip {
-			return
-		} else if response != nil {
-			break
-		}
-	}
-
-	// Only run the handler if no middleware provided a response.
-	if response == nil {
-		skip := false
-		response, skip = handler(registry, request)
-		if skip {
-			return
-		}
-	}
-
-	// Note: error responses are converted with the serverErrrorMiddleware middleware.
-
-	for _, middleware := range registry.HttpFrontend().AfterMiddlewares() {
-		skip := middleware(registry, request, response)
-		if skip {
-			return
-		}
-	}
-
-	status := response.GetHttpStatus()
-	if status == 0 {
-		status = 200
-		response.SetHttpStatus(200)
+	response, skip := processRequest(registry, request, handler)
+	if skip {
+		return
 	}
 
 	// If a data reader is set, write the data of the reader.
 	reader := response.GetRawDataReader()
 	if reader != nil {
-		w.WriteHeader(status)
+		w.WriteHeader(response.GetHttpStatus())
 		io.Copy(w, reader)
 		reader.Close()
 		return
@@ -428,13 +459,12 @@ func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	// If raw data is set, write the raw data.
 	rawData := response.GetRawData()
 	if rawData != nil {
-		w.WriteHeader(status)
+		w.WriteHeader(response.GetHttpStatus())
 		w.Write(rawData)
 		return
 	}
 
-	// Send json response.
-	RespondWithJson(w, response)
+	registry.Logger().Panicf("Invalid response with no raw data: %+v", response)
 }
 
 /**
@@ -446,9 +476,9 @@ func RequestTraceMiddleware(registry kit.Registry, r kit.Request) (kit.Response,
 	return nil, false
 }
 
-func RequestTraceAfterMiddleware(registry kit.Registry, r kit.Request, response kit.Response) bool {
+func RequestTraceAfterMiddleware(registry kit.Registry, r kit.Request, response kit.Response) (kit.Response, bool) {
 	r.GetContext().Set("endTime", time.Now())
-	return false
+	return nil, false
 }
 
 /**
@@ -522,10 +552,10 @@ func AuthenticationMiddleware(registry kit.Registry, r kit.Request) (kit.Respons
  * After middlewares.
  */
 
-func ServerErrorMiddleware(registry kit.Registry, r kit.Request, response kit.Response) bool {
+func ServerErrorMiddleware(registry kit.Registry, r kit.Request, response kit.Response) (kit.Response, bool) {
 	err := response.GetError()
 	if err == nil {
-		return false
+		return nil, false
 	}
 
 	status := 500
@@ -540,20 +570,19 @@ func ServerErrorMiddleware(registry kit.Registry, r kit.Request, response kit.Re
 
 	response.SetHttpStatus(status)
 
-	if response.GetRawData() != nil {
-		return false
+	if response.GetRawData() != nil || response.GetRawDataReader() != nil {
+		return nil, false
 	}
 
 	httpRequest := r.GetHttpRequest()
 	apiPrefix := "/" + registry.Config().UString("api.prefix", "api")
 	isApiRequest := strings.HasPrefix(httpRequest.URL.Path, apiPrefix)
 
-	data := map[string]interface{}{"errors": []error{response.GetError()}}
-
 	if isApiRequest {
-		response.SetData(data)
-		return false
+		return nil, false
 	}
+
+	data := map[string]interface{}{"errors": []error{response.GetError()}}
 
 	tpl := defaultErrorTpl()
 
@@ -575,10 +604,44 @@ func ServerErrorMiddleware(registry kit.Registry, r kit.Request, response kit.Re
 		response.SetRawData(buffer.Bytes())
 	}
 
-	return false
+	return nil, false
 }
 
-func RequestLoggerMiddleware(registry kit.Registry, r kit.Request, response kit.Response) bool {
+func SerializeResponseMiddleware(registry kit.Registry, request kit.Request, response kit.Response) (kit.Response, bool) {
+	// Try to serialize the reponse data.
+
+	// Determine serializer.
+	serializer := registry.DefaultSerializer()
+
+	// Check if a custom serializer was specified.
+	if name := request.GetContext().String("response-serializer"); name != "" {
+		serializer = registry.Serializer(name)
+		if serializer == nil {
+			errResp := &kit.AppResponse{Error: apperror.New("unknown_response_serializer", true)}
+			data := serializer.MustSerializeResponse(errResp)
+			errResp.SetData(data)
+			return errResp, false
+		}
+	}
+
+	data := serializer.MustSerializeResponse(response)
+	response.SetData(data)
+
+	return nil, false
+}
+
+func MarshalResponseMiddleware(registry kit.Registry, request kit.Request, response kit.Response) (kit.Response, bool) {
+	js, err := json.Marshal(response.GetData())
+	if err != nil {
+		js = []byte(`{"errors": [{code: "response_marshal_error"}]}`)
+	}
+
+	response.SetRawData(js)
+
+	return nil, false
+}
+
+func RequestLoggerMiddleware(registry kit.Registry, r kit.Request, response kit.Response) (kit.Response, bool) {
 	rawStarted, ok1 := r.GetContext().Get("startTime")
 	rawFinished, ok2 := r.GetContext().Get("endTime")
 
@@ -613,5 +676,5 @@ func RequestLoggerMiddleware(registry kit.Registry, r kit.Request, response kit.
 		}).Debugf("%v: %v - %v", response.GetHttpStatus(), method, url)
 	}
 
-	return false
+	return nil, false
 }
