@@ -8,9 +8,10 @@ import (
 )
 
 type Registry struct {
-	app    kit.App
-	logger *logrus.Logger
-	config kit.Config
+	app      kit.App
+	logger   *logrus.Logger
+	eventBus kit.EventBus
+	config   kit.Config
 
 	defaultCache kit.Cache
 	caches       map[string]kit.Cache
@@ -74,6 +75,18 @@ func (d *Registry) Logger() *logrus.Logger {
 
 func (d *Registry) SetLogger(l *logrus.Logger) {
 	d.logger = l
+}
+
+/**
+ * EventBus.
+ */
+
+func (r *Registry) EventBus() kit.EventBus {
+	return r.eventBus
+}
+
+func (r *Registry) SetEventBus(x kit.EventBus) {
+	r.eventBus = x
 }
 
 /**

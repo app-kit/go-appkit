@@ -47,6 +47,34 @@ func (f *Frontend) Logger() *logrus.Logger {
 	return f.registry.Logger()
 }
 
+/**
+ * Middlewares.
+ */
+
+func (f *Frontend) RegisterBeforeMiddleware(handler kit.RequestHandler) {
+	panic("JSONAPI frontend does not support middlewares. Register your middlewares with the HTTP frontend instead.")
+}
+
+func (f *Frontend) SetBeforeMiddlewares(middlewares []kit.RequestHandler) {
+	panic("JSONAPI frontend does not support middlewares. Register your middlewares with the HTTP frontend instead.")
+}
+
+func (f *Frontend) BeforeMiddlewares() []kit.RequestHandler {
+	panic("JSONAPI frontend does not support middlewares. Register your middlewares with the HTTP frontend instead.")
+}
+
+func (f *Frontend) RegisterAfterMiddleware(middleware kit.AfterRequestMiddleware) {
+	panic("JSONAPI frontend does not support middlewares. Register your middlewares with the HTTP frontend instead.")
+}
+
+func (f *Frontend) SetAfterMiddlewares(middlewares []kit.AfterRequestMiddleware) {
+	panic("JSONAPI frontend does not support middlewares. Register your middlewares with the HTTP frontend instead.")
+}
+
+func (f *Frontend) AfterMiddlewares() []kit.AfterRequestMiddleware {
+	panic("JSONAPI frontend does not support middlewares. Register your middlewares with the HTTP frontend instead.")
+}
+
 func (f *Frontend) Init() apperror.Error {
 	apiPrefix := f.registry.Config().UString("api.prefix", "api")
 

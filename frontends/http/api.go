@@ -328,39 +328,6 @@ func RespondWithJson(w http.ResponseWriter, response kit.Response) {
 }
 
 func processRequest(registry kit.Registry, request kit.Request, handler kit.RequestHandler) (kit.Response, bool) {
-	// Try to parse json in body. Ignore error since body might not contain json.
-	contentType := request.GetHttpRequest().Header.Get("Content-Type")
-	if strings.Contains(contentType, "json") {
-		// Only read the HTTP body automatically for json content type requests,
-		// since some handlers might need to read it themselfes (see the files package resource).
-		if err := request.ReadHttpBody(); err != nil {
-			return kit.NewErrorResponse(err, "http_body_read_error"), false
-		} else {
-			if err := request.ParseJsonData(); err != nil {
-				return kit.NewErrorResponse(err, "invalid_json_body", true), false
-			}
-
-			// Successfully parsed json body.
-
-			// Now try to unserialize.
-
-			// Determine serializer.
-			serializer := registry.DefaultSerializer()
-
-			// Check if a custom serializer was specified.
-			if name := request.GetContext().String("request-serializer"); name != "" {
-				serializer = registry.Serializer(name)
-				if serializer == nil {
-					return kit.NewErrorResponse("unknown_serializer", fmt.Sprintf("The specified request serializer %v does not exist", name)), false
-				}
-			}
-
-			if err := request.Unserialize(serializer); err != nil {
-				return kit.NewErrorResponse(err, "request_unserialize_error", true), false
-			}
-		}
-	}
-
 	var response kit.Response
 
 	// Run before middlewares.
@@ -424,7 +391,9 @@ func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	}
 
 	request := kit.NewRequest()
-
+	request.SetFrontend("http")
+	request.SetPath(r.URL.String())
+	request.SetHttpMethod(r.Method)
 	request.SetHttpRequest(r)
 	request.SetHttpResponseWriter(w)
 
@@ -468,22 +437,50 @@ func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 }
 
 /**
- * Request trace middlewares.
- */
-
-func RequestTraceMiddleware(registry kit.Registry, r kit.Request) (kit.Response, bool) {
-	r.GetContext().Set("startTime", time.Now())
-	return nil, false
-}
-
-func RequestTraceAfterMiddleware(registry kit.Registry, r kit.Request, response kit.Response) (kit.Response, bool) {
-	r.GetContext().Set("endTime", time.Now())
-	return nil, false
-}
-
-/**
  * Before middlewares.
  */
+
+func UnserializeRequestMiddleware(registry kit.Registry, request kit.Request) (kit.Response, bool) {
+	// Try to parse json in body. Ignore error since body might not contain json.
+	contentType := request.GetHttpRequest().Header.Get("Content-Type")
+	if strings.Contains(contentType, "json") {
+		// Only read the HTTP body automatically for json content type requests,
+		// since some handlers might need to read it themselfes (see the files package resource).
+		if err := request.ReadHttpBody(); err != nil {
+			return kit.NewErrorResponse(err, "http_body_read_error"), false
+		} else {
+			if request.GetRawData() != nil {
+				if err := request.ParseJsonData(); err != nil {
+					return kit.NewErrorResponse(err, "invalid_json_body", true), false
+				}
+
+				if request.GetData() != nil {
+					// Successfully parsed json body.
+
+					// Now try to unserialize.
+
+					// Determine serializer.
+					serializer := registry.DefaultSerializer()
+
+					// Check if a custom serializer was specified.
+					if name := request.GetContext().String("request-serializer"); name != "" {
+						serializer = registry.Serializer(name)
+					}
+
+					if serializer == nil {
+						return kit.NewErrorResponse("unknown_serializer", fmt.Sprintf("The specified request serializer does not exist")), false
+					} else {
+						if err := request.Unserialize(serializer); err != nil {
+							return kit.NewErrorResponse(err, "request_unserialize_error", true), false
+						}
+					}
+				}
+			}
+		}
+	}
+
+	return nil, false
+}
 
 func AuthenticationMiddleware(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 	// Handle authentication.
@@ -511,14 +508,7 @@ func AuthenticationMiddleware(registry kit.Registry, r kit.Request) (kit.Respons
 				userIdentifier := parts[0]
 				pw := parts[1]
 
-				user, err := userService.FindUser(userIdentifier)
-				if err != nil {
-					return kit.NewErrorResponse(err), false
-				} else if user == nil {
-					return kit.NewErrorResponse("unknown_user"), false
-				}
-
-				user, err = userService.AuthenticateUser(user, "password", map[string]interface{}{"password": pw})
+				user, err := userService.AuthenticateUser(userIdentifier, "password", map[string]interface{}{"password": pw})
 				if err != nil {
 					return kit.NewErrorResponse(err), false
 				}
@@ -607,29 +597,6 @@ func ServerErrorMiddleware(registry kit.Registry, r kit.Request, response kit.Re
 	return nil, false
 }
 
-func SerializeResponseMiddleware(registry kit.Registry, request kit.Request, response kit.Response) (kit.Response, bool) {
-	// Try to serialize the reponse data.
-
-	// Determine serializer.
-	serializer := registry.DefaultSerializer()
-
-	// Check if a custom serializer was specified.
-	if name := request.GetContext().String("response-serializer"); name != "" {
-		serializer = registry.Serializer(name)
-		if serializer == nil {
-			errResp := &kit.AppResponse{Error: apperror.New("unknown_response_serializer", true)}
-			data := serializer.MustSerializeResponse(errResp)
-			errResp.SetData(data)
-			return errResp, false
-		}
-	}
-
-	data := serializer.MustSerializeResponse(response)
-	response.SetData(data)
-
-	return nil, false
-}
-
 func MarshalResponseMiddleware(registry kit.Registry, request kit.Request, response kit.Response) (kit.Response, bool) {
 	js, err := json.Marshal(response.GetData())
 	if err != nil {
@@ -637,44 +604,6 @@ func MarshalResponseMiddleware(registry kit.Registry, request kit.Request, respo
 	}
 
 	response.SetRawData(js)
-
-	return nil, false
-}
-
-func RequestLoggerMiddleware(registry kit.Registry, r kit.Request, response kit.Response) (kit.Response, bool) {
-	rawStarted, ok1 := r.GetContext().Get("startTime")
-	rawFinished, ok2 := r.GetContext().Get("endTime")
-
-	var timeTaken int64 = int64(-1)
-	if ok1 && ok2 {
-		started := rawStarted.(time.Time)
-		finished := rawFinished.(time.Time)
-		timeTaken = int64(finished.Sub(started) / time.Millisecond)
-	}
-
-	httpRequest := r.GetHttpRequest()
-	method := httpRequest.Method
-	url := httpRequest.URL
-
-	// Log the request.
-	if response.GetError() != nil {
-		registry.Logger().WithFields(log.Fields{
-			"action":       "request",
-			"method":       method,
-			"url":          url.String(),
-			"status":       response.GetHttpStatus(),
-			"err":          response.GetError(),
-			"milliseconds": timeTaken,
-		}).Errorf("%v: %v - %v - %v", response.GetHttpStatus(), method, url, response.GetError())
-	} else {
-		registry.Logger().WithFields(log.Fields{
-			"action":       "request",
-			"method":       method,
-			"url":          url.String(),
-			"status":       response.GetHttpStatus(),
-			"milliseconds": timeTaken,
-		}).Debugf("%v: %v - %v", response.GetHttpStatus(), method, url)
-	}
 
 	return nil, false
 }

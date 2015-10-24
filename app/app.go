@@ -501,7 +501,7 @@ func (a *App) RunMethod(name string, r kit.Request, responder func(kit.Response)
 	}
 
 	if r.GetSession() == nil {
-		session, err := a.UserService().StartSession(r.GetUser())
+		session, err := a.UserService().StartSession(r.GetUser(), "")
 		if err != nil {
 			return nil, err
 		}

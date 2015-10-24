@@ -83,7 +83,6 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 // Creating a session is equivalent to logging in.
 func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request) kit.Response {
 	userService := res.Registry().UserService()
-	userResource := userService.UserResource()
 
 	meta := r.GetMeta()
 
@@ -91,24 +90,10 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 
 	// Find user.
 	userIdentifier := meta.String("user")
-	var user kit.User
-
-	if userIdentifier != "" {
-		rawUser, err := userResource.Q().
-			Filter("username", userIdentifier).Or("email", userIdentifier).First()
-
-		if err != nil {
-			return &kit.AppResponse{Error: err}
-		} else if rawUser == nil {
-			return kit.NewErrorResponse("user_not_found", "Username/Email does not exist ", true)
-		}
-
-		user = rawUser.(kit.User)
-	}
-
 	adaptor := meta.String("adaptor")
 	data, _ := meta.Map("auth-data")
 
+	var user kit.User
 	if !isAnonymous {
 		if adaptor == "" {
 			return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.", true)
@@ -119,13 +104,13 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 		}
 
 		var err apperror.Error
-		user, err = userService.AuthenticateUser(user, adaptor, data)
+		user, err = userService.AuthenticateUser(userIdentifier, adaptor, data)
 		if err != nil {
-			return &kit.AppResponse{Error: err}
+			return kit.NewErrorResponse(err)
 		}
 	}
 
-	session, err := userService.StartSession(user)
+	session, err := userService.StartSession(user, r.GetFrontend())
 	if err != nil {
 		return &kit.AppResponse{Error: err}
 	}
@@ -359,6 +344,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 	}
 
 	return []kit.Method{
+		AuthenticateMethod,
 		sendConfirmationEmail,
 		confirmEmail,
 		requestPwReset,

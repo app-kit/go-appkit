@@ -1,6 +1,7 @@
 package jsonapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"strings"
@@ -21,6 +22,36 @@ type ApiData struct {
 	Included []*ApiModel            `json:"included,omitempty"`
 	Meta     map[string]interface{} `json:"meta,omitempty"`
 	Errors   []*ApiError            `json:"errors,omitempty"`
+}
+
+func (d ApiData) ToMap() map[string]interface{} {
+	// Todo: fix this ugly hack.
+
+	js, _ := json.Marshal(d)
+	var m map[string]interface{}
+
+	json.Unmarshal(js, &m)
+
+	return m
+}
+
+func (d *ApiData) ReduceIncludedDuplicates() {
+	if len(d.Included) < 1 {
+		return
+	}
+
+	cleanedModels := make([]*ApiModel, 0)
+	mapper := make(map[string]bool)
+
+	for _, model := range d.Included {
+		id := model.Type + "_" + model.Id
+		if _, ok := mapper[id]; !ok {
+			cleanedModels = append(cleanedModels, model)
+			mapper[id] = true
+		}
+	}
+
+	d.Included = cleanedModels
 }
 
 type ApiModelData struct {
@@ -640,7 +671,10 @@ func (s *Serializer) SerializeResponse(response kit.Response) (interface{}, appe
 	apiResponse.Data = modelData
 	apiResponse.Included = included
 
-	return apiResponse, nil
+	// Remove duplicates from included data.
+	apiResponse.ReduceIncludedDuplicates()
+
+	return apiResponse.ToMap(), nil
 }
 
 func (s *Serializer) MustSerializeResponse(response kit.Response) interface{} {
@@ -656,6 +690,10 @@ func (s *Serializer) MustSerializeResponse(response kit.Response) interface{} {
 
 // UnserializeRequest converts request data into a request object.
 func (s *Serializer) UnserializeRequest(rawData interface{}, request kit.Request) apperror.Error {
+	if rawData == nil {
+		return nil
+	}
+
 	allData, ok := rawData.(map[string]interface{})
 	if !ok {
 		return apperror.New("invalid_data", "Invalid request data: dict expected", true)

@@ -8,6 +8,7 @@ import (
 	"github.com/theduke/go-apperror"
 
 	kit "github.com/theduke/go-appkit"
+	"github.com/theduke/go-appkit/frontends"
 )
 
 type Frontend struct {
@@ -37,14 +38,15 @@ func New(registry kit.Registry) *Frontend {
 		router: httprouter.New(),
 	}
 
-	f.RegisterBeforeMiddleware(RequestTraceMiddleware)
+	f.RegisterBeforeMiddleware(frontends.RequestTraceMiddleware)
+	f.RegisterBeforeMiddleware(UnserializeRequestMiddleware)
 	f.RegisterBeforeMiddleware(AuthenticationMiddleware)
 
 	f.RegisterAfterMiddleware(ServerErrorMiddleware)
-	f.RegisterAfterMiddleware(SerializeResponseMiddleware)
+	f.RegisterAfterMiddleware(frontends.SerializeResponseMiddleware)
 	f.RegisterAfterMiddleware(MarshalResponseMiddleware)
-	f.RegisterAfterMiddleware(RequestTraceAfterMiddleware)
-	f.RegisterAfterMiddleware(RequestLoggerMiddleware)
+	f.RegisterAfterMiddleware(frontends.RequestTraceAfterMiddleware)
+	f.RegisterAfterMiddleware(frontends.RequestLoggerMiddleware)
 
 	return f
 }

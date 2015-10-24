@@ -10,6 +10,10 @@ import (
 )
 
 type AppRequest struct {
+	Frontend   string
+	Path       string
+	HttpMethod string
+
 	Context *Context
 	Meta    *Context
 
@@ -29,6 +33,30 @@ func NewRequest() *AppRequest {
 	r.Meta = NewContext()
 
 	return &r
+}
+
+func (r *AppRequest) GetFrontend() string {
+	return r.Frontend
+}
+
+func (r *AppRequest) SetFrontend(x string) {
+	r.Frontend = x
+}
+
+func (r *AppRequest) GetPath() string {
+	return r.Path
+}
+
+func (r *AppRequest) SetPath(x string) {
+	r.Path = x
+}
+
+func (r *AppRequest) GetHttpMethod() string {
+	return r.HttpMethod
+}
+
+func (r *AppRequest) SetHttpMethod(x string) {
+	r.HttpMethod = x
 }
 
 func (r *AppRequest) GetUser() User {

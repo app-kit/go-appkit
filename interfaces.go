@@ -20,6 +20,24 @@ type Model interface {
 }
 
 /**
+ * EventHandler.
+ */
+
+type EventHandler func(data interface{})
+type AllEventsHandler func(event string, data interface{})
+
+type EventBus interface {
+	// Publish registers an event type with the EventBus.
+	Publish(event string)
+
+	// Subscribe registers a handler function for events of the given event type.
+	Subscribe(event string, handler EventHandler)
+
+	// Trigger triggers an event with the given event data.
+	Trigger(event string, data interface{})
+}
+
+/**
  * Taskrunner system.
  */
 
@@ -282,6 +300,16 @@ type AuthAdaptor interface {
  */
 
 type Request interface {
+	// GetFrontend returns the name of the frontend this request is from.
+	GetFrontend() string
+	SetFrontend(name string)
+
+	GetPath() string
+	SetPath(path string)
+
+	GetHttpMethod() string
+	SetHttpMethod(method string)
+
 	GetContext() *Context
 	SetContext(context *Context)
 
@@ -676,8 +704,8 @@ type UserService interface {
 	FindUser(userId interface{}) (User, apperror.Error)
 
 	CreateUser(user User, adaptor string, data map[string]interface{}) apperror.Error
-	AuthenticateUser(user User, adaptor string, data map[string]interface{}) (User, apperror.Error)
-	StartSession(user User) (Session, apperror.Error)
+	AuthenticateUser(userIdentifier string, adaptor string, data map[string]interface{}) (User, apperror.Error)
+	StartSession(user User, sessionType string) (Session, apperror.Error)
 	VerifySession(token string) (User, Session, apperror.Error)
 
 	SendConfirmationEmail(User) apperror.Error
@@ -861,6 +889,11 @@ type Registry interface {
 	Logger() *logrus.Logger
 	SetLogger(logger *logrus.Logger)
 
+	// EventBus.
+
+	EventBus() EventBus
+	SetEventBus(bus EventBus)
+
 	// Config.
 
 	Config() Config
@@ -1027,6 +1060,16 @@ type Frontend interface {
 
 	Logger() *logrus.Logger
 
+	// Middleware methods.
+
+	RegisterBeforeMiddleware(handler RequestHandler)
+	BeforeMiddlewares() []RequestHandler
+	SetBeforeMiddlewares(middlewares []RequestHandler)
+
+	RegisterAfterMiddleware(middleware AfterRequestMiddleware)
+	AfterMiddlewares() []AfterRequestMiddleware
+	SetAfterMiddlewares(middlewares []AfterRequestMiddleware)
+
 	Init() apperror.Error
 	Start() apperror.Error
 
@@ -1039,16 +1082,6 @@ type HttpFrontend interface {
 	Router() *httprouter.Router
 
 	ServeFiles(route, path string)
-
-	// Middleware methods.
-
-	RegisterBeforeMiddleware(handler RequestHandler)
-	BeforeMiddlewares() []RequestHandler
-	SetBeforeMiddlewares(middlewares []RequestHandler)
-
-	RegisterAfterMiddleware(middleware AfterRequestMiddleware)
-	AfterMiddlewares() []AfterRequestMiddleware
-	SetAfterMiddlewares(middlewares []AfterRequestMiddleware)
 
 	// HTTP related methods.
 

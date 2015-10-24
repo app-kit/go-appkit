@@ -243,10 +243,6 @@ func HandleFindOne(registry kit.Registry, request kit.Request) (kit.Response, bo
 }
 
 func Create(registry kit.Registry, request kit.Request) (kit.Response, apperror.Error) {
-	if err := request.ParseJsonData(); err != nil {
-		return nil, err
-	}
-
 	collection := request.GetContext().MustString("collection")
 
 	res := registry.Resource(collection)
@@ -257,6 +253,7 @@ func Create(registry kit.Registry, request kit.Request) (kit.Response, apperror.
 		}
 	}
 
+	fmt.Printf("data: %v |  %+v\n\n", nil, request.GetData())
 	model, ok := request.GetData().(kit.Model)
 	if !ok {
 		return nil, apperror.New("invalid_data_no_model", "No model data in request.")
@@ -280,10 +277,6 @@ func HandleCreate(registry kit.Registry, request kit.Request) (kit.Response, boo
 }
 
 func Update(registry kit.Registry, request kit.Request) (kit.Response, apperror.Error) {
-	if err := request.ParseJsonData(); err != nil {
-		return nil, err
-	}
-
 	collection := request.GetContext().MustString("collection")
 
 	res := registry.Resource(collection)

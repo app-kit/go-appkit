@@ -39,7 +39,10 @@ func (m *StrUserModel) SetUserID(id interface{}) error {
 }
 
 func (m *StrUserModel) GetUser() kit.User {
-	return m.User
+	if m.User != nil {
+		return m.User
+	}
+	return nil
 }
 
 func (m *StrUserModel) SetUser(u kit.User) {
@@ -72,7 +75,10 @@ func (m *IntUserModel) SetUserID(id interface{}) error {
 }
 
 func (m *IntUserModel) GetUser() kit.User {
-	return m.User
+	if m.User != nil {
+		return m.User
+	}
+	return nil
 }
 
 func (m *IntUserModel) SetUser(x kit.User) {

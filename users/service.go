@@ -671,7 +671,7 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, apperror.E
 	return user, nil
 }
 
-func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data map[string]interface{}) (kit.User, apperror.Error) {
+func (h *Service) AuthenticateUser(userIdentifier string, authAdaptorName string, data map[string]interface{}) (kit.User, apperror.Error) {
 	authAdaptor := h.AuthAdaptor(authAdaptorName)
 	if authAdaptor == nil {
 		return nil, &apperror.Err{
@@ -680,12 +680,24 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 			Message: "Unknown auth adaptor: " + authAdaptorName}
 	}
 
+	var user kit.User
+	var err apperror.Error
+
+	if userIdentifier != "" {
+		user, err = h.FindUser(userIdentifier)
+
+		if err != nil {
+			return nil, err
+		} else if user == nil {
+			return nil, apperror.New("user_not_found", "Username/Email does not exist ", true)
+		}
+	}
+
 	userId := ""
 	if user != nil {
 		userId = user.GetStrID()
 	}
 
-	var err apperror.Error
 	userId, err = authAdaptor.Authenticate(userId, data)
 	if err != nil {
 		if err.IsPublic() {
@@ -695,19 +707,19 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 		}
 	}
 
-	// Query user to get a full user with permissions and profile.
-
-	rawUser, err := h.FindUser(userId)
-	if err != nil {
-		return nil, apperror.Wrap(err, "user_query_error", "")
-	} else if rawUser == nil {
-		return nil, &apperror.Err{
-			Code:    "user_not_found",
-			Message: fmt.Sprintf("User with id %v could not be found", userId),
-			Public:  true,
+	if user == nil {
+		// Query user to get a full user with permissions and profile.
+		user, err = h.FindUser(userId)
+		if err != nil {
+			return nil, err
+		} else if user == nil {
+			return nil, &apperror.Err{
+				Code:    "user_not_found",
+				Message: fmt.Sprintf("User with id %v could not be found", userId),
+				Public:  true,
+			}
 		}
 	}
-	user = rawUser.(kit.User)
 
 	if !user.IsActive() {
 		return nil, apperror.New("user_inactive", true)
@@ -716,7 +728,7 @@ func (h *Service) AuthenticateUser(user kit.User, authAdaptorName string, data m
 	return user, nil
 }
 
-func (s Service) StartSession(user kit.User) (kit.Session, apperror.Error) {
+func (s Service) StartSession(user kit.User, sessionType string) (kit.Session, apperror.Error) {
 	token := randomToken()
 	if token == "" {
 		return nil, apperror.New("token_creation_failed")
@@ -724,6 +736,7 @@ func (s Service) StartSession(user kit.User) (kit.Session, apperror.Error) {
 
 	session := s.Sessions.CreateModel().(kit.Session)
 
+	session.SetType(sessionType)
 	session.SetToken(token)
 	session.SetStartedAt(time.Now())
 	session.SetValidUntil(time.Now().Add(time.Hour * 12))
