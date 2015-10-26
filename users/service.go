@@ -11,11 +11,11 @@ import (
 	db "github.com/theduke/go-dukedb"
 	"github.com/twinj/uuid"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/email"
-	"github.com/theduke/go-appkit/resources"
-	"github.com/theduke/go-appkit/users/auth/oauth"
-	"github.com/theduke/go-appkit/users/auth/password"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/email"
+	"github.com/app-kit/go-appkit/resources"
+	"github.com/app-kit/go-appkit/users/auth/oauth"
+	"github.com/app-kit/go-appkit/users/auth/password"
 )
 
 type Service struct {

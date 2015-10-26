@@ -1,7 +1,7 @@
 package methods
 
 import (
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 type Method struct {

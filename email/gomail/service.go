@@ -7,9 +7,9 @@ import (
 	"github.com/theduke/go-apperror"
 	"gopkg.in/gomail.v2"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/email"
-	"github.com/theduke/go-appkit/utils"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/email"
+	"github.com/app-kit/go-appkit/utils"
 )
 
 type Service struct {

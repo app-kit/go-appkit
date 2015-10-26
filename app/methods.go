@@ -8,8 +8,8 @@ import (
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/app/methods"
+	kit "github.com/app-kit/go-appkit"
+	. "github.com/app-kit/go-appkit/app/methods"
 )
 
 type methodInstance struct {

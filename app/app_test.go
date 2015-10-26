@@ -17,10 +17,10 @@ import (
 	"github.com/theduke/go-apperror"
 	"github.com/theduke/go-dukedb/backends/memory"
 
-	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/app"
-	"github.com/theduke/go-appkit/users"
-	"github.com/theduke/go-appkit/users/auth/oauth"
+	kit "github.com/app-kit/go-appkit"
+	. "github.com/app-kit/go-appkit/app"
+	"github.com/app-kit/go-appkit/users"
+	"github.com/app-kit/go-appkit/users/auth/oauth"
 )
 
 func GetNested(rawData interface{}, key string) interface{} {

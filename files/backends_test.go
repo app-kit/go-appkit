@@ -4,10 +4,10 @@ import (
 	"io/ioutil"
 	"os"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/files/backends/fs"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/files/backends/fs"
 
-	//. "github.com/theduke/go-appkit/files"
+	//. "github.com/app-kit/go-appkit/files"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

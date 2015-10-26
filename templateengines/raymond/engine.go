@@ -5,8 +5,8 @@ import (
 
 	"github.com/aymerick/raymond"
 
-	"github.com/theduke/go-appkit/templateengines"
-	"github.com/theduke/go-appkit/utils"
+	"github.com/app-kit/go-appkit/templateengines"
+	"github.com/app-kit/go-appkit/utils"
 )
 
 type Engine struct {

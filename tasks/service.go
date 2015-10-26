@@ -3,8 +3,8 @@ package tasks
 import (
 	"time"
 
+	kit "github.com/app-kit/go-appkit"
 	"github.com/theduke/go-apperror"
-	kit "github.com/theduke/go-appkit"
 	db "github.com/theduke/go-dukedb"
 )
 

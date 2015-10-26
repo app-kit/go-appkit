@@ -12,13 +12,13 @@ import (
 	db "github.com/theduke/go-dukedb"
 	"github.com/theduke/go-dukedb/backends/sql"
 
-	kit "github.com/theduke/go-appkit"
-	kitapp "github.com/theduke/go-appkit/app"
-	"github.com/theduke/go-appkit/caches/fs"
-	"github.com/theduke/go-appkit/email"
-	"github.com/theduke/go-appkit/files"
-	"github.com/theduke/go-appkit/resources"
-	"github.com/theduke/go-appkit/users"
+	kit "github.com/app-kit/go-appkit"
+	kitapp "github.com/app-kit/go-appkit/app"
+	"github.com/app-kit/go-appkit/caches/fs"
+	"github.com/app-kit/go-appkit/email"
+	"github.com/app-kit/go-appkit/files"
+	"github.com/app-kit/go-appkit/resources"
+	"github.com/app-kit/go-appkit/users"
 )
 
 type Project struct {

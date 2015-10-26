@@ -7,7 +7,7 @@ import (
 	db "github.com/theduke/go-dukedb"
 	"golang.org/x/crypto/bcrypt"
 
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 func GetStringFromMap(data map[string]interface{}, field string) (string, bool) {

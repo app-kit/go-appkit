@@ -10,8 +10,8 @@ import (
 	"github.com/theduke/go-dukedb/backends/memory"
 	"github.com/theduke/go-dukedb/backends/tests"
 
-	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/frontends/jsonapi"
+	kit "github.com/app-kit/go-appkit"
+	. "github.com/app-kit/go-appkit/frontends/jsonapi"
 )
 
 func buildBackend() db.Backend {

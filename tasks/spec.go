@@ -3,7 +3,7 @@ package tasks
 import (
 	"time"
 
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 type TaskSpec struct {

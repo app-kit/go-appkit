@@ -3,7 +3,7 @@ package users
 import (
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 func GetUserMigrations(service kit.UserService) []db.Migration {

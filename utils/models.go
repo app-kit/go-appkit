@@ -1,7 +1,7 @@
 package utils
 
 import (
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 func InterfaceToModelSlice(items []interface{}) []kit.Model {

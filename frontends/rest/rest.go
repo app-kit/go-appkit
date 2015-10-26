@@ -8,8 +8,8 @@ import (
 
 	"github.com/theduke/go-apperror"
 
-	kit "github.com/theduke/go-appkit"
-	apphttp "github.com/theduke/go-appkit/frontends/http"
+	kit "github.com/app-kit/go-appkit"
+	apphttp "github.com/app-kit/go-appkit/frontends/http"
 )
 
 type Frontend struct {

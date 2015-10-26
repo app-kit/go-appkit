@@ -6,8 +6,8 @@ import (
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
-	//"github.com/theduke/go-appkit/users"
+	kit "github.com/app-kit/go-appkit"
+	//"github.com/app-kit/go-appkit/users"
 )
 
 type AuthItemOauth struct {

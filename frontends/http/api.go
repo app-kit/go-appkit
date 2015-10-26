@@ -22,9 +22,9 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/theduke/go-apperror"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/caches"
-	"github.com/theduke/go-appkit/utils"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/caches"
+	"github.com/app-kit/go-appkit/utils"
 )
 
 type HttpHandlerStruct struct {
@@ -232,7 +232,7 @@ func getIndexTpl(registry kit.Registry) ([]byte, apperror.Error) {
 			<p>Welcome to your new appkit server.</p>
 
 			<p>
-			  Find instructions on how to set up your app at <a href="http://github.com/theduke/go-appkit">Github</a>
+			  Find instructions on how to set up your app at <a href="http://github.com/app-kit/go-appkit">Github</a>
 			</p>
 		</body>
 	</html>

@@ -6,7 +6,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/theduke/go-appkit/users/auth/oauth"
+	. "github.com/app-kit/go-appkit/users/auth/oauth"
 )
 
 var _ = Describe("Facebook", func() {

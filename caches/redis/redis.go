@@ -6,9 +6,9 @@ import (
 
 	"github.com/garyburd/redigo/redis"
 
-	kit "github.com/theduke/go-appkit"
-	. "github.com/theduke/go-appkit/caches"
-	"github.com/theduke/go-appkit/utils"
+	kit "github.com/app-kit/go-appkit"
+	. "github.com/app-kit/go-appkit/caches"
+	"github.com/app-kit/go-appkit/utils"
 )
 
 type Config struct {

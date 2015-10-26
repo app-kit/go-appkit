@@ -7,7 +7,7 @@ import (
 
 	"github.com/olebedev/config"
 
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 type Config struct {

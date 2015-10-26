@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"html/template"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/templateengines"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/templateengines"
 )
 
 type Engine struct {

@@ -9,7 +9,7 @@ import (
 
 	"github.com/theduke/go-apperror"
 
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 func FileExists(path string) (bool, error) {

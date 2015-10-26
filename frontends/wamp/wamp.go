@@ -9,8 +9,8 @@ import (
 	"github.com/theduke/go-apperror"
 	"gopkg.in/jcelliott/turnpike.v2"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/frontends"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/frontends"
 )
 
 func UnserializerMiddleware(registry kit.Registry, request kit.Request) (kit.Response, bool) {

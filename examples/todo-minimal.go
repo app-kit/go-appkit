@@ -6,15 +6,15 @@ import (
 	"github.com/theduke/go-dukedb"
 	"github.com/theduke/go-dukedb/backends/memory"
 
-	"github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/app"
-	"github.com/theduke/go-appkit/resources"
+	"github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/app"
+	"github.com/app-kit/go-appkit/resources"
 )
 
 type Project struct {
 	// IntIDModel contains an ID uint64 field and some methods implementing the appkit.Model interface.
 	// You can also implemnt the methods yourself.
-	// For details, refer to the [Concepts](https://github.com/theduke/go-appkit#Concepts.Models) and the DukeDB documentation.
+	// For details, refer to the [Concepts](https://github.com/app-kit/go-appkit#Concepts.Models) and the DukeDB documentation.
 	dukedb.IntIDModel
 
 	Name        string `db:"not-null;max:100"`

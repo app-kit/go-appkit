@@ -14,24 +14,24 @@ import (
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/caches/fs"
-	"github.com/theduke/go-appkit/crawler"
-	"github.com/theduke/go-appkit/files"
-	"github.com/theduke/go-appkit/resources"
-	"github.com/theduke/go-appkit/tasks"
-	"github.com/theduke/go-appkit/users"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/caches/fs"
+	"github.com/app-kit/go-appkit/crawler"
+	"github.com/app-kit/go-appkit/files"
+	"github.com/app-kit/go-appkit/resources"
+	"github.com/app-kit/go-appkit/tasks"
+	"github.com/app-kit/go-appkit/users"
 
-	apphttp "github.com/theduke/go-appkit/frontends/http"
-	"github.com/theduke/go-appkit/frontends/jsonapi"
-	"github.com/theduke/go-appkit/frontends/rest"
-	"github.com/theduke/go-appkit/frontends/wamp"
+	apphttp "github.com/app-kit/go-appkit/frontends/http"
+	"github.com/app-kit/go-appkit/frontends/jsonapi"
+	"github.com/app-kit/go-appkit/frontends/rest"
+	"github.com/app-kit/go-appkit/frontends/wamp"
 
-	jsonapiserializer "github.com/theduke/go-appkit/serializers/jsonapi"
+	jsonapiserializer "github.com/app-kit/go-appkit/serializers/jsonapi"
 
-	"github.com/theduke/go-appkit/email"
-	"github.com/theduke/go-appkit/email/gomail"
-	emaillog "github.com/theduke/go-appkit/email/log"
+	"github.com/app-kit/go-appkit/email"
+	"github.com/app-kit/go-appkit/email/gomail"
+	emaillog "github.com/app-kit/go-appkit/email/log"
 )
 
 type App struct {

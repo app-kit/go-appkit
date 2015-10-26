@@ -4,7 +4,7 @@ import (
 	"sort"
 	"time"
 
-	"github.com/theduke/go-appkit/caches"
+	"github.com/app-kit/go-appkit/caches"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

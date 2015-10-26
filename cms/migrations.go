@@ -3,7 +3,7 @@ package cms
 import (
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 func BuildMigrations(b db.MigrationBackend, app kit.App) []db.Migration {

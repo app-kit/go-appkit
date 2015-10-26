@@ -4,7 +4,7 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	. "github.com/theduke/go-appkit/templateengines/gohtml"
+	. "github.com/app-kit/go-appkit/templateengines/gohtml"
 )
 
 var tpl1 string = `Test {{.var}}`

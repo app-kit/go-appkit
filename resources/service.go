@@ -6,7 +6,7 @@ import (
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
+	kit "github.com/app-kit/go-appkit"
 )
 
 type Service struct {

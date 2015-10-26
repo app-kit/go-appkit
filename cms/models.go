@@ -5,8 +5,8 @@ import (
 
 	db "github.com/theduke/go-dukedb"
 
-	"github.com/theduke/go-appkit/files"
-	"github.com/theduke/go-appkit/users"
+	"github.com/app-kit/go-appkit/files"
+	"github.com/app-kit/go-appkit/users"
 )
 
 /**

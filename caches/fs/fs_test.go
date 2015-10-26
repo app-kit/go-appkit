@@ -7,8 +7,8 @@ import (
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"
 
-	"github.com/theduke/go-appkit/caches/fs"
-	"github.com/theduke/go-appkit/caches/tests"
+	"github.com/app-kit/go-appkit/caches/fs"
+	"github.com/app-kit/go-appkit/caches/tests"
 )
 
 var _ = Describe("Redis", func() {

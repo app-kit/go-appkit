@@ -6,12 +6,12 @@ import (
 
 	"github.com/Sirupsen/logrus"
 
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/app"
 	"github.com/theduke/go-apperror"
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/app"
 	"github.com/theduke/go-dukedb/backends/memory"
 
-	. "github.com/theduke/go-appkit/tasks"
+	. "github.com/app-kit/go-appkit/tasks"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

@@ -8,10 +8,10 @@ import (
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/app/methods"
-	"github.com/theduke/go-appkit/resources"
-	"github.com/theduke/go-appkit/utils"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/app/methods"
+	"github.com/app-kit/go-appkit/resources"
+	"github.com/app-kit/go-appkit/utils"
 )
 
 // randomToken creates a random alphanumeric string with a length of 32.

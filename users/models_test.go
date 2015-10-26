@@ -1,7 +1,7 @@
 package users_test
 
 import (
-	. "github.com/theduke/go-appkit/users"
+	. "github.com/app-kit/go-appkit/users"
 
 	. "github.com/onsi/ginkgo"
 	. "github.com/onsi/gomega"

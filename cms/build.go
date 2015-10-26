@@ -3,8 +3,8 @@ package cms
 import (
 	db "github.com/theduke/go-dukedb"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/resources"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/resources"
 )
 
 func Build(backend db.Backend, app kit.App, integerIds bool) {

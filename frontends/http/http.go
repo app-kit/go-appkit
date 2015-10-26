@@ -7,8 +7,8 @@ import (
 	"github.com/julienschmidt/httprouter"
 	"github.com/theduke/go-apperror"
 
-	kit "github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/frontends"
+	kit "github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/frontends"
 )
 
 type Frontend struct {

@@ -23,30 +23,30 @@ but with an efficient and compiled language in the backend.
 * Easily extendable CLI.
 * File storage with different backends (File system included, easily extendable to Amazon S3 etc).
 * Caching system with different caches (File system, in memory and REDIS included, easily extendable).
-* [Scaffolding CLI](https://github.com/theduke/go-appkitcli) similar to Yeoman for quick setup and development.
+* [Scaffolding CLI](https://github.com/app-kit/go-appkitcli) similar to Yeoman for quick setup and development.
 * **Optional** light weight CMS with menu system and pages with an Admin frontend written in EmberJS.
 * Ember CLI addon for easy integration into the [Ember JS framework](emberjs.com).
 
 ## TOC
 
-1. [Concepts](https://github.com/theduke/go-appkit#Concepts)
-  * [Frontends](https://github.com/theduke/go-appkit#Concepts.Frontends)
-  * [Models](https://github.com/theduke/go-appkit#Concepts.Models)
-  * [Resources](https://github.com/theduke/go-appkit#Concepts.Resources)
-  * [Methods](https://github.com/theduke/go-appkit#Concepts.Methods)
-  * [DukeDB, backends and client side queries](https://github.com/theduke/go-appkit#Concepts.dukedb)
-  * [User system](https://github.com/theduke/go-appkit#Concepts.Usersystem)
-  * [File storage](https://github.com/theduke/go-appkit#Concepts.Filestorage)
-  * [Server side rendering](https://github.com/theduke/go-appkit#Concepts.serversiderendering)
-  * [Caching](https://github.com/theduke/go-appkit#Concepts.caching)
-  * [Registry and Services](https://github.com/theduke/go-appkit#Concepts.registry)
-2. [Getting started](https://github.com/theduke/go-appkit#Gettingstarted)
-  * [Setup](https://github.com/theduke/go-appkit#Gettingstarted.setup)
-  * [Example: Minimal Todo](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo)
-  * [Example: Todo with Usersystem](https://github.com/theduke/go-appkit#Gettingstarted.TodoWithUsers)
-3. [Documentation](https://github.com/theduke/go-appkit#docs)
-  * [Resources](https://github.com/theduke/go-appkit#docs.resources)
-4. [Additional Information](https://github.com/theduke/go-appkit#additional)
+1. [Concepts](https://github.com/app-kit/go-appkit#Concepts)
+  * [Frontends](https://github.com/app-kit/go-appkit#Concepts.Frontends)
+  * [Models](https://github.com/app-kit/go-appkit#Concepts.Models)
+  * [Resources](https://github.com/app-kit/go-appkit#Concepts.Resources)
+  * [Methods](https://github.com/app-kit/go-appkit#Concepts.Methods)
+  * [DukeDB, backends and client side queries](https://github.com/app-kit/go-appkit#Concepts.dukedb)
+  * [User system](https://github.com/app-kit/go-appkit#Concepts.Usersystem)
+  * [File storage](https://github.com/app-kit/go-appkit#Concepts.Filestorage)
+  * [Server side rendering](https://github.com/app-kit/go-appkit#Concepts.serversiderendering)
+  * [Caching](https://github.com/app-kit/go-appkit#Concepts.caching)
+  * [Registry and Services](https://github.com/app-kit/go-appkit#Concepts.registry)
+2. [Getting started](https://github.com/app-kit/go-appkit#Gettingstarted)
+  * [Setup](https://github.com/app-kit/go-appkit#Gettingstarted.setup)
+  * [Example: Minimal Todo](https://github.com/app-kit/go-appkit#Gettingstarted.Minimaltodo)
+  * [Example: Todo with Usersystem](https://github.com/app-kit/go-appkit#Gettingstarted.TodoWithUsers)
+3. [Documentation](https://github.com/app-kit/go-appkit#docs)
+  * [Resources](https://github.com/app-kit/go-appkit#docs.resources)
+4. [Additional Information](https://github.com/app-kit/go-appkit#additional)
 
 <a name="Concepts"></a>
 ## Concepts
@@ -147,7 +147,7 @@ You can also alter the default CRUD operations by implementing some of these hoo
 
 There are also several supplied resource implementations for common use cases.
 
-You can find more information in the [Resources documentation](https://github.com/theduke/go-appkit#docs.resources)
+You can find more information in the [Resources documentation](https://github.com/app-kit/go-appkit#docs.resources)
 
 
 <a name="Concepts.Methods"></a>
@@ -155,7 +155,7 @@ You can find more information in the [Resources documentation](https://github.co
 
 All API operations that do not correspond to simple CRUD operations are exposed in the form of methods.
 
-Methods can be registered directly from your resources with the [Methods() hook](https://github.com/theduke/go-appkit#docs.resources.hooks.methods), or with the app.
+Methods can be registered directly from your resources with the [Methods() hook](https://github.com/app-kit/go-appkit#docs.resources.hooks.methods), or with the app.
 
 Methods can be *blocking* or *non-blocking*.
 
@@ -170,7 +170,7 @@ creation has finished, and will therefore include the new model.
 Example of a simple method that returns the count of a certain model.
 ```go
 import(
-	"github.com/theduke/go-appkit/api/methods"
+	"github.com/app-kit/go-appkit/api/methods"
 )
 
 countMethod := &methods.Method{
@@ -384,13 +384,13 @@ This gives you the power to implement your own service if the default does not f
 <a name="Gettingstarted.setup"></a>
 ### Setup
 
-You should first read over the *Models*, *Resources* and *Methods* section in [Concepts](https://github.com/theduke/go-appkit#Concepts), and 
-then check out the [Todo example](https://github.com/theduke/go-appkit#Gettingstarted.Minimaltodo) to familiarize yourself with the way Appkit works.
+You should first read over the *Models*, *Resources* and *Methods* section in [Concepts](https://github.com/app-kit/go-appkit#Concepts), and 
+then check out the [Todo example](https://github.com/app-kit/go-appkit#Gettingstarted.Minimaltodo) to familiarize yourself with the way Appkit works.
 
 After that, run these  commands to **create a new Appkit project:**
 ```bash
-go get github.com/theduke/go-appkitcli
-go install github.com/theduke/go-appkitcli/appkit
+go get github.com/app-kit/go-appkitcli
+go install github.com/app-kit/go-appkitcli/appkit
 
 appkit bootstrap --backend="postgres" myproject
 
@@ -405,7 +405,7 @@ The examples use a **non-persistent in memory backend**.
 
 You can use all backends supported by [DukeDB](https://github.com/theduke/go-dukedb) (the recommended one is PostgreSQL).
 
-To use a different backend, refer to the [Backends section](https://github.com/theduke/go-appkit#Backends).
+To use a different backend, refer to the [Backends section](https://github.com/app-kit/go-appkit#Backends).
 
 <a name="Gettingstarted.Minimaltodo"></a>
 #### Minimal Todo Example
@@ -414,7 +414,7 @@ The following example shows how to create a very simple todo application, where 
 
 To see how to employ the user system, refer to the next section.
 
-Save this code into a file "todo.go" or just download the [file](https://github.com/theduke/go-appkit/tree/master/examples/todo-minimal.go)
+Save this code into a file "todo.go" or just download the [file](https://github.com/app-kit/go-appkit/tree/master/examples/todo-minimal.go)
 
 ```go
 package main
@@ -424,15 +424,15 @@ import(
 
 	"github.com/theduke/go-dukedb"
 	"github.com/theduke/go-dukedb/backends/memory"
-	"github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/app"
-	"github.com/theduke/go-appkit/resources"
+	"github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/app"
+	"github.com/app-kit/go-appkit/resources"
 )
 
 type Project struct {
 	// IntIDModel contains an ID uint64 field and some methods implementing the appkit.Model interface.
 	// You can also implemnt the methods yourself.
-	// For details, refer to the [Concepts](https://github.com/theduke/go-appkit#Concepts.Models) and the DukeDB documentation.
+	// For details, refer to the [Concepts](https://github.com/app-kit/go-appkit#Concepts.Models) and the DukeDB documentation.
 	dukedb.IntIDModel
 
 	Name string `db:"not-null;max:100"`
@@ -574,7 +574,7 @@ You just can embed the *UserModel* base struct in your models, and alter the res
 
 By doing that, your project and todo models with belong to a user, and create, update and delete operations will be  restricted to admins and owners of the model.
 
-Save this code into a file "todo.go" or just download the [file](https://github.com/theduke/go-appkit/tree/master/examples/todo-users.go).
+Save this code into a file "todo.go" or just download the [file](https://github.com/app-kit/go-appkit/tree/master/examples/todo-users.go).
 
 ```go
 package main
@@ -585,16 +585,16 @@ import (
 	"github.com/theduke/go-dukedb"
 	"github.com/theduke/go-dukedb/backends/memory"
 
-	"github.com/theduke/go-appkit"
-	"github.com/theduke/go-appkit/app"
-	"github.com/theduke/go-appkit/resources"
-	"github.com/theduke/go-appkit/users"
+	"github.com/app-kit/go-appkit"
+	"github.com/app-kit/go-appkit/app"
+	"github.com/app-kit/go-appkit/resources"
+	"github.com/app-kit/go-appkit/users"
 )
 
 type Project struct {
 	// IntIDModel contains an ID uint64 field and some methods implementing the appkit.Model interface.
 	// You can also implemnt the methods yourself.
-	// For details, refer to the [Concepts](https://github.com/theduke/go-appkit#Concepts.Models) and the DukeDB documentation.
+	// For details, refer to the [Concepts](https://github.com/app-kit/go-appkit#Concepts.Models) and the DukeDB documentation.
 	dukedb.IntIDModel
 
 	users.IntUserModel
@@ -710,19 +710,19 @@ from  the previous example one to one.
 <a name="docs.resources"></a>
 ### Resources
 
-* [Resource implementations](https://github.com/theduke/go-appkit#docs.resources.implementations)
-* [Hooks](https://github.com/theduke/go-appkit#docs.resources.hooks)
+* [Resource implementations](https://github.com/app-kit/go-appkit#docs.resources.implementations)
+* [Hooks](https://github.com/app-kit/go-appkit#docs.resources.hooks)
 
 <a name="docs.resources.implementations"></a>
 #### Resource implementations
 
 The package contains several resource implementations that fulfill common needs, making it unneccessary to implement the  hooks yourself.
 
-* [ReadOnlyResource](https://github.com/theduke/go-appkit#docs.resources.implementations.readonly)
-* [AdminResource](https://github.com/theduke/go-appkit#docs.resources.implementations.admin)
-* [LoggedInResource](https://github.com/theduke/go-appkit#docs.resources.implementations.loggedin)
-* [PublicWriteResource](https://github.com/theduke/go-appkit#docs.resources.implementations.publicwrite)
-* [UserResource](https://github.com/theduke/go-appkit#docs.resources.implementations.user)
+* [ReadOnlyResource](https://github.com/app-kit/go-appkit#docs.resources.implementations.readonly)
+* [AdminResource](https://github.com/app-kit/go-appkit#docs.resources.implementations.admin)
+* [LoggedInResource](https://github.com/app-kit/go-appkit#docs.resources.implementations.loggedin)
+* [PublicWriteResource](https://github.com/app-kit/go-appkit#docs.resources.implementations.publicwrite)
+* [UserResource](https://github.com/app-kit/go-appkit#docs.resources.implementations.user)
 
 <a name="docs.resources.implementations.readonly"></a>
 ##### ReadOnlyResource
@@ -732,7 +732,7 @@ This resource only allows READ operations via the API, no create, update or dele
 ```go
 import(
   ...
-  "github.com/theduke/go-appkit/resources"
+  "github.com/app-kit/go-appkit/resources"
   ...
 )
 
@@ -747,7 +747,7 @@ This resource restricts create, read and update operations to users with the 'ad
 ```go
 import(
   ...
-  "github.com/theduke/go-appkit/resources"
+  "github.com/app-kit/go-appkit/resources"
   ...
 )
 
@@ -763,7 +763,7 @@ This resource restricts create, read and update operations to logged in users.
 ```go
 import(
   ...
-  "github.com/theduke/go-appkit/resources"
+  "github.com/app-kit/go-appkit/resources"
   ...
 )
 
@@ -778,7 +778,7 @@ This resource allows all create/update/delete operations for all api users, even
 ```go
 import(
   ...
-  "github.com/theduke/go-appkit/resources"
+  "github.com/app-kit/go-appkit/resources"
   ...
 )
 
@@ -797,8 +797,8 @@ For this to work, your model has to implement the *appkit.UserModel* interface.
 ```go
 import(
   ...
-  "github.com/theduke/go-appkit/resources"
-  "github.com/theduke/go-appkit/users"
+  "github.com/app-kit/go-appkit/resources"
+  "github.com/app-kit/go-appkit/users"
   ...
 )
 
@@ -815,33 +815,33 @@ app.RegisterResource(&Model{}, &resources.UserResource{})
 
 Here you can find all the available hooks you can implement on your resources.
 
-* [General](https://github.com/theduke/go-appkit#docs.resources.hooks.general)
-  * [HttpRoutes](https://github.com/theduke/go-appkit#docs.resources.hooks.httproutes)
-  * [Methods](https://github.com/theduke/go-appkit#docs.resources.hooks.methods)
-* [Find](https://github.com/theduke/go-appkit#docs.resources.hooks.find)
-  * [AllowFind](https://github.com/theduke/go-appkit#docs.resources.hooks.allowfind)
-  * [ApiFindOne](https://github.com/theduke/go-appkit#docs.resources.hooks.apifindone)
-  * [ApiFind](https://github.com/theduke/go-appkit#docs.resources.hooks.apifind)
-  * [ApiAlterQuery](https://github.com/theduke/go-appkit#docs.resources.hooks.apialterquery)
-  * [ApiAfterFind](https://github.com/theduke/go-appkit#docs.resources.hooks.apiafterfind)
-* [Create](https://github.com/theduke/go-appkit#docs.resources.hooks.createoverview)
-  * [Create](https://github.com/theduke/go-appkit#docs.resources.hooks.create)
-  * [ApiCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.apicreate)
-  * [BeforeCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.beforecreate)
-  * [AllowCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.allowcreate)
-  * [AfterCreate](https://github.com/theduke/go-appkit#docs.resources.hooks.aftercreate)
-* [Update](https://github.com/theduke/go-appkit#docs.resources.hooks.updateoverview)
-  * [ApiUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.apiupdate)
-  * [Update](https://github.com/theduke/go-appkit#docs.resources.hooks.update)
-  * [BeforeUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.beforeupdate)
-  * [AllowUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.allowupdate)
-  * [AfterUpdate](https://github.com/theduke/go-appkit#docs.resources.hooks.afterupdate)
-* [Delete](https://github.com/theduke/go-appkit#docs.resources.hooks.deleteoverview)
-  * [ApiDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.apidelete)
-  * [Delete](https://github.com/theduke/go-appkit#docs.resources.hooks.delete)
-  * [BeforeDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.beforedelete)
-  * [AllowDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.allowdelete)
-  * [AfterDelete](https://github.com/theduke/go-appkit#docs.resources.hooks.afterdelete)
+* [General](https://github.com/app-kit/go-appkit#docs.resources.hooks.general)
+  * [HttpRoutes](https://github.com/app-kit/go-appkit#docs.resources.hooks.httproutes)
+  * [Methods](https://github.com/app-kit/go-appkit#docs.resources.hooks.methods)
+* [Find](https://github.com/app-kit/go-appkit#docs.resources.hooks.find)
+  * [AllowFind](https://github.com/app-kit/go-appkit#docs.resources.hooks.allowfind)
+  * [ApiFindOne](https://github.com/app-kit/go-appkit#docs.resources.hooks.apifindone)
+  * [ApiFind](https://github.com/app-kit/go-appkit#docs.resources.hooks.apifind)
+  * [ApiAlterQuery](https://github.com/app-kit/go-appkit#docs.resources.hooks.apialterquery)
+  * [ApiAfterFind](https://github.com/app-kit/go-appkit#docs.resources.hooks.apiafterfind)
+* [Create](https://github.com/app-kit/go-appkit#docs.resources.hooks.createoverview)
+  * [Create](https://github.com/app-kit/go-appkit#docs.resources.hooks.create)
+  * [ApiCreate](https://github.com/app-kit/go-appkit#docs.resources.hooks.apicreate)
+  * [BeforeCreate](https://github.com/app-kit/go-appkit#docs.resources.hooks.beforecreate)
+  * [AllowCreate](https://github.com/app-kit/go-appkit#docs.resources.hooks.allowcreate)
+  * [AfterCreate](https://github.com/app-kit/go-appkit#docs.resources.hooks.aftercreate)
+* [Update](https://github.com/app-kit/go-appkit#docs.resources.hooks.updateoverview)
+  * [ApiUpdate](https://github.com/app-kit/go-appkit#docs.resources.hooks.apiupdate)
+  * [Update](https://github.com/app-kit/go-appkit#docs.resources.hooks.update)
+  * [BeforeUpdate](https://github.com/app-kit/go-appkit#docs.resources.hooks.beforeupdate)
+  * [AllowUpdate](https://github.com/app-kit/go-appkit#docs.resources.hooks.allowupdate)
+  * [AfterUpdate](https://github.com/app-kit/go-appkit#docs.resources.hooks.afterupdate)
+* [Delete](https://github.com/app-kit/go-appkit#docs.resources.hooks.deleteoverview)
+  * [ApiDelete](https://github.com/app-kit/go-appkit#docs.resources.hooks.apidelete)
+  * [Delete](https://github.com/app-kit/go-appkit#docs.resources.hooks.delete)
+  * [BeforeDelete](https://github.com/app-kit/go-appkit#docs.resources.hooks.beforedelete)
+  * [AllowDelete](https://github.com/app-kit/go-appkit#docs.resources.hooks.allowdelete)
+  * [AfterDelete](https://github.com/app-kit/go-appkit#docs.resources.hooks.afterdelete)
 
 <a name="docs.resources.hooks.general"></a>
 ##### General
@@ -861,7 +861,7 @@ Supply http route connected with your resource
 Methods(kit.Resource) []kit.Method
 ```
 
-Supply methods connected with your resource (See [Methods](https://github.com/theduke/go-appkit#Concepts.Methods)).
+Supply methods connected with your resource (See [Methods](https://github.com/app-kit/go-appkit#Concepts.Methods)).
 
 
 <a name="docs.resources.hooks.find"></a>
