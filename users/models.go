@@ -46,8 +46,13 @@ func (m *StrUserModel) GetUser() kit.User {
 }
 
 func (m *StrUserModel) SetUser(u kit.User) {
-	m.User = u.(*UserStrID)
-	m.SetUserID(u.GetID())
+	if u == nil {
+		m.User = nil
+		m.UserID = ""
+	} else {
+		m.User = u.(*UserStrID)
+		m.SetUserID(u.GetID())
+	}
 }
 
 type IntUserModel struct {
@@ -81,9 +86,14 @@ func (m *IntUserModel) GetUser() kit.User {
 	return nil
 }
 
-func (m *IntUserModel) SetUser(x kit.User) {
-	m.User = x.(*UserIntID)
-	m.SetUserID(x.GetID())
+func (m *IntUserModel) SetUser(u kit.User) {
+	if u == nil {
+		m.User = nil
+		m.UserID = 0
+	} else {
+		m.User = u.(*UserIntID)
+		m.SetUserID(u.GetID())
+	}
 }
 
 /**

@@ -1,6 +1,7 @@
 package jsonapi
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"strings"
@@ -31,10 +32,17 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 
 	jsonQuery := request.GetContext().String("query")
 	if jsonQuery != "" {
+		var rawQuery map[string]interface{}
+		if err := json.Unmarshal([]byte(jsonQuery), &rawQuery); err != nil {
+			return nil, apperror.Wrap(err, "invalid_query_json")
+		}
+
+		rawQuery["collection"] = collection
+
 		// A custom query was supplied.
 		// Try to parse the query.
 		var err apperror.Error
-		query, err = db.ParseJsonQuery(collection, []byte(jsonQuery))
+		query, err = db.ParseQuery(rawQuery)
 		if err != nil {
 			return nil, apperror.Wrap(err, "invalid_query", "", false)
 		}
@@ -206,12 +214,12 @@ func HandleFind(registry kit.Registry, request kit.Request) (kit.Response, bool)
 			Code:    "unknown_resource",
 			Message: fmt.Sprintf("The resource '%v' does not exist", collection),
 		}
-		return &kit.AppResponse{Error: err}, false
+		return kit.NewErrorResponse(err), false
 	}
 
 	response, err := Find(res, request)
 	if err != nil {
-		response = &kit.AppResponse{Error: err}
+		response = kit.NewErrorResponse(err)
 	}
 
 	// If response contains a count and the request a "perPage" param, add a total_pages param
@@ -270,7 +278,7 @@ func Create(registry kit.Registry, request kit.Request) (kit.Response, apperror.
 func HandleCreate(registry kit.Registry, request kit.Request) (kit.Response, bool) {
 	response, err := Create(registry, request)
 	if err != nil {
-		return &kit.AppResponse{Error: err}, false
+		return kit.NewErrorResponse(err), false
 	}
 
 	return response, false
@@ -300,7 +308,7 @@ func Update(registry kit.Registry, request kit.Request) (kit.Response, apperror.
 func HandleUpdate(registry kit.Registry, request kit.Request) (kit.Response, bool) {
 	response, err := Update(registry, request)
 	if err != nil {
-		return &kit.AppResponse{Error: err}, false
+		return kit.NewErrorResponse(err), false
 	}
 
 	return response, false

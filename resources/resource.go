@@ -1,6 +1,7 @@
 package resources
 
 import (
+	"math"
 	"reflect"
 
 	"github.com/theduke/go-apperror"
@@ -153,7 +154,7 @@ func (res *Resource) ApiFindOne(rawId string, r kit.Request) kit.Response {
 
 	result, err := res.FindOne(rawId)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	} else if result == nil {
 		return kit.NewErrorResponse("not_found", "")
 	}
@@ -187,7 +188,7 @@ func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
 
 	result, err := res.Query(query)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	user := r.GetUser()
@@ -207,7 +208,8 @@ func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
 
 	// If a limit was set, count the total number of results
 	// and set count parameter in metadata.
-	if query.GetLimit() > 0 {
+	limit := query.GetLimit()
+	if limit > 0 {
 		query.Limit(0).Offset(0)
 		count, err := res.backend.Count(query)
 		if err != nil {
@@ -216,7 +218,10 @@ func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
 			}
 		}
 
-		response.SetMeta(map[string]interface{}{"count": count})
+		response.SetMeta(map[string]interface{}{
+			"count":       count,
+			"total_pages": math.Ceil(float64(count) / float64(limit)),
+		})
 	}
 
 	return response
@@ -270,7 +275,7 @@ func (res *Resource) ApiCreate(obj kit.Model, r kit.Request) kit.Response {
 	user := r.GetUser()
 	err := res.Create(obj, user)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	return &kit.AppResponse{
@@ -353,7 +358,7 @@ func (res *Resource) ApiUpdate(obj kit.Model, r kit.Request) kit.Response {
 	user := r.GetUser()
 	err := res.Update(obj, user)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	return &kit.AppResponse{
@@ -369,7 +374,7 @@ func (res *Resource) ApiPartialUpdate(obj kit.Model, r kit.Request) kit.Response
 	user := r.GetUser()
 	err := res.PartialUpdate(obj, user)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	return &kit.AppResponse{
@@ -418,14 +423,14 @@ func (res *Resource) ApiDelete(id string, r kit.Request) kit.Response {
 
 	oldObj, err := res.FindOne(id)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	} else if oldObj == nil {
 		return kit.NewErrorResponse("not_found", "")
 	}
 
 	user := r.GetUser()
 	if err := res.Delete(oldObj, user); err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	return &kit.AppResponse{

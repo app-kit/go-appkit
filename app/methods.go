@@ -1,7 +1,6 @@
 package app
 
 import (
-	"encoding/json"
 	"fmt"
 	"sync"
 	"time"
@@ -333,189 +332,127 @@ type ResourceMethodData struct {
 	Query    db.Query
 }
 
-func buildResourceMethodData(registry kit.Registry, rawData interface{}) (*ResourceMethodData, apperror.Error) {
-	if data, ok := rawData.(ResourceMethodData); ok {
-		return &data, nil
-	}
-	methodData := &ResourceMethodData{}
-
-	data, ok := rawData.(map[string]interface{})
-	if !ok {
-		return nil, &apperror.Err{
-			Code:    "invalid_data_map_expected",
-			Message: "Data must contain a map/dict",
-		}
-	}
-
-	// Try to build model objects.
-	resourceName, _ := data["collection"].(string)
-	if resourceName == "" {
-		return nil, &apperror.Err{
-			Code:    "collection_missing",
-			Message: "Data must contain a 'collection' key",
-		}
-	}
-
-	resource := registry.Resource(resourceName)
-	if resource == nil {
-		return nil, &apperror.Err{
-			Code:    "unknown_resource",
-			Message: fmt.Sprintf("The resource %v is not registered", resourceName),
-		}
-	}
-	methodData.Resource = resource
-
-	if rawIds, ok := data["ids"].([]interface{}); ok {
-		ids := make([]string, 0)
-		for index, rawId := range rawIds {
-			id, ok := rawId.(string)
-			if !ok {
-				return nil, &apperror.Err{
-					Code:    "invalid_id",
-					Message: fmt.Sprintf("The %vth id '%v' must be a string", index, rawId),
-				}
-			}
-
-			ids = append(ids, id)
+var createMethod kit.Method = &Method{
+	Name:     "create",
+	Blocking: true,
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+		models := r.GetTransferData().GetModels()
+		if len(models) == 0 {
+			return kit.NewErrorResponse("no_model", "No model was found in the request.")
+		} else if len(models) > 1 {
+			return kit.NewErrorResponse("multiple_models", "Request contained more than one model.")
 		}
 
-		methodData.IDs = ids
-	}
-
-	if objectData, ok := data["objects"]; ok {
-		// Objects key exists, try to parse it.
-
-		if objects, ok := objectData.([]kit.Model); ok {
-			// Objects are already a model slice.
-			methodData.Objects = objects
-		} else {
-			// Try to unmarshal the data.
-			rawObjects, ok := data["objects"].([]interface{})
-			if !ok {
-				return nil, &apperror.Err{
-					Code:    "invalid_object_data",
-					Message: "Expected array in key 'objects'",
-				}
-			}
-
-			for index, rawObj := range rawObjects {
-				js, err := json.Marshal(rawObj)
-				if err != nil {
-					return nil, apperror.Wrap(err, "json_error")
-				}
-
-				model := resource.CreateModel()
-				if err := json.Unmarshal(js, model); err != nil {
-					return nil, apperror.Wrap(err, "json_unmarshal_error",
-						fmt.Sprintf("Could not unmarshal model %v", index))
-				}
-
-				methodData.Objects = append(methodData.Objects, model)
-			}
+		res := registry.Resource(models[0].Collection())
+		if res == nil || !res.IsPublic() {
+			return kit.NewErrorResponse("unknown_collection", fmt.Sprintf("The collection %v does not exist", models[0].Collection()))
 		}
-	}
 
-	// Build query.
-	if rawQuery, ok := data["query"].(map[string]interface{}); ok {
-		query, err := db.ParseQuery(resourceName, rawQuery)
+		return res.ApiCreate(models[0], r)
+	},
+}
+
+var updateMethod kit.Method = &Method{
+	Name:     "update",
+	Blocking: true,
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+		models := r.GetTransferData().GetModels()
+		if len(models) == 0 {
+			return kit.NewErrorResponse("no_model", "No model was found in the request.")
+		} else if len(models) > 1 {
+			return kit.NewErrorResponse("multiple_models", "Request contained more than one model.")
+		}
+
+		res := registry.Resource(models[0].Collection())
+		if res == nil || !res.IsPublic() {
+			return kit.NewErrorResponse("unknown_collection", fmt.Sprintf("The collection %v does not exist", models[0].Collection()))
+		}
+
+		return res.ApiUpdate(models[0], r)
+	},
+}
+
+var deleteMethod kit.Method = &Method{
+	Name:     "delete",
+	Blocking: true,
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+		data, _ := r.GetData().(map[string]interface{})
+		if data == nil {
+			return kit.NewErrorResponse("no_data", "No request data.")
+		}
+		collection, _ := data["collection"].(string)
+		id, _ := data["id"].(string)
+
+		if collection == "" {
+			return kit.NewErrorResponse("no_collection", "Expected 'collection' key in data")
+		} else if id == "" {
+			return kit.NewErrorResponse("no_id", "Expected 'id' key with string value in data")
+		}
+
+		res := registry.Resource(collection)
+		if res == nil || !res.IsPublic() {
+			return kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The collection %v does not exist", collection))
+		}
+
+		return res.ApiDelete(id, r)
+	},
+}
+
+var queryMethod kit.Method = &Method{
+	Name:     "query",
+	Blocking: false,
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+		// Build query.
+		data, _ := r.GetData().(map[string]interface{})
+		if data == nil {
+			return kit.NewErrorResponse("no_data", "No request data.")
+		}
+
+		rawQuery, _ := data["query"].(map[string]interface{})
+		if rawQuery == nil {
+			return kit.NewErrorResponse("no_query", "No query in request data.")
+		}
+
+		query, err := db.ParseQuery(rawQuery)
 		if err != nil {
-			return nil, apperror.Wrap(err, "invalid_query")
+			if err.IsPublic() {
+				return kit.NewErrorResponse(err)
+			} else {
+				return kit.NewErrorResponse("invalid_query", err)
+			}
 		}
-		methodData.Query = query
-	}
 
-	return methodData, nil
+		res := registry.Resource(query.GetCollection())
+		if res == nil {
+			return kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The collection %v does not exist", query.GetCollection()))
+		}
+
+		return res.ApiFind(query, r)
+	},
 }
 
-func createMethod() kit.Method {
-	return &Method{
-		Name:     "create",
-		Blocking: true,
-		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(registry, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
-			}
+var findOneMethod kit.Method = &Method{
+	Name:     "find_one",
+	Blocking: false,
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+		data, _ := r.GetData().(map[string]interface{})
+		if data == nil {
+			return kit.NewErrorResponse("no_data", "No request data.")
+		}
+		collection, _ := data["collection"].(string)
+		id, _ := data["id"].(string)
 
-			if methodData.Objects == nil || len(methodData.Objects) < 1 {
-				return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
-			}
-			if len(methodData.Objects) != 1 {
-				return kit.NewErrorResponse("only_one_object_allowed", "")
-			}
+		if collection == "" {
+			return kit.NewErrorResponse("no_collection", "Expected 'collection' key in data")
+		} else if id == "" {
+			return kit.NewErrorResponse("no_id", "Expected 'id' key with string value in data")
+		}
 
-			return methodData.Resource.ApiCreate(methodData.Objects[0], r)
-		},
-	}
-}
+		res := registry.Resource(collection)
+		if res == nil || !res.IsPublic() {
+			return kit.NewErrorResponse("unknown_resource", fmt.Sprintf("The collection %v does not exist", collection))
+		}
 
-func updateMethod() kit.Method {
-	return &Method{
-		Name:     "update",
-		Blocking: true,
-		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(registry, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
-			}
-
-			if methodData.Objects == nil || len(methodData.Objects) < 1 {
-				return kit.NewErrorResponse("no_objects", "No objects sent in data.objects")
-			}
-			if len(methodData.Objects) != 1 {
-				return kit.NewErrorResponse("only_one_object_allowed", "")
-			}
-
-			return methodData.Resource.ApiUpdate(methodData.Objects[0], r)
-		},
-	}
-}
-
-func deleteMethod() kit.Method {
-	return &Method{
-		Name:     "delete",
-		Blocking: true,
-		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(registry, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
-			}
-
-			if methodData.IDs == nil || len(methodData.IDs) < 1 {
-				return kit.NewErrorResponse("no_ids", "No ids sent in data.ids")
-			}
-			if len(methodData.IDs) != 1 {
-				return kit.NewErrorResponse("only_one_object_allowed", "")
-			}
-
-			return methodData.Resource.ApiDelete(methodData.IDs[0], r)
-		},
-	}
-}
-
-func queryMethod() kit.Method {
-	return &Method{
-		Name:     "query",
-		Blocking: false,
-		Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
-			methodData, err := buildResourceMethodData(registry, r.GetData())
-			if err != nil {
-				return &kit.AppResponse{
-					Error: err,
-				}
-			}
-
-			if methodData.Query == nil {
-				return kit.NewErrorResponse("no_query", "No query sent")
-			}
-
-			return methodData.Resource.ApiFind(methodData.Query, r)
-		},
-	}
+		return res.ApiFindOne(id, r)
+	},
 }

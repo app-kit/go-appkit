@@ -758,12 +758,12 @@ func (h *Service) VerifySession(token string) (kit.User, kit.Session, apperror.E
 	if err != nil {
 		return nil, nil, err
 	} else if rawSession == nil {
-		return nil, nil, apperror.New("session_not_found")
+		return nil, nil, apperror.New("session_not_found", true)
 	}
 	session := rawSession.(kit.Session)
 
 	if session.GetValidUntil().Sub(time.Now()) < 1 {
-		return nil, nil, apperror.New("session_expired")
+		return nil, nil, apperror.New("session_expired", true)
 	}
 
 	var user kit.User
@@ -777,7 +777,7 @@ func (h *Service) VerifySession(token string) (kit.User, kit.Session, apperror.E
 		user = rawUser.(kit.User)
 
 		if !user.IsActive() {
-			return nil, nil, apperror.New("user_inactive")
+			return nil, nil, apperror.New("user_inactive", true)
 		}
 	}
 

@@ -165,7 +165,7 @@ func (_ FilesResource) ApiCreate(res kit.Resource, obj kit.Model, r kit.Request)
 	// Build the file, save it to backend and persist it to the db.
 	err := res.Registry().FileService().BuildFile(file, r.GetUser(), true, true)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		kit.NewErrorResponse(err)
 	}
 
 	return &kit.AppResponse{
@@ -553,7 +553,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		if err == nil {
 			files, err = handleUpload(registry, tmpPath, r.GetHttpRequest())
 			if err != nil {
-				return &kit.AppResponse{Error: err}, false
+				return kit.NewErrorResponse(err), false
 			}
 		}
 
@@ -570,9 +570,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		file, err := registry.FileService().FindOne(r.GetContext().String("id"))
 
 		if err != nil {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
+			return kit.NewErrorResponse(err), false
 		}
 
 		if file == nil {
@@ -584,9 +582,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 
 		reader, err := file.Reader()
 		if err != nil {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
+			return kit.NewErrorResponse(err), false
 		}
 		defer reader.Close()
 
@@ -607,9 +603,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 	serveImageHandler := func(registry kit.Registry, r kit.Request) (kit.Response, bool) {
 		file, err := registry.FileService().FindOne(r.GetContext().String("id"))
 		if err != nil {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
+			return kit.NewErrorResponse(err), false
 		}
 
 		if file == nil {
@@ -658,9 +652,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 
 		reader, size, err := hooks.getImageReader(registry, thumbDir, file, width, height, filters, ip)
 		if err != nil {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
+			return kit.NewErrorResponse(err), false
 		}
 
 		w := r.GetHttpResponseWriter()

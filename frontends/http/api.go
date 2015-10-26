@@ -137,7 +137,7 @@ func serverRenderer(registry kit.Registry, r kit.Request) kit.Response {
 
 	content, err2 := utils.ReadFile(filePath)
 	if err2 != nil {
-		return &kit.AppResponse{Error: err2}
+		return kit.NewErrorResponse(err2)
 	}
 
 	// Find http status code.
@@ -260,9 +260,7 @@ func notFoundHandler(registry kit.Registry, r kit.Request) (kit.Response, bool) 
 	if !isApiRequest {
 		tpl, err := getIndexTpl(registry)
 		if err != nil {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
+			return kit.NewErrorResponse(err), false
 		}
 		return &kit.AppResponse{
 			RawData: tpl,
@@ -381,7 +379,7 @@ func HttpHandler(w http.ResponseWriter, r *http.Request, params httprouter.Param
 	methods := config.UString("accessControl.allowedMethods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
 	header.Set("Access-Control-Allow-Methods", methods)
 
-	allowedHeaders := config.UString("accessControl.allowedHeaders", "Authentication, Content-Type")
+	allowedHeaders := config.UString("accessControl.allowedHeaders", "Authentication, Content-Type, X-Requested-With, Accept, Accept-Language, Content-Language")
 	header.Set("Access-Control-Allow-Headers", allowedHeaders)
 
 	// If it is an options request, just respond with 200.
@@ -529,9 +527,7 @@ func AuthenticationMiddleware(registry kit.Registry, r kit.Request) (kit.Respons
 
 			return nil, false
 		} else {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
+			return kit.NewErrorResponse(err), false
 		}
 	}
 

@@ -164,7 +164,6 @@ func (f *Frontend) Init() apperror.Error {
 
 	// Register websocket handler.
 	httpFrontend.Router().Handle("GET", path, func(w http.ResponseWriter, req *http.Request, params httprouter.Params) {
-		fmt.Printf("Handling wamp request")
 		req.Header["Origin"] = nil
 		server.ServeHTTP(w, req)
 	})
@@ -207,19 +206,25 @@ func (f *Frontend) registerMethod(method kit.Method) {
 		request.SetPath("/method/" + methodName)
 		request.SetData(kwargs)
 
+		var response kit.Response
+
 		// Find session.
 		sessionId := uint(details["session_id"].(turnpike.ID))
 		session := f.sessions[sessionId]
 		if session == nil {
-			panic("WAMP: could not find session")
-		}
-		request.SetSession(session)
-		if session.GetUser() != nil {
-			fmt.Printf("\n\nSESSION USER: %v\n\n", session.GetUser())
-			request.SetUser(session.GetUser())
+			s, err := f.registry.UserService().StartSession(nil, "wamp")
+			if err != nil {
+				response = kit.NewErrorResponse(err)
+			} else {
+				f.sessions[sessionId] = s
+				session = s
+			}
 		}
 
-		var response kit.Response
+		request.SetSession(session)
+		if session.GetUser() != nil {
+			request.SetUser(session.GetUser())
+		}
 
 		// Run before middlewares.
 		for _, middleware := range f.beforeMiddlewares {
@@ -256,8 +261,6 @@ func (f *Frontend) registerMethod(method kit.Method) {
 				response = resp
 			}
 		}
-
-		fmt.Printf("wamp response: %+v\n", response)
 
 		return &turnpike.CallResult{Kwargs: response.GetData().(map[string]interface{})}
 	}, nil)

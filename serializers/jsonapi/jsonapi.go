@@ -18,21 +18,71 @@ type ApiError struct {
 }
 
 type ApiData struct {
-	Data     interface{}            `json:"data,omitempty"`
+	Data     interface{}            `json:"data"`
 	Included []*ApiModel            `json:"included,omitempty"`
 	Meta     map[string]interface{} `json:"meta,omitempty"`
 	Errors   []*ApiError            `json:"errors,omitempty"`
 }
 
-func (d ApiData) ToMap() map[string]interface{} {
-	// Todo: fix this ugly hack.
+func (d *ApiData) AddModel(s *Serializer, models ...kit.Model) apperror.Error {
+	collection := ""
+	for _, m := range models {
+		modelCol := m.Collection()
+		// Check that all models have the same collection.
+		if collection == "" {
+			collection = modelCol
+		} else if modelCol != collection {
+			return apperror.New("mixed_model_response", "The JSONAPI serializer does not allow different model collections in main data")
+		}
 
-	js, _ := json.Marshal(d)
-	var m map[string]interface{}
+		// Find backend.
+		backend := s.findBackend(modelCol)
+		if backend == nil {
+			return apperror.New("unknown_model_collection", fmt.Sprintf("Can't serialize model of unknown collection %v", modelCol))
+		}
 
-	json.Unmarshal(js, &m)
+		model, included, err := SerializeModel(backend, m)
+		if err != nil {
+			return err
+		}
 
-	return m
+		if d.Data == nil {
+			// Data is still empty, just set the model.
+			d.Data = model
+		} else if slice, ok := d.Data.([]interface{}); ok {
+			// Data is a slice, so append model.
+			slice = append(slice, model)
+			d.Data = slice
+		} else {
+			// Data is not empty, assumed to be another model.
+			// So convert into a slice.
+			slice := make([]interface{}, 0)
+			slice = append(slice, d.Data, model)
+			d.Data = slice
+		}
+
+		d.Included = append(d.Included, included...)
+	}
+
+	return nil
+}
+
+func (d *ApiData) AddIncludedModel(s *Serializer, models ...kit.Model) apperror.Error {
+	for _, m := range models {
+		// Find backend.
+		backend := s.findBackend(m.Collection())
+		if backend == nil {
+			return apperror.New("unknown_model_collection", fmt.Sprintf("Can't serialize model of unknown collection %v", m.Collection()))
+		}
+
+		model, included, err := SerializeModel(backend, m)
+		if err != nil {
+			return err
+		}
+		d.Included = append(d.Included, model)
+		d.Included = append(d.Included, included...)
+	}
+	return nil
 }
 
 func (d *ApiData) ReduceIncludedDuplicates() {
@@ -52,6 +102,25 @@ func (d *ApiData) ReduceIncludedDuplicates() {
 	}
 
 	d.Included = cleanedModels
+}
+
+func (d *ApiData) AddError(errs ...apperror.Error) {
+	for _, err := range errs {
+		d.Errors = append(d.Errors, SerializeError(err)...)
+	}
+}
+
+func (d ApiData) ToMap() map[string]interface{} {
+	if len(d.Included) < 1 {
+		d.Included = nil
+	}
+
+	// Todo: fix this ugly hack.
+	js, _ := json.Marshal(d)
+	var m map[string]interface{}
+	json.Unmarshal(js, &m)
+
+	return m
 }
 
 type ApiModelData struct {
@@ -396,6 +465,7 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 		if _, ok := data["type"].(string); !ok && collection != "" {
 			data["type"] = collection
 		}
+		data["type"] = strings.Replace(data["type"].(string), "-", "_", -1)
 	}
 
 	data, err := ApiModelFromMap(rawData)
@@ -595,86 +665,91 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 	return model, nil
 }
 
-// SerializeResponse converts a response with model data into the target format.
-func (s *Serializer) SerializeResponse(response kit.Response) (interface{}, apperror.Error) {
-	apiResponse := &ApiData{}
+func (s *Serializer) SerializeTransferData(transData kit.TransferData) (interface{}, apperror.Error) {
+	apiData := &ApiData{}
 
-	if err := response.GetError(); err != nil {
-		apiResponse.Errors = SerializeError(err)
-	}
-
-	var modelData interface{}
-	var included []*ApiModel
-	var err apperror.Error
-
-	if data := response.GetData(); data != nil {
-		if model, ok := data.(kit.Model); ok {
-			// Find backend.
-			backend := s.findBackend(model.Collection())
-			if backend == nil {
-				return nil, apperror.New("unknown_model_collection", fmt.Sprintf("Can't serialize unknown collection %v", model.Collection()))
-			}
-
-			// Serialize the model.
-			modelData, included, err = SerializeModel(backend, model)
-		} else if models, ok := data.([]kit.Model); ok {
-			if len(models) > 0 {
-				// Find backend.
-				backend := s.findBackend(models[0].Collection())
-				if backend == nil {
-					return nil, apperror.New("unknown_model_collection", fmt.Sprintf("Can't serialize model of unknown collection %v", model.Collection()))
-				}
-
-				// Serialize the models.
-				modelData, included, err = SerializeModels(backend, models)
-			} else {
-				modelData = make([]interface{}, 0)
+	// Handle models and data.
+	data := transData.GetData()
+	models := transData.GetModels()
+	if models != nil {
+		if data != nil {
+			return nil, apperror.New("unallowed_extra_data", "JSONAPI serialzier does not allow both 'Data' and 'Models' to be present", true)
+		}
+		if len(models) > 0 {
+			if err := apiData.AddModel(s, transData.GetModels()...); err != nil {
+				return nil, err
 			}
 		} else {
-			// Data is not a model or a slice of models, so just include the plain data.
-			modelData = data
+			// If empty models array is supplied, make sure that result data
+			// contains an emtpy array.
+			apiData.Data = []kit.Model{}
+		}
+	} else {
+		apiData.Data = data
+	}
+
+	// Ensure that data is a map.
+	if apiData.Data == nil {
+		apiData.Data = map[string]interface{}{}
+	}
+
+	// Handle extra models.
+	if err := apiData.AddIncludedModel(s, transData.GetExtraModels()...); err != nil {
+		return nil, err
+	}
+	// Remove duplicates from included data.
+	apiData.ReduceIncludedDuplicates()
+
+	// Handle metadata.
+	apiData.Meta = transData.GetMeta()
+
+	// Handle Errors.
+	apiData.AddError(transData.GetErrors()...)
+
+	return apiData.ToMap(), nil
+}
+
+// SerializeResponse converts a response with model data into the target format.
+func (s *Serializer) SerializeResponse(response kit.Response) (interface{}, apperror.Error) {
+	transData := response.GetTransferData()
+	if transData == nil {
+		transData = &kit.AppTransferData{}
+
+		data := response.GetData()
+		if model, ok := data.(kit.Model); ok {
+			transData.SetModels([]kit.Model{model})
+		} else if models, ok := data.([]kit.Model); ok {
+			transData.SetModels(models)
+		} else {
+			transData.SetData(data)
 		}
 	}
 
+	// Append response metadata.
+	if meta := response.GetMeta(); meta != nil {
+		transMeta := transData.GetMeta()
+		if transMeta != nil {
+			for key, val := range meta {
+				transMeta[key] = val
+			}
+		} else {
+			transData.SetMeta(meta)
+		}
+	}
+
+	// If a response error is defined, prepend it to all errors that might have been in
+	// TransferData.
+	if err := response.GetError(); err != nil {
+		oldErrs := transData.GetErrors()
+		transData.SetErrors(append([]apperror.Error{err}, oldErrs...))
+	}
+
+	data, err := s.SerializeTransferData(transData)
 	if err != nil {
 		return nil, err
 	}
 
-	meta := response.GetMeta()
-
-	// Check meta for modeldata to include.
-	if meta != nil {
-		for key, val := range meta {
-			if model, ok := val.(kit.Model); ok {
-				backend := s.findBackend(model.Collection())
-				if backend == nil {
-					return nil, apperror.New("unknown_model_collection", fmt.Sprintf("Can't serialize model of unknown collection %v", model.Collection()))
-				}
-
-				data, metaIncluded, err := SerializeModel(backend, model)
-				if err != nil {
-					return nil, err
-				}
-
-				included = append(included, data)
-				included = append(included, metaIncluded...)
-
-				// Delete model from meta.
-				delete(meta, key)
-			}
-		}
-
-		// Set remaining meta data.
-		apiResponse.Meta = meta
-	}
-
-	apiResponse.Data = modelData
-	apiResponse.Included = included
-
-	// Remove duplicates from included data.
-	apiResponse.ReduceIncludedDuplicates()
-
-	return apiResponse.ToMap(), nil
+	return data, nil
 }
 
 func (s *Serializer) MustSerializeResponse(response kit.Response) interface{} {
@@ -684,35 +759,35 @@ func (s *Serializer) MustSerializeResponse(response kit.Response) interface{} {
 			Errors: SerializeError(err),
 		}
 	}
-
 	return data
 }
 
-// UnserializeRequest converts request data into a request object.
-func (s *Serializer) UnserializeRequest(rawData interface{}, request kit.Request) apperror.Error {
+func (s *Serializer) UnserializeTransferData(rawData interface{}) (kit.TransferData, apperror.Error) {
 	if rawData == nil {
-		return nil
+		return nil, nil
 	}
-
 	allData, ok := rawData.(map[string]interface{})
 	if !ok {
-		return apperror.New("invalid_data", "Invalid request data: dict expected", true)
+		return nil, apperror.New("invalid_data", "Invalid request data: dict expected", true)
 	}
 
-	// Handle model data.
+	transData := &kit.AppTransferData{}
+
+	// Handle data.
 	if data, ok := allData["data"]; ok {
 		// Handle map data.
 		if mapData, ok := data.(map[string]interface{}); ok {
 			// Check if data looks like model data.
 			if _, ok := mapData["type"]; ok {
+				// Data looks like a model, so try to unserialize.
 				model, err := s.UnserializeModel("", mapData)
 				if err != nil {
-					return err
+					return nil, err
 				}
-				request.SetData(model)
+				transData.SetModels([]kit.Model{model})
 			} else {
-				// Assume regular data.
-				request.SetData(mapData)
+				// Assume regular non-model data.
+				transData.SetData(mapData)
 			}
 		} else if sliceData, ok := data.([]interface{}); ok {
 			// Data looks like slice of models.
@@ -721,13 +796,32 @@ func (s *Serializer) UnserializeRequest(rawData interface{}, request kit.Request
 			for _, item := range sliceData {
 				model, err := s.UnserializeModel("", item)
 				if err != nil {
-					return err
+					return nil, err
 				}
 
 				models = append(models, model)
 			}
 
-			request.SetData(models)
+			transData.SetModels(models)
+		} else {
+			// Non-model data which is not a map.
+			transData.SetData(data)
+		}
+	}
+
+	// Handle included models.
+	if rawIncluded, ok := allData["included"]; ok && rawIncluded != nil {
+		included, ok := rawIncluded.([]interface{})
+		if !ok {
+			return nil, apperror.New("invalid_included_models", "'included' key must be an array", true)
+		}
+
+		for _, m := range included {
+			model, err := s.UnserializeModel("", m)
+			if err != nil {
+				return nil, err
+			}
+			transData.ExtraModels = append(transData.ExtraModels, model)
 		}
 	}
 
@@ -735,11 +829,22 @@ func (s *Serializer) UnserializeRequest(rawData interface{}, request kit.Request
 	if rawMeta, ok := allData["meta"]; ok && rawMeta != nil {
 		meta, ok := rawMeta.(map[string]interface{})
 		if !ok {
-			return apperror.New("invalid_metadata", "Invalid metadata: dict expected", true)
+			return nil, apperror.New("invalid_metadata", "Invalid metadata: dict expected", true)
 		}
 
-		request.SetMeta(kit.NewContext(meta))
+		transData.SetMeta(meta)
 	}
 
+	return transData, nil
+}
+
+// UnserializeRequest converts request data into a request object.
+func (s *Serializer) UnserializeRequest(rawData interface{}, request kit.Request) apperror.Error {
+	transData, err := s.UnserializeTransferData(rawData)
+	if err != nil {
+		return err
+	}
+	request.SetTransferData(transData)
+	request.SetData(transData.GetData())
 	return nil
 }

@@ -299,6 +299,23 @@ type AuthAdaptor interface {
  * Api interfaces.
  */
 
+type TransferData interface {
+	GetData() interface{}
+	SetData(data interface{})
+
+	GetModels() []Model
+	SetModels(models []Model)
+
+	GetExtraModels() []Model
+	SetExtraModels(models []Model)
+
+	GetMeta() map[string]interface{}
+	SetMeta(meta map[string]interface{})
+
+	GetErrors() []apperror.Error
+	SetErrors(errors []apperror.Error)
+}
+
 type Request interface {
 	// GetFrontend returns the name of the frontend this request is from.
 	GetFrontend() string
@@ -313,8 +330,11 @@ type Request interface {
 	GetContext() *Context
 	SetContext(context *Context)
 
+	GetTransferData() TransferData
+	SetTransferData(data TransferData)
+
+	// Convenience helper for .GetTransferData().GetMeta().
 	GetMeta() *Context
-	SetMeta(meta *Context)
 
 	GetData() interface{}
 	SetData(data interface{})
@@ -349,7 +369,10 @@ type Response interface {
 	SetHttpStatus(int)
 
 	GetMeta() map[string]interface{}
-	SetMeta(map[string]interface{})
+	SetMeta(meta map[string]interface{})
+
+	GetTransferData() TransferData
+	SetTransferData(data TransferData)
 
 	GetData() interface{}
 	SetData(interface{})
@@ -384,6 +407,9 @@ type Serializer interface {
 	// collection argument is optional, but has to be supplied if the
 	// collection can not be extracted from data.
 	UnserializeModel(collection string, data interface{}) (Model, apperror.Error)
+
+	SerializeTransferData(data TransferData) (interface{}, apperror.Error)
+	UnserializeTransferData(data interface{}) (TransferData, apperror.Error)
 
 	// SerializeResponse converts a response with model data into the target format.
 	SerializeResponse(response Response) (interface{}, apperror.Error)

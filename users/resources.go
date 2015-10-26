@@ -53,7 +53,7 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 
 	user, session, err := userService.VerifySession(rawId)
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	meta := make(map[string]interface{})
@@ -61,14 +61,14 @@ func (SessionResourceHooks) ApiFindOne(res kit.Resource, rawId string, r kit.Req
 	if user != nil {
 		userData, err := res.Backend().ModelToMap(user, true, false)
 		if err != nil {
-			return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
+			return kit.NewErrorResponse("marshal_error", err)
 		}
 		meta["user"] = userData
 
 		if user.GetProfile() != nil {
 			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true, false)
 			if err != nil {
-				return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
+				return kit.NewErrorResponse("marshal_error", err)
 			}
 			meta["profile"] = profileData
 		}
@@ -91,7 +91,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 	// Find user.
 	userIdentifier := meta.String("user")
 	adaptor := meta.String("adaptor")
-	data, _ := meta.Map("auth-data")
+	data, _ := meta.Map("authData")
 
 	var user kit.User
 	if !isAnonymous {
@@ -100,7 +100,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 		}
 
 		if data == nil {
-			kit.NewErrorResponse("no_or_invalid_auth_data", "Expected 'auth-data' dictionary in metadata.")
+			kit.NewErrorResponse("no_or_invalid_auth_data", "Expected 'authData' dictionary in metadata.")
 		}
 
 		var err apperror.Error
@@ -112,7 +112,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 
 	session, err := userService.StartSession(user, r.GetFrontend())
 	if err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	responseMeta := make(map[string]interface{})
@@ -120,14 +120,14 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 	if !isAnonymous {
 		userData, err := res.Backend().ModelToMap(user, true, false)
 		if err != nil {
-			return &kit.AppResponse{Error: apperror.New("marshal_error", err)}
+			return kit.NewErrorResponse("marshal_error", err)
 		}
 		responseMeta["user"] = userData
 
 		if user.GetProfile() != nil {
 			profileData, err := res.Backend().ModelToMap(user.GetProfile(), true, false)
 			if err != nil {
-				return &kit.AppResponse{Error: apperror.New("marshal_error", true, err)}
+				return kit.NewErrorResponse("marshal_error", err)
 			}
 			responseMeta["profile"] = profileData
 		}
@@ -145,7 +145,7 @@ func (SessionResourceHooks) ApiDelete(res kit.Resource, id string, r kit.Request
 	}
 
 	if err := res.Backend().Delete(r.GetSession()); err != nil {
-		return &kit.AppResponse{Error: apperror.Wrap(err, "db_delete_error", true)}
+		return kit.NewErrorResponse("db_delete_error", err, true)
 	}
 
 	return &kit.AppResponse{}
@@ -226,7 +226,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 
 			rawUser, err := res.Q().Filter("email", userIdentifier).Or("username", userIdentifier).First()
 			if err != nil {
-				return &kit.AppResponse{Error: err}
+				return kit.NewErrorResponse(err)
 			}
 			if rawUser == nil {
 				return kit.NewErrorResponse("unknown_user", fmt.Sprintf("The user %v does not exist", userIdentifier), true)
@@ -275,7 +275,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			user, err := registry.UserService().ResetPassword(token, newPw)
 			if err != nil {
 				if err.IsPublic() {
-					return &kit.AppResponse{Error: err}
+					return kit.NewErrorResponse(err)
 				} else {
 					return kit.NewErrorResponse("password_reset_failed", "Could not reset the password.", true)
 				}
@@ -333,7 +333,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			targetUser := rawUser.(kit.User)
 
 			if err := userService.ChangePassword(targetUser, password); err != nil {
-				return &kit.AppResponse{Error: err}
+				return kit.NewErrorResponse(err)
 			}
 
 			// Everything worked fine.
@@ -345,6 +345,9 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 
 	return []kit.Method{
 		AuthenticateMethod,
+		ResumeSessionMethod,
+		UnAuthenticateMethod,
+
 		sendConfirmationEmail,
 		confirmEmail,
 		requestPwReset,
@@ -360,9 +363,9 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 		return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.", true)
 	}
 
-	rawData, ok := meta.Get("auth-data")
+	rawData, ok := meta.Get("authData")
 	if !ok {
-		return kit.NewErrorResponse("auth_data_missing", "Expected 'auth-data' in metadata.", true)
+		return kit.NewErrorResponse("auth_data_missing", "Expected 'authData' in metadata.", true)
 	}
 
 	data, ok := rawData.(map[string]interface{})
@@ -385,9 +388,7 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 				// Update profile with data.
 				info := res.Backend().ModelInfo(profile.Collection())
 				if err := db.UpdateModelFromData(info, profile, data); err != nil {
-					return &kit.AppResponse{
-						Error: apperror.Wrap(err, "invalid_profile_data", "Invalid profile data.", true),
-					}
+					return kit.NewErrorResponse("invalid_profile_data", "Invalid profile data.", err, true)
 				}
 			}
 		}
@@ -396,7 +397,7 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 	}
 
 	if err := service.CreateUser(user, adaptor, data); err != nil {
-		return &kit.AppResponse{Error: err}
+		return kit.NewErrorResponse(err)
 	}
 
 	return &kit.AppResponse{

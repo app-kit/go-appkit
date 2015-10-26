@@ -83,8 +83,6 @@ func (f *Frontend) AfterMiddlewares() []kit.AfterRequestMiddleware {
 func (f *Frontend) Init() apperror.Error {
 	// Register route for method calls.
 	methodHandler := func(registry kit.Registry, r kit.Request) (kit.Response, bool) {
-		r.ParseJsonData()
-
 		var response kit.Response
 
 		responder := func(r kit.Response) {
@@ -95,9 +93,7 @@ func (f *Frontend) Init() apperror.Error {
 
 		finishedChannel, err := registry.App().RunMethod(method, r, responder, true)
 		if err != nil {
-			return &kit.AppResponse{
-				Error: err,
-			}, false
+			return kit.NewErrorResponse(err), false
 		}
 		<-finishedChannel
 

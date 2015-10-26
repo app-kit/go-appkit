@@ -9,16 +9,67 @@ import (
 	"github.com/theduke/go-apperror"
 )
 
+type AppTransferData struct {
+	Data        interface{}
+	Models      []Model
+	ExtraModels []Model
+	Meta        map[string]interface{}
+	Errors      []apperror.Error
+}
+
+// Ensure AppTransferData implements TransferData.
+var _ TransferData = (*AppTransferData)(nil)
+
+func (d *AppTransferData) GetData() interface{} {
+	return d.Data
+}
+
+func (d *AppTransferData) SetData(x interface{}) {
+	d.Data = x
+}
+
+func (d *AppTransferData) GetModels() []Model {
+	return d.Models
+}
+
+func (d *AppTransferData) SetModels(x []Model) {
+	d.Models = x
+}
+
+func (d *AppTransferData) GetExtraModels() []Model {
+	return d.ExtraModels
+}
+
+func (d *AppTransferData) SetExtraModels(x []Model) {
+	d.ExtraModels = x
+}
+
+func (d *AppTransferData) GetMeta() map[string]interface{} {
+	return d.Meta
+}
+
+func (d *AppTransferData) SetMeta(x map[string]interface{}) {
+	d.Meta = x
+}
+
+func (d *AppTransferData) GetErrors() []apperror.Error {
+	return d.Errors
+}
+
+func (d *AppTransferData) SetErrors(x []apperror.Error) {
+	d.Errors = x
+}
+
 type AppRequest struct {
 	Frontend   string
 	Path       string
 	HttpMethod string
 
 	Context *Context
-	Meta    *Context
 
-	RawData []byte
-	Data    interface{}
+	RawData      []byte
+	Data         interface{}
+	TransferData TransferData
 
 	User    User
 	Session Session
@@ -30,9 +81,17 @@ type AppRequest struct {
 func NewRequest() *AppRequest {
 	r := AppRequest{}
 	r.Context = NewContext()
-	r.Meta = NewContext()
 
 	return &r
+}
+
+func (r *AppRequest) GetMeta() *Context {
+	td := r.GetTransferData()
+	if td == nil {
+		return NewContext()
+	} else {
+		return NewContext(td.GetMeta())
+	}
 }
 
 func (r *AppRequest) GetFrontend() string {
@@ -83,12 +142,12 @@ func (r *AppRequest) SetContext(x *Context) {
 	r.Context = x
 }
 
-func (r *AppRequest) GetMeta() *Context {
-	return r.Meta
+func (r *AppRequest) GetTransferData() TransferData {
+	return r.TransferData
 }
 
-func (r *AppRequest) SetMeta(x *Context) {
-	r.Meta = x
+func (r *AppRequest) SetTransferData(x TransferData) {
+	r.TransferData = x
 }
 
 func (r *AppRequest) GetData() interface{} {
@@ -167,7 +226,8 @@ func (r *AppRequest) ParseJsonData() apperror.Error {
 
 // Unserialize converts the raw request data with the given serializer.
 func (r *AppRequest) Unserialize(serializer Serializer) apperror.Error {
-	return serializer.UnserializeRequest(r.Data, r)
+	err := serializer.UnserializeRequest(r.Data, r)
+	return err
 }
 
 type AppResponse struct {
@@ -176,6 +236,7 @@ type AppResponse struct {
 
 	Meta map[string]interface{}
 
+	TransferData  TransferData
 	Data          interface{}
 	RawData       []byte
 	RawDataReader io.ReadCloser
@@ -199,6 +260,14 @@ func (r *AppResponse) GetMeta() map[string]interface{} {
 
 func (r *AppResponse) SetMeta(m map[string]interface{}) {
 	r.Meta = m
+}
+
+func (r *AppResponse) GetTransferData() TransferData {
+	return r.TransferData
+}
+
+func (r *AppResponse) SetTransferData(x TransferData) {
+	r.TransferData = x
 }
 
 func (r *AppResponse) GetData() interface{} {

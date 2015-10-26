@@ -101,10 +101,11 @@ func (a *App) Defaults() {
 }
 
 func (a *App) BuildDefaultMethods() {
-	a.RegisterMethod(createMethod())
-	a.RegisterMethod(updateMethod())
-	a.RegisterMethod(deleteMethod())
-	a.RegisterMethod(queryMethod())
+	a.RegisterMethod(createMethod)
+	a.RegisterMethod(updateMethod)
+	a.RegisterMethod(deleteMethod)
+	a.RegisterMethod(queryMethod)
+	a.RegisterMethod(findOneMethod)
 }
 
 func (a *App) BuildDefaultFrontends() {

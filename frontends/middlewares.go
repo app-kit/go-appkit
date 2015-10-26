@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/Sirupsen/logrus"
-	"github.com/theduke/go-apperror"
 
 	kit "github.com/theduke/go-appkit"
 )
@@ -33,12 +32,21 @@ func SerializeResponseMiddleware(registry kit.Registry, request kit.Request, res
 	if name := request.GetContext().String("response-serializer"); name != "" {
 		serializer = registry.Serializer(name)
 		if serializer == nil {
-			errResp := &kit.AppResponse{Error: apperror.New("unknown_response_serializer", true)}
+			errResp := kit.NewErrorResponse("unknown_response_serializer", true)
 			data := serializer.MustSerializeResponse(errResp)
 			errResp.SetData(data)
 			return errResp, false
 		}
 	}
+
+	// Set format in metadata.
+	meta := response.GetMeta()
+	if meta == nil {
+		meta = make(map[string]interface{})
+	}
+
+	meta["format"] = serializer.Name()
+	response.SetMeta(meta)
 
 	data := serializer.MustSerializeResponse(response)
 	response.SetData(data)

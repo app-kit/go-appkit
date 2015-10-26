@@ -1,9 +1,6 @@
 package users
 
 import (
-	"fmt"
-	"reflect"
-
 	//"github.com/theduke/go-apperror"
 	kit "github.com/theduke/go-appkit"
 	"github.com/theduke/go-appkit/app/methods"
@@ -13,8 +10,6 @@ var AuthenticateMethod kit.Method = &methods.Method{
 	Name:     "users.authenticate",
 	Blocking: true,
 	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
-		fmt.Printf("\nuser: %+v\n", reflect.TypeOf(r.GetUser()))
-
 		if r.GetUser() != nil {
 			return kit.NewErrorResponse("already_authenticated", "Can't authenticate a session which is already authenticated", true)
 		}
@@ -33,9 +28,9 @@ var AuthenticateMethod kit.Method = &methods.Method{
 			return kit.NewErrorResponse("adaptor_missing", "Expected 'adaptor' in metadata.", true)
 		}
 
-		authData, _ := data["auth-data"].(map[string]interface{})
+		authData, _ := data["authData"].(map[string]interface{})
 		if authData == nil {
-			kit.NewErrorResponse("no_or_invalid_auth_data", "Expected 'auth-data' dictionary in metadata.")
+			kit.NewErrorResponse("no_or_invalid_auth_data", "Expected 'authData' dictionary in metadata.")
 		}
 
 		userService := registry.UserService()
@@ -46,27 +41,72 @@ var AuthenticateMethod kit.Method = &methods.Method{
 
 		session := r.GetSession()
 
-		if session != nil {
-			// Already have a session, so update it.
-			if err := session.SetUserID(user.GetID()); err != nil {
-				return kit.NewErrorResponse(err)
-			}
-			if err := userService.SessionResource().Update(session, user); err != nil {
-				return kit.NewErrorResponse(err)
-			}
-		} else {
-			session, err = userService.StartSession(user, r.GetFrontend())
-			if err != nil {
-				return kit.NewErrorResponse(err)
-			}
+		// Already have a session, so update it.
+		if err := session.SetUserID(user.GetID()); err != nil {
+			return kit.NewErrorResponse(err)
+		}
+		if err := userService.SessionResource().Update(session, user); err != nil {
+			return kit.NewErrorResponse(err)
 		}
 
-		// Set user in session to include it in serialized response.
-		// Also required for wamp backend.
+		// Update session with user to include it in response, and also to
+		// update the session in case it is persistent (eg in wamp frontend).
 		session.SetUser(user)
 
 		return &kit.AppResponse{
 			Data: session,
+		}
+	},
+}
+
+var ResumeSessionMethod kit.Method = &methods.Method{
+	Name:     "users.resume_session",
+	Blocking: true,
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+		registry.Logger().Infof("data: %v", r.GetData())
+		data, _ := r.GetData().(map[string]interface{})
+		token, _ := data["token"].(string)
+
+		if token == "" {
+			return kit.NewErrorResponse("no_token", "Expected 'token' in data.", true)
+		}
+
+		user, session, err := registry.UserService().VerifySession(token)
+		if err != nil {
+			return kit.NewErrorResponse(err)
+		}
+
+		// Update session with user to include it in response, and also to
+		// update the session in case it is persistent (eg in wamp frontend).
+		session.SetUser(user)
+
+		curSession := r.GetSession()
+		curSession.SetToken(token)
+		curSession.SetValidUntil(session.GetValidUntil())
+		curSession.SetUser(user)
+
+		return &kit.AppResponse{
+			Data: session,
+		}
+	},
+}
+
+var UnAuthenticateMethod kit.Method = &methods.Method{
+	Name:     "users.unauthenticate",
+	Blocking: true,
+	Handler: func(registry kit.Registry, r kit.Request, unblock func()) kit.Response {
+		if r.GetUser() == nil {
+			return kit.NewErrorResponse("not_authenticated", "Can't un-authenticate a session which is not authenticated", true)
+		}
+
+		session := r.GetSession()
+		session.SetUser(nil)
+		if err := registry.UserService().SessionResource().Update(session, r.GetUser()); err != nil {
+			return kit.NewErrorResponse(err)
+		}
+
+		return &kit.AppResponse{
+			Data: map[string]interface{}{},
 		}
 	},
 }
