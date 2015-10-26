@@ -224,6 +224,12 @@ func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
 		})
 	}
 
+	if hook, ok := res.hooks.(ApiAfterFindHook); ok {
+		if err := hook.ApiAfterFind(res, result, r, response); err != nil {
+			return kit.NewErrorResponse(err)
+		}
+	}
+
 	return response
 }
 

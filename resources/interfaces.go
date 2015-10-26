@@ -44,7 +44,7 @@ type ApiAlterQueryHook interface {
 }
 
 type ApiAfterFindHook interface {
-	ApiAfterFind(res kit.Resource, obj []kit.Model, user kit.User) apperror.Error
+	ApiAfterFind(res kit.Resource, objects []kit.Model, req kit.Request, resp kit.Response) apperror.Error
 }
 
 /**
