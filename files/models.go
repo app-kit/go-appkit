@@ -1,7 +1,9 @@
 package files
 
 import (
+	"encoding/base64"
 	"io"
+	"io/ioutil"
 	"strings"
 
 	"github.com/theduke/go-apperror"
@@ -285,13 +287,38 @@ func (f *FileStrID) SetRelatedFiles(rawFiles []kit.File) {
 	f.RelatedFiles = files
 }
 
+// Note: needs to be duplicated for FileStrID because access to ID field is
+// required.
 func (f *FileStrID) Reader() (kit.ReadSeekerCloser, apperror.Error) {
 	if f.Backend == nil {
-		return nil, nil
+		panic("Can't call .Reader() on a file with empty backend.")
 	}
 	return f.Backend.Reader(f)
 }
 
+// Note: needs to be duplicated for FileStrID because access to ID field is
+// required.
+func (f *FileStrID) Base64() (string, apperror.Error) {
+	if f.Backend == nil {
+		panic("Can't call .Reader() on a file with unset backend.")
+	}
+	reader, err := f.Backend.Reader(f)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	data, err2 := ioutil.ReadAll(reader)
+	if err2 != nil {
+		return "", apperror.Wrap(err2, "read_error")
+	}
+
+	b64 := base64.StdEncoding.EncodeToString(data)
+	return b64, nil
+}
+
+// Note: needs to be duplicated for FileStrID because access to ID field is
+// required.
 func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
 		panic("Called File.Writer() on a file with unset backend.")
@@ -351,13 +378,38 @@ func (f *FileIntID) SetRelatedFiles(rawFiles []kit.File) {
 	f.RelatedFiles = files
 }
 
+// Note: needs to be duplicated for FileIntID because access to ID field is
+// required.
 func (f *FileIntID) Reader() (kit.ReadSeekerCloser, apperror.Error) {
 	if f.Backend == nil {
-		return nil, nil
+		panic("Can't call .Reader() on a file with unset backend.")
 	}
 	return f.Backend.Reader(f)
 }
 
+// Note: needs to be duplicated for FileIntID because access to ID field is
+// required.
+func (f *FileIntID) Base64() (string, apperror.Error) {
+	if f.Backend == nil {
+		panic("Can't call .Reader() on a file with unset backend.")
+	}
+	reader, err := f.Backend.Reader(f)
+	if err != nil {
+		return "", err
+	}
+	defer reader.Close()
+
+	data, err2 := ioutil.ReadAll(reader)
+	if err2 != nil {
+		return "", apperror.Wrap(err2, "read_error")
+	}
+
+	b64 := base64.StdEncoding.EncodeToString(data)
+	return b64, nil
+}
+
+// Note: needs to be duplicated for FileIntID because access to ID field is
+// required.
 func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
 		panic("Called File.Writer() on a file with unset backend.")

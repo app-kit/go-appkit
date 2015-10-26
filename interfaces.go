@@ -845,6 +845,10 @@ type File interface {
 	// or it is not connected to a backend.
 	Reader() (ReadSeekerCloser, apperror.Error)
 
+	// Base64 returns the file contents as a base64 encoded string.
+	// Can only be called if Backend is set on the file.
+	Base64() (string, apperror.Error)
+
 	// Get a writer for the file.
 	// Might return an error if the file is not connected to a backend.
 	Writer(create bool) (string, io.WriteCloser, apperror.Error)
