@@ -208,6 +208,7 @@ func ApiModelFromMap(rawData interface{}) (*ApiModel, apperror.Error) {
 	// Build the type.
 	typ, ok := data["type"].(string)
 	if !ok || typ == "" {
+		panic("invalid_data_no_or_invalid_or_empty_type")
 		return nil, apperror.New("invalid_data_no_or_invalid_or_empty_type", true)
 	}
 
@@ -234,9 +235,23 @@ func ApiModelFromMap(rawData interface{}) (*ApiModel, apperror.Error) {
 		relationships := make(map[string]map[string]interface{})
 
 		for name, rawData := range rels {
-			relModels, isMulti, err := ApiModelsFromData(rawData)
+			mapData, _ := rawData.(map[string]interface{})
+
+			// Some stores like ember-data create a structure that like this:
+			// {"relationships": {relName: {data: nil}}}
+			// when a relationship is empty.
+			// Therefore, we need to allow empty data without an error.
+			if mapData == nil {
+				continue
+			}
+			modelsData, ok := mapData["data"]
+			if !ok || modelsData == nil {
+				continue
+			}
+
+			relModels, isMulti, err := ApiModelsFromData(modelsData)
 			if err != nil {
-				return nil, apperror.Wrap(err, "invalid_relationship", fmt.Sprintf("Invalid relationship %v", name), true)
+				return nil, err
 			}
 
 			if isMulti {
