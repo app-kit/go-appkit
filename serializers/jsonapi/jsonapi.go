@@ -110,17 +110,23 @@ func (d *ApiData) AddError(errs ...apperror.Error) {
 	}
 }
 
-func (d ApiData) ToMap() map[string]interface{} {
+func (d *ApiData) ToMap() (map[string]interface{}, apperror.Error) {
 	if len(d.Included) < 1 {
 		d.Included = nil
 	}
 
 	// Todo: fix this ugly hack.
-	js, _ := json.Marshal(d)
-	var m map[string]interface{}
-	json.Unmarshal(js, &m)
+	js, err := json.Marshal(d)
+	if err != nil {
+		return nil, apperror.Wrap(err, "json_marshal_error")
+	}
 
-	return m
+	var m map[string]interface{}
+	if err := json.Unmarshal(js, &m); err != nil {
+		return nil, apperror.Wrap(err, "json_unmarshal_error")
+	}
+
+	return m, nil
 }
 
 type ApiModelData struct {
@@ -721,7 +727,7 @@ func (s *Serializer) SerializeTransferData(transData kit.TransferData) (interfac
 	// Handle Errors.
 	apiData.AddError(transData.GetErrors()...)
 
-	return apiData.ToMap(), nil
+	return apiData.ToMap()
 }
 
 // SerializeResponse converts a response with model data into the target format.
@@ -767,14 +773,14 @@ func (s *Serializer) SerializeResponse(response kit.Response) (interface{}, appe
 	return data, nil
 }
 
-func (s *Serializer) MustSerializeResponse(response kit.Response) interface{} {
+func (s *Serializer) MustSerializeResponse(response kit.Response) (interface{}, apperror.Error) {
 	data, err := s.SerializeResponse(response)
 	if err != nil {
 		return &ApiData{
 			Errors: SerializeError(err),
-		}
+		}, err
 	}
-	return data
+	return data, nil
 }
 
 func (s *Serializer) UnserializeTransferData(rawData interface{}) (kit.TransferData, apperror.Error) {

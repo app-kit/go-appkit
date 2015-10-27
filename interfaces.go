@@ -416,7 +416,8 @@ type Serializer interface {
 
 	// MustSerializeResponse serializes a response, and returns properly serialized error data
 	// if any error occurs.
-	MustSerializeResponse(response Response) interface{}
+	// In addition, an error is returned if one occured, to allow logging the error.
+	MustSerializeResponse(response Response) (interface{}, apperror.Error)
 
 	// UnserializeRequest converts request data into a request object.
 	UnserializeRequest(data interface{}, request Request) apperror.Error

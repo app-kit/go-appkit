@@ -33,7 +33,7 @@ func SerializeResponseMiddleware(registry kit.Registry, request kit.Request, res
 		serializer = registry.Serializer(name)
 		if serializer == nil {
 			errResp := kit.NewErrorResponse("unknown_response_serializer", true)
-			data := serializer.MustSerializeResponse(errResp)
+			data, _ := serializer.MustSerializeResponse(errResp)
 			errResp.SetData(data)
 			return errResp, false
 		}
@@ -48,7 +48,10 @@ func SerializeResponseMiddleware(registry kit.Registry, request kit.Request, res
 	meta["format"] = serializer.Name()
 	response.SetMeta(meta)
 
-	data := serializer.MustSerializeResponse(response)
+	data, err := serializer.MustSerializeResponse(response)
+	if err != nil {
+		registry.Logger().Errorf("Response serialization error: %v (%+v)", err, response)
+	}
 	response.SetData(data)
 
 	return nil, false
