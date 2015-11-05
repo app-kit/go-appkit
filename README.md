@@ -792,8 +792,6 @@ This resource restricts create, read and update operations to **users that OWN a
 
 For this to work, your model has to implement the *appkit.UserModel* interface.
 
-**This is the default behaviour used if you do not supply your own resource struct.**
-
 ```go
 import(
   ...

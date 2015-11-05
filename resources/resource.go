@@ -242,15 +242,17 @@ func (res *Resource) Create(obj kit.Model, user kit.User) apperror.Error {
 		return hook.Create(res, obj, user)
 	}
 
-	if allowCreate, ok := res.hooks.(AllowCreateHook); ok {
-		if !allowCreate.AllowCreate(res, obj, user) {
-			return apperror.New("permission_denied")
-		}
-	}
-
+	// This has to be done before tthe AllowCreate hook to allow the hook to
+	// compare UserID value.
 	if userModel, ok := obj.(kit.UserModel); ok && user != nil {
 		if db.IsZero(userModel.GetUserID()) {
 			userModel.SetUserID(user.GetID())
+		}
+	}
+
+	if allowCreate, ok := res.hooks.(AllowCreateHook); ok {
+		if !allowCreate.AllowCreate(res, obj, user) {
+			return apperror.New("permission_denied")
 		}
 	}
 
