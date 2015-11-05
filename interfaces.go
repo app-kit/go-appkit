@@ -13,10 +13,10 @@ import (
 
 type Model interface {
 	Collection() string
-	GetID() interface{}
-	SetID(id interface{}) error
-	GetStrID() string
-	SetStrID(id string) error
+	GetId() interface{}
+	SetId(id interface{}) error
+	GetStrId() string
+	SetStrId(id string) error
 }
 
 /**
@@ -69,15 +69,15 @@ type TaskSpec interface {
 
 // Task represents a single task to be executed.
 type Task interface {
-	// GetID returns the unique task id.
-	GetStrID() string
+	// GetId returns the unique task id.
+	GetStrId() string
 
 	// GetName Returns the name of the task (see @TaskSpec).
 	GetName() string
 	SetName(name string)
 
-	GetUserID() interface{}
-	SetUserID(id interface{})
+	GetUserId() interface{}
+	SetUserId(id interface{})
 
 	GetRunAt() *time.Time
 	SetRunAt(t *time.Time)
@@ -251,8 +251,8 @@ type UserModel interface {
 	GetUser() User
 	SetUser(User)
 
-	GetUserID() interface{}
-	SetUserID(id interface{}) error
+	GetUserId() interface{}
+	SetUserId(id interface{}) error
 }
 
 type UserProfile interface {
@@ -289,10 +289,10 @@ type AuthAdaptor interface {
 
 	RegisterUser(user User, data map[string]interface{}) (AuthItem, apperror.Error)
 
-	// Authenticate  a user based on data map, and return userID or an error.
-	// The userID argument may be an empty string if the adaptor has to
-	// map the userID.
-	Authenticate(userID string, data map[string]interface{}) (string, apperror.Error)
+	// Authenticate  a user based on data map, and return userId or an error.
+	// The userId argument may be an empty string if the adaptor has to
+	// map the userId.
+	Authenticate(userId string, data map[string]interface{}) (string, apperror.Error)
 }
 
 /**
@@ -575,6 +575,8 @@ type Resource interface {
 	Backend() db.Backend
 	SetBackend(db.Backend)
 
+	ModelInfo() *db.ModelInfo
+
 	IsPublic() bool
 
 	Collection() string
@@ -585,15 +587,15 @@ type Resource interface {
 	Hooks() interface{}
 	SetHooks(interface{})
 
-	Q() db.Query
+	Q() *db.Query
 
-	Query(query db.Query, targetSlice ...interface{}) ([]Model, apperror.Error)
+	Query(query *db.Query, targetSlice ...interface{}) ([]Model, apperror.Error)
 	FindOne(id interface{}) (Model, apperror.Error)
 
-	Count(query db.Query) (int, apperror.Error)
+	Count(query *db.Query) (int, apperror.Error)
 
 	ApiFindOne(string, Request) Response
-	ApiFind(db.Query, Request) Response
+	ApiFind(*db.Query, Request) Response
 
 	Create(obj Model, user User) apperror.Error
 	ApiCreate(obj Model, r Request) Response
@@ -630,7 +632,7 @@ type Service interface {
 type ResourceService interface {
 	Service
 
-	Q(modelType string) (db.Query, apperror.Error)
+	Q(modelType string) (*db.Query, apperror.Error)
 	FindOne(modelType string, id string) (Model, apperror.Error)
 
 	Create(Model, User) apperror.Error
@@ -675,13 +677,13 @@ type FileService interface {
 	New() File
 
 	FindOne(id string) (File, apperror.Error)
-	Find(db.Query) ([]File, apperror.Error)
+	Find(*db.Query) ([]File, apperror.Error)
 
 	Create(File, User) apperror.Error
 	Update(File, User) apperror.Error
 	Delete(File, User) apperror.Error
 
-	DeleteByID(id interface{}, user User) apperror.Error
+	DeleteById(id interface{}, user User) apperror.Error
 }
 
 /**
@@ -771,8 +773,8 @@ type File interface {
 	GetBackendName() string
 	SetBackendName(string)
 
-	GetBackendID() string
-	SetBackendID(string) error
+	GetBackendId() string
+	SetBackendId(string) error
 
 	// File bucket.
 	GetBucket() string
@@ -835,8 +837,8 @@ type File interface {
 	GetParentFile() File
 	SetParentFile(f File)
 
-	GetParentFileID() interface{}
-	SetParentFileID(id interface{})
+	GetParentFileId() interface{}
+	SetParentFileId(id interface{})
 
 	GetRelatedFiles() []File
 	SetRelatedFiles(files []File)
@@ -883,7 +885,7 @@ type FileBackend interface {
 	ClearAll() apperror.Error
 
 	// Return the ids of all files in a bucket.
-	FileIDs(bucket string) ([]string, apperror.Error)
+	FileIds(bucket string) ([]string, apperror.Error)
 
 	HasFile(File) (bool, apperror.Error)
 	HasFileById(bucket, id string) (bool, apperror.Error)
@@ -1127,11 +1129,11 @@ type HttpFrontend interface {
  */
 
 type App interface {
-	// InstanceID returns a unique ID for the app instance.
-	InstanceID() string
+	// InstanceId returns a unique Id for the app instance.
+	InstanceId() string
 
-	// SetInstanceID sets the unique instance id for the app instance.
-	SetInstanceID(id string)
+	// SetInstanceId sets the unique instance id for the app instance.
+	SetInstanceId(id string)
 
 	Debug() bool
 	SetDebug(bool)

@@ -7,6 +7,7 @@ import (
 	kit "github.com/app-kit/go-appkit"
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
+	expr "github.com/theduke/go-dukedb/expressions"
 )
 
 type Runner struct {
@@ -177,9 +178,7 @@ func (r *Runner) startNewTasks() {
 		Filter("Complete", false).
 		Filter("Running", false).
 		Filter("Cancelled", false).
-		AndQ(db.Or(
-		db.Eq("RunAt", nil),
-		db.Lte("RunAt", time.Now()))).
+		FilterExpr(expr.Or(expr.Eq("", "run_at", nil), expr.Lte("", "run_at", time.Now()))).
 		Limit(r.maximumConcurrentTasks - len(r.activeTasks)).
 		Find()
 
@@ -207,10 +206,10 @@ func (r *Runner) runTask(task kit.Task) apperror.Error {
 		return err
 	}
 
-	r.activeTasks[task.GetStrID()] = task
+	r.activeTasks[task.GetStrId()] = task
 
 	r.registry.Logger().Debugf("TaskRunner: running task %v (task %v, try %v) (%v tasks running)",
-		task.GetStrID(),
+		task.GetStrId(),
 		task.GetName(),
 		task.GetTryCount()+1,
 		len(r.activeTasks))
@@ -247,20 +246,20 @@ func (r *Runner) runTask(task kit.Task) apperror.Error {
 func (r *Runner) finishTask(task kit.Task) {
 	if task.IsComplete() {
 		if !task.IsSuccess() {
-			r.registry.Logger().Debugf("TaskRunner: Task %v failed after %v tries: %v", task.GetStrID(), task.GetTryCount(), task.GetError())
+			r.registry.Logger().Debugf("TaskRunner: Task %v failed after %v tries: %v", task.GetStrId(), task.GetTryCount(), task.GetError())
 		} else {
 			secs := task.GetFinishedAt().Sub(*task.GetStartedAt()).Seconds()
-			r.registry.Logger().Debugf("TaskRunner: Task %v completed successfully (%v secs)", task.GetStrID(), secs)
+			r.registry.Logger().Debugf("TaskRunner: Task %v completed successfully (%v secs)", task.GetStrId(), secs)
 		}
 	} else {
-		r.Registry().Logger().Debugf("TaskRunner: Task %v(%v) failed, will retry: %v", task.GetStrID(), task.GetName(), task.GetError())
+		r.Registry().Logger().Debugf("TaskRunner: Task %v(%v) failed, will retry: %v", task.GetStrId(), task.GetName(), task.GetError())
 	}
 
 	if err := r.backend.Update(task); err != nil {
 		r.registry.Logger().Errorf("TaskRunner: Could not update task: %v", err)
 	}
 
-	delete(r.activeTasks, task.GetStrID())
+	delete(r.activeTasks, task.GetStrId())
 
 	// Call onComplete handler if specified.
 	spec := r.tasks[task.GetName()]

@@ -42,7 +42,7 @@ var AuthenticateMethod kit.Method = &methods.Method{
 		session := r.GetSession()
 
 		// Already have a session, so update it.
-		if err := session.SetUserID(user.GetID()); err != nil {
+		if err := session.SetUserId(user.GetId()); err != nil {
 			return kit.NewErrorResponse(err)
 		}
 		if err := userService.SessionResource().Update(session, user); err != nil {

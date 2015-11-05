@@ -79,11 +79,11 @@ func (c *Client) MarkMessageSeen(mailbox string, uid uint32) error {
 	set, _ := imap.NewSeqSet("")
 	set.AddNum(uint32(uid))
 
-	_, err = imap.Wait(c.ImapClient.UIDStore(set, "+FLAGS", "(\\Seen)"))
+	_, err = imap.Wait(c.ImapClient.UIdStore(set, "+FLAGS", "(\\Seen)"))
 	if err != nil {
 		return err
 	}
-	_, err = imap.Wait(c.ImapClient.UIDFetch(set, "FLAGS"))
+	_, err = imap.Wait(c.ImapClient.UIdFetch(set, "FLAGS"))
 
 	return err
 }
@@ -126,9 +126,9 @@ func (c *Client) GetMessages(mailbox string, withBody bool, ids []uint32) ([]Ema
 	}
 
 	if withBody {
-		cmd, err = imap.Wait(c.ImapClient.UIDFetch(set, "FLAGS", "UID", "BODY.PEEK[HEADER.FIELDS (SUBJECT DATE FROM)]", "RFC822"))
+		cmd, err = imap.Wait(c.ImapClient.UIdFetch(set, "FLAGS", "UId", "BODY.PEEK[HEADER.FIELDS (SUBJECT DATE FROM)]", "RFC822"))
 	} else {
-		cmd, err = imap.Wait(c.ImapClient.UIDFetch(set, "FLAGS", "UID", "BODY.PEEK[HEADER.FIELDS (SUBJECT DATE FROM)]"))
+		cmd, err = imap.Wait(c.ImapClient.UIdFetch(set, "FLAGS", "UId", "BODY.PEEK[HEADER.FIELDS (SUBJECT DATE FROM)]"))
 	}
 	if err != nil {
 		return nil, err
@@ -156,7 +156,7 @@ func (c *Client) GetMessages(mailbox string, withBody bool, ids []uint32) ([]Ema
 		date, _ := time.Parse(time.RFC1123Z, header.Get("Date"))
 
 		email := Email{
-			UID:     info.UID,
+			UId:     info.UId,
 			Subject: DecodeStr(header.Get("Subject")),
 			From:    DecodeStr(header.Get("From")),
 			Date:    date,
@@ -173,7 +173,7 @@ func (c *Client) GetMessages(mailbox string, withBody bool, ids []uint32) ([]Ema
 
 				isMulti := err == nil && strings.HasPrefix(mediaType, "multipart/")
 				if isMulti {
-					email.Attachments = ExtractAttachments(info.UID, params, msg)
+					email.Attachments = ExtractAttachments(info.UId, params, msg)
 					log.Printf("Attachments: %v\n", len(email.Attachments))
 
 					// Look for plain + html content.
@@ -249,8 +249,8 @@ func ExtractAttachments(msgId uint32, params map[string]string, msg *mail.Messag
 		attachment := EmailAttachment{
 			Encoding: encoding,
 			Mime:     contentType,
-			EmailID:  strconv.FormatUint(uint64(msgId), 10),
-			ID:       fmt.Sprintf("%v-%v", msgId, index),
+			EmailId:  strconv.FormatUint(uint64(msgId), 10),
+			Id:       fmt.Sprintf("%v-%v", msgId, index),
 		}
 		index += 1
 

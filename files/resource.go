@@ -197,7 +197,7 @@ func handleUpload(registry kit.Registry, tmpPath string, r *http.Request) ([]str
 			continue
 		}
 
-		id := utils.UUIDv4()
+		id := utils.UUIdv4()
 		path := tmpPath + string(os.PathSeparator) + id
 
 		if err := os.MkdirAll(path, 0777); err != nil {
@@ -355,7 +355,7 @@ func (r *FilesResource) getImageReader(registry kit.Registry, tmpDir string, fil
 	if (width == 0 || height == 0) && (file.GetWidth() == 0 || file.GetHeight() == 0) {
 		err = &apperror.Err{
 			Code:    "image_dimensions_not_determined",
-			Message: fmt.Sprintf("The file with id %v does not have width/height", file.GetID()),
+			Message: fmt.Sprintf("The file with id %v does not have width/height", file.GetId()),
 		}
 		return
 	}
@@ -386,7 +386,7 @@ func (r *FilesResource) getImageReader(registry kit.Registry, tmpDir string, fil
 	}
 
 	thumbId := fmt.Sprintf("%v_%v_%v_%v_%v_%v.%v",
-		file.GetID(),
+		file.GetId(),
 		file.GetBucket(),
 		file.GetName(),
 		strconv.FormatInt(width, 10),
@@ -592,7 +592,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		reader.Close()
 
 		if err != nil {
-			registry.Logger().Errorf("Error while serving file %v(%v): %v", file.GetID(), file.GetBackendID(), err)
+			registry.Logger().Errorf("Error while serving file %v(%v): %v", file.GetId(), file.GetBackendId(), err)
 		}
 
 		return nil, true
@@ -661,7 +661,7 @@ func (hooks FilesResource) HttpRoutes(res kit.Resource) []kit.HttpRoute {
 		reader.Close()
 
 		if err != nil {
-			registry.Logger().Errorf("Error while serving image %v(%v): %v", file.GetID(), file.GetBackendID(), err)
+			registry.Logger().Errorf("Error while serving image %v(%v): %v", file.GetId(), file.GetBackendId(), err)
 		}
 
 		return nil, true

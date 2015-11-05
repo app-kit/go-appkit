@@ -140,7 +140,7 @@ func (hooks SessionResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r k
 }
 
 func (SessionResourceHooks) ApiDelete(res kit.Resource, id string, r kit.Request) kit.Response {
-	if id != r.GetSession().GetStrID() {
+	if id != r.GetSession().GetStrId() {
 		return kit.NewErrorResponse("permission_denied", "Permission denied", 403)
 	}
 
@@ -284,7 +284,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			return &kit.AppResponse{
 				Data: map[string]interface{}{
 					"success":   true,
-					"userId":    user.GetID(),
+					"userId":    user.GetId(),
 					"userEmail": user.GetEmail(),
 				},
 			}
@@ -298,7 +298,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			// Get userId and password from request.
 			userId := utils.GetMapStringKey(r.GetData(), "userId")
 			if userId == "" {
-				return kit.NewErrorResponse("no_userid", "Expected userID key in data", true)
+				return kit.NewErrorResponse("no_userid", "Expected userId key in data", true)
 			}
 			password := utils.GetMapStringKey(r.GetData(), "password")
 			if password == "" {
@@ -312,7 +312,7 @@ func (UserResourceHooks) Methods(res kit.Resource) []kit.Method {
 			}
 
 			// Users can only change their own password, unless they are admins.
-			if userId != user.GetStrID() {
+			if userId != user.GetStrId() {
 				if !(user.HasRole("admin") || user.HasPermission("users.change_passwords")) {
 					return kit.NewErrorResponse("permission_denied", true)
 				}
@@ -386,8 +386,7 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 			if data, ok := rawData.(map[string]interface{}); ok {
 				// Profile data present in meta.
 				// Update profile with data.
-				info := res.Backend().ModelInfo(profile.Collection())
-				if err := db.UpdateModelFromData(info, profile, data); err != nil {
+				if err := res.ModelInfo().UpdateModelFromData(profile, data); err != nil {
 					return kit.NewErrorResponse("invalid_profile_data", "Invalid profile data.", err, true)
 				}
 			}
@@ -408,7 +407,7 @@ func (hooks UserResourceHooks) ApiCreate(res kit.Resource, obj kit.Model, r kit.
 func (hooks UserResourceHooks) AllowFind(res kit.Resource, obj kit.Model, user kit.User) bool {
 	/*
 		u := obj.(kit.User)
-		return u.GetID() == user.GetID()
+		return u.GetId() == user.GetId()
 	*/
 	return true
 }
@@ -420,7 +419,7 @@ func (hooks UserResourceHooks) AllowUpdate(res kit.Resource, obj kit.Model, old 
 	if user.HasRole("admin") || user.HasPermission("users.update") {
 		return true
 	}
-	return obj.GetID() == user.GetID()
+	return obj.GetId() == user.GetId()
 }
 
 func (hooks UserResourceHooks) AllowDelete(res kit.Resource, obj kit.Model, old kit.Model, user kit.User) bool {

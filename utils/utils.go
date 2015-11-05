@@ -92,6 +92,6 @@ func Canonicalize(str string) string {
 	return str
 }
 
-func UUIDv4() string {
+func UUIdv4() string {
 	return uuid.NewV4().String()
 }

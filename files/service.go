@@ -32,7 +32,7 @@ var _ kit.FileService = (*FileService)(nil)
 func NewFileService(registry kit.Registry) *FileService {
 	return &FileService{
 		registry: registry,
-		model:    &FileIntID{},
+		model:    &FileIntId{},
 		backends: make(map[string]kit.FileBackend),
 	}
 }
@@ -44,7 +44,7 @@ func NewFileServiceWithFs(registry kit.Registry, dataPath string) *FileService {
 
 	service := NewFileService(registry)
 
-	res := resources.NewResource(&FileIntID{}, FilesResource{}, true)
+	res := resources.NewResource(&FileIntId{}, FilesResource{}, true)
 	service.SetResource(res)
 
 	fs, err := fs.New(dataPath)
@@ -218,7 +218,7 @@ func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFi
 	}
 
 	if strings.HasPrefix(mimeType, "video") {
-		file.SetMediaType(MEDIA_TYPE_VIDEO)
+		file.SetMediaType(MEDIA_TYPE_VIdEO)
 	}
 
 	// Store the file in the backend.
@@ -243,12 +243,12 @@ func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFi
 	f.Close()
 
 	// File is stored in backend now!
-	file.SetBackendID(backendId)
+	file.SetBackendId(backendId)
 
 	// Persist file to db.
 	file.SetTmpPath("")
 
-	if file.GetStrID() != "" {
+	if file.GetStrId() != "" {
 		err2 = h.resource.Update(file, user)
 	} else {
 		err2 = h.resource.Create(file, user)
@@ -298,7 +298,7 @@ func (h *FileService) FindOne(id string) (kit.File, apperror.Error) {
 	}
 }
 
-func (h *FileService) Find(q db.Query) ([]kit.File, apperror.Error) {
+func (h *FileService) Find(q *db.Query) ([]kit.File, apperror.Error) {
 	rawFiles, err := h.resource.Query(q)
 	if err != nil {
 		return nil, err
@@ -329,7 +329,7 @@ func (h *FileService) Update(f kit.File, u kit.User) apperror.Error {
 	return h.resource.Update(f, u)
 }
 
-func (h *FileService) DeleteByID(id interface{}, user kit.User) apperror.Error {
+func (h *FileService) DeleteById(id interface{}, user kit.User) apperror.Error {
 	// Find the file first.
 	f, err := h.Resource().FindOne(id)
 	if err != nil {
@@ -343,10 +343,10 @@ func (h *FileService) DeleteByID(id interface{}, user kit.User) apperror.Error {
 
 func (h *FileService) Delete(f kit.File, u kit.User) apperror.Error {
 	// Delete file from backend.
-	if f.GetBackendName() != "" && f.GetBackendID() != "" {
+	if f.GetBackendName() != "" && f.GetBackendId() != "" {
 		backend := h.Backend(f.GetBackendName())
 		if backend == nil {
-			h.Registry().Logger().Errorf("Deleting file %v in backend %v, which is unconfigured", f.GetID(), f.GetBackendName())
+			h.Registry().Logger().Errorf("Deleting file %v in backend %v, which is unconfigured", f.GetId(), f.GetBackendName())
 		} else {
 			if err := backend.DeleteFile(f); err != nil {
 				return err

@@ -175,7 +175,7 @@ func (fs Fs) ConfigureBucket(string, kit.BucketConfig) apperror.Error {
 }
 
 func (fs Fs) ClearBucket(bucket string) apperror.Error {
-	files, err := fs.FileIDs(bucket)
+	files, err := fs.FileIds(bucket)
 	if err != nil {
 		return err
 	}
@@ -205,7 +205,7 @@ func (fs Fs) ClearAll() apperror.Error {
 	return nil
 }
 
-func (fs Fs) FileIDs(bucket string) ([]string, apperror.Error) {
+func (fs Fs) FileIds(bucket string) ([]string, apperror.Error) {
 	bucketPath := fs.bucketPath(bucket)
 	dir, err := os.Open(bucketPath)
 	if err != nil {
@@ -229,7 +229,7 @@ func (fs Fs) FileIDs(bucket string) ([]string, apperror.Error) {
 }
 
 func (fs Fs) HasFile(f kit.File) (bool, apperror.Error) {
-	return fs.HasFileById(f.GetBucket(), f.GetBackendID())
+	return fs.HasFileById(f.GetBucket(), f.GetBackendId())
 }
 
 func (fs Fs) HasFileById(bucket, id string) (bool, apperror.Error) {
@@ -244,7 +244,7 @@ func (fs Fs) HasFileById(bucket, id string) (bool, apperror.Error) {
 }
 
 func (fs Fs) FileSize(file kit.File) (int64, apperror.Error) {
-	return fs.FileSizeById(file.GetBucket(), file.GetBackendID())
+	return fs.FileSizeById(file.GetBucket(), file.GetBackendId())
 }
 
 func (fs Fs) FileSizeById(bucket, id string) (int64, apperror.Error) {
@@ -265,7 +265,7 @@ func (fs Fs) FileSizeById(bucket, id string) (int64, apperror.Error) {
 }
 
 func (fs Fs) DeleteFile(f kit.File) apperror.Error {
-	return fs.DeleteFileById(f.GetBucket(), f.GetBackendID())
+	return fs.DeleteFileById(f.GetBucket(), f.GetBackendId())
 }
 
 func (fs Fs) DeleteFileById(bucket, id string) apperror.Error {
@@ -279,7 +279,7 @@ func (fs Fs) DeleteFileById(bucket, id string) apperror.Error {
 }
 
 func (fs Fs) Reader(f kit.File) (kit.ReadSeekerCloser, apperror.Error) {
-	return fs.ReaderById(f.GetBucket(), f.GetBackendID())
+	return fs.ReaderById(f.GetBucket(), f.GetBackendId())
 }
 
 func (fs Fs) ReaderById(bucket, id string) (kit.ReadSeekerCloser, apperror.Error) {
@@ -298,7 +298,7 @@ func (fs Fs) ReaderById(bucket, id string) (kit.ReadSeekerCloser, apperror.Error
 }
 
 func (fs Fs) Writer(f kit.File, create bool) (string, io.WriteCloser, apperror.Error) {
-	id := f.GetBackendID()
+	id := f.GetBackendId()
 	if create {
 		id = f.GetFullName()
 	}

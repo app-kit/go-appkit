@@ -99,7 +99,7 @@ func serverRenderer(registry kit.Registry, r kit.Request) kit.Response {
 	}
 
 	// Build a unique file name.
-	filePath := path.Join(tmpDir, utils.UUIDv4()+".html")
+	filePath := path.Join(tmpDir, utils.UUIdv4()+".html")
 
 	// Execute phantom js.
 

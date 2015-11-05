@@ -12,12 +12,12 @@ import (
 )
 
 type Project struct {
-	// IntIDModel contains an ID uint64 field and some methods implementing the appkit.Model interface.
+	// IntIdModel contains an Id uint64 field and some methods implementing the appkit.Model interface.
 	// You can also implemnt the methods yourself.
 	// For details, refer to the [Concepts](https://github.com/app-kit/go-appkit#Concepts.Models) and the DukeDB documentation.
-	dukedb.IntIDModel
+	dukedb.IntIdModel
 
-	Name        string `db:"not-null;max:100"`
+	Name        string `db:"required;max:100"`
 	Description string `db:"max:5000"`
 }
 
@@ -26,12 +26,12 @@ func (Project) Collection() string {
 }
 
 type Todo struct {
-	dukedb.IntIDModel
+	dukedb.IntIdModel
 
 	Project   *Project
-	ProjectID uint64 `db:"not-null"`
+	ProjectId uint64 `db:"required"`
 
-	Name        string `db:"not-null;max:300"`
+	Name        string `db:"required;max:300"`
 	Description string `db:"max:5000"`
 	DueDate     time.Time
 	FinishedAt  *time.Time

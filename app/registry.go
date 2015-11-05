@@ -167,7 +167,7 @@ func (d *Registry) AllModelInfo() map[string]*db.ModelInfo {
 	info := make(map[string]*db.ModelInfo)
 
 	for _, backend := range d.backends {
-		for name, mInfo := range backend.AllModelInfo() {
+		for name, mInfo := range backend.ModelInfos() {
 			info[name] = mInfo
 		}
 	}

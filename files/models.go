@@ -15,7 +15,7 @@ import (
 
 const (
 	MEDIA_TYPE_IMAGE = "image"
-	MEDIA_TYPE_VIDEO = "video"
+	MEDIA_TYPE_VIdEO = "video"
 )
 
 /**
@@ -23,20 +23,20 @@ const (
  */
 
 // File that can be extended.
-// You can use FileIntID or FileStrID in almost all cases.
+// You can use FileIntId or FileStrId in almost all cases.
 type File struct {
 	Backend kit.FileBackend `db:"-"`
 
-	BackendName string `db:"not-null;max:100"`
-	BackendID   string `db:"not-null;max:150"`
-	Bucket      string `db:"not-null;max:150"`
+	BackendName string `db:"required;max:100"`
+	BackendId   string `db:"required;max:150"`
+	Bucket      string `db:"required;max:150"`
 
 	// Used to store the tmp file path before it is persisted to the backend.
 	TmpPath string
 
-	Name      string `db:"not-null;max:1000"`
+	Name      string `db:"required;max:1000"`
 	Extension string `db:"max:100"`
-	FullName  string `db:"not-null;max:1100"`
+	FullName  string `db:"required;max:1100"`
 
 	Title       string `db:"max:100"`
 	Description string `db:""`
@@ -92,12 +92,12 @@ func (f *File) SetBackendName(x string) {
 	f.BackendName = x
 }
 
-func (f *File) GetBackendID() string {
-	return f.BackendID
+func (f *File) GetBackendId() string {
+	return f.BackendId
 }
 
-func (f *File) SetBackendID(x string) error {
-	f.BackendID = x
+func (f *File) SetBackendId(x string) error {
+	f.BackendId = x
 	return nil
 }
 
@@ -239,38 +239,38 @@ func (f *File) SetWeight(x int) {
 	f.Weight = x
 }
 
-type FileStrID struct {
+type FileStrId struct {
 	File
-	db.StrIDModel
+	db.StrIdModel
 	users.StrUserModel
 
-	ParentFile   *FileStrID
-	ParentFileID string
+	ParentFile   *FileStrId
+	ParentFileId string
 
-	RelatedFiles []*FileStrID `db:"belongs-to:ID:ParentFileID"`
+	RelatedFiles []*FileStrId `db:"belongs-to:Id:ParentFileId"`
 }
 
-// Ensure FileStrID implements File interface.
-var _ kit.File = (*FileStrID)(nil)
+// Ensure FileStrId implements File interface.
+var _ kit.File = (*FileStrId)(nil)
 
-func (f *FileStrID) GetParentFile() kit.File {
+func (f *FileStrId) GetParentFile() kit.File {
 	return f.ParentFile
 }
 
-func (f *FileStrID) SetParentFile(file kit.File) {
-	f.ParentFile = file.(*FileStrID)
-	f.ParentFileID = file.GetID().(string)
+func (f *FileStrId) SetParentFile(file kit.File) {
+	f.ParentFile = file.(*FileStrId)
+	f.ParentFileId = file.GetId().(string)
 }
 
-func (f *FileStrID) GetParentFileID() interface{} {
-	return f.ParentFileID
+func (f *FileStrId) GetParentFileId() interface{} {
+	return f.ParentFileId
 }
 
-func (f *FileStrID) SetParentFileID(id interface{}) {
-	f.ParentFileID = id.(string)
+func (f *FileStrId) SetParentFileId(id interface{}) {
+	f.ParentFileId = id.(string)
 }
 
-func (f *FileStrID) GetRelatedFiles() []kit.File {
+func (f *FileStrId) GetRelatedFiles() []kit.File {
 	files := make([]kit.File, 0)
 	for _, file := range f.RelatedFiles {
 		files = append(files, file)
@@ -279,26 +279,26 @@ func (f *FileStrID) GetRelatedFiles() []kit.File {
 	return files
 }
 
-func (f *FileStrID) SetRelatedFiles(rawFiles []kit.File) {
-	files := make([]*FileStrID, 0)
+func (f *FileStrId) SetRelatedFiles(rawFiles []kit.File) {
+	files := make([]*FileStrId, 0)
 	for _, file := range rawFiles {
-		files = append(files, file.(*FileStrID))
+		files = append(files, file.(*FileStrId))
 	}
 	f.RelatedFiles = files
 }
 
-// Note: needs to be duplicated for FileStrID because access to ID field is
+// Note: needs to be duplicated for FileStrId because access to Id field is
 // required.
-func (f *FileStrID) Reader() (kit.ReadSeekerCloser, apperror.Error) {
+func (f *FileStrId) Reader() (kit.ReadSeekerCloser, apperror.Error) {
 	if f.Backend == nil {
 		panic("Can't call .Reader() on a file with empty backend.")
 	}
 	return f.Backend.Reader(f)
 }
 
-// Note: needs to be duplicated for FileStrID because access to ID field is
+// Note: needs to be duplicated for FileStrId because access to Id field is
 // required.
-func (f *FileStrID) Base64() (string, apperror.Error) {
+func (f *FileStrId) Base64() (string, apperror.Error) {
 	if f.Backend == nil {
 		panic("Can't call .Reader() on a file with unset backend.")
 	}
@@ -317,9 +317,9 @@ func (f *FileStrID) Base64() (string, apperror.Error) {
 	return b64, nil
 }
 
-// Note: needs to be duplicated for FileStrID because access to ID field is
+// Note: needs to be duplicated for FileStrId because access to Id field is
 // required.
-func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
+func (f *FileStrId) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
 		panic("Called File.Writer() on a file with unset backend.")
 	}
@@ -330,38 +330,38 @@ func (f *FileStrID) Writer(create bool) (string, io.WriteCloser, apperror.Error)
  * File with int id.
  */
 
-type FileIntID struct {
+type FileIntId struct {
 	File
-	db.IntIDModel
+	db.IntIdModel
 	users.IntUserModel
 
-	ParentFile   *FileIntID
-	ParentFileID uint64
+	ParentFile   *FileIntId
+	ParentFileId uint64
 
-	RelatedFiles []*FileIntID `db:"belongs-to:ID:ParentFileID"`
+	RelatedFiles []*FileIntId `db:"belongs-to:Id:ParentFileId"`
 }
 
-// Ensure FileIntID implements File interface.
-var _ kit.File = (*FileIntID)(nil)
+// Ensure FileIntId implements File interface.
+var _ kit.File = (*FileIntId)(nil)
 
-func (f *FileIntID) GetParentFile() kit.File {
+func (f *FileIntId) GetParentFile() kit.File {
 	return f.ParentFile
 }
 
-func (f *FileIntID) SetParentFile(file kit.File) {
-	f.ParentFile = file.(*FileIntID)
-	f.ParentFileID = file.GetID().(uint64)
+func (f *FileIntId) SetParentFile(file kit.File) {
+	f.ParentFile = file.(*FileIntId)
+	f.ParentFileId = file.GetId().(uint64)
 }
 
-func (f *FileIntID) GetParentFileID() interface{} {
-	return f.ParentFileID
+func (f *FileIntId) GetParentFileId() interface{} {
+	return f.ParentFileId
 }
 
-func (f *FileIntID) SetParentFileID(id interface{}) {
-	f.ParentFileID = id.(uint64)
+func (f *FileIntId) SetParentFileId(id interface{}) {
+	f.ParentFileId = id.(uint64)
 }
 
-func (f *FileIntID) GetRelatedFiles() []kit.File {
+func (f *FileIntId) GetRelatedFiles() []kit.File {
 	files := make([]kit.File, 0)
 	for _, file := range f.RelatedFiles {
 		files = append(files, file)
@@ -370,26 +370,26 @@ func (f *FileIntID) GetRelatedFiles() []kit.File {
 	return files
 }
 
-func (f *FileIntID) SetRelatedFiles(rawFiles []kit.File) {
-	files := make([]*FileIntID, 0)
+func (f *FileIntId) SetRelatedFiles(rawFiles []kit.File) {
+	files := make([]*FileIntId, 0)
 	for _, file := range rawFiles {
-		files = append(files, file.(*FileIntID))
+		files = append(files, file.(*FileIntId))
 	}
 	f.RelatedFiles = files
 }
 
-// Note: needs to be duplicated for FileIntID because access to ID field is
+// Note: needs to be duplicated for FileIntId because access to Id field is
 // required.
-func (f *FileIntID) Reader() (kit.ReadSeekerCloser, apperror.Error) {
+func (f *FileIntId) Reader() (kit.ReadSeekerCloser, apperror.Error) {
 	if f.Backend == nil {
 		panic("Can't call .Reader() on a file with unset backend.")
 	}
 	return f.Backend.Reader(f)
 }
 
-// Note: needs to be duplicated for FileIntID because access to ID field is
+// Note: needs to be duplicated for FileIntId because access to Id field is
 // required.
-func (f *FileIntID) Base64() (string, apperror.Error) {
+func (f *FileIntId) Base64() (string, apperror.Error) {
 	if f.Backend == nil {
 		panic("Can't call .Reader() on a file with unset backend.")
 	}
@@ -408,9 +408,9 @@ func (f *FileIntID) Base64() (string, apperror.Error) {
 	return b64, nil
 }
 
-// Note: needs to be duplicated for FileIntID because access to ID field is
+// Note: needs to be duplicated for FileIntId because access to Id field is
 // required.
-func (f *FileIntID) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
+func (f *FileIntId) Writer(create bool) (string, io.WriteCloser, apperror.Error) {
 	if f.Backend == nil {
 		panic("Called File.Writer() on a file with unset backend.")
 	}

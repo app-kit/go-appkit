@@ -16,10 +16,10 @@ var _ kit.TaskService = (*Service)(nil)
 
 func NewService(reg kit.Registry, b db.Backend) *Service {
 	var model kit.Model
-	if b.HasStringIDs() {
-		model = &TaskStrID{}
+	if b.HasStringIds() {
+		model = &TaskStrId{}
 	} else {
-		model = &TaskIntID{}
+		model = &TaskIntId{}
 	}
 
 	s := &Service{}

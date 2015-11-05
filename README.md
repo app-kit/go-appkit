@@ -78,8 +78,8 @@ Ember uses JSONAPI by default starting with version 1.13.
 
 * GET */api/users*: Query for resources.
 * POST */api/users*: Create a new model.
-* PATCH */api/users/ID*: Update a model
-* DELETE */api/users/ID*: Delete a model
+* PATCH */api/users/Id*: Update a model
+* DELETE */api/users/Id*: Delete a model
 
 Other methods can be accessed in the same way as specified for REST.
 
@@ -103,16 +103,16 @@ The API revolves about models which are just GO structs.
 For Appkit to understand your models, your structs need to implement a few interfaces.
 
 * Collection() string: return a name for your model collection. Eg "todos" for your 'Todo' struct.
-* GetID() interface{}: Return the id
-* SetID(id interface{}) error: Set the ID. Return an error if the given ID is invalid or nil otherwise.
-* GetStrID() string: Return a string version of the ID. Empty string if no ID is set yet.
-* SetStrID(id string) error: Set the ID from a string version of the ID. Return error if given ID is invalid, or nil otherwise.
+* GetId() interface{}: Return the id
+* SetId(id interface{}) error: Set the Id. Return an error if the given Id is invalid or nil otherwise.
+* GetStrId() string: Return a string version of the Id. Empty string if no Id is set yet.
+* SetStrId(id string) error: Set the Id from a string version of the Id. Return error if given Id is invalid, or nil otherwise.
 
-DukeDB offers embeddable base structs that implement all interfaces except collection: *dukedb.IntIDModel* if your models use an integer ID or *dukedb.StrIDModel* for models with a string ID (like MongoDB uses).
+DukeDB offers embeddable base structs that implement all interfaces except collection: *dukedb.IntIdModel* if your models use an integer Id or *dukedb.StrIdModel* for models with a string Id (like MongoDB uses).
 
 ```go
 type Todo struct {
-  dukedb.IntIDModel
+  dukedb.IntIdModel
   
   Name string
   ...
@@ -291,7 +291,7 @@ Files can be either public with no access control, or restricted access based on
 
 Files can be accessed via the http route:
 ```
-GET /files/ID/file-name.txt
+GET /files/Id/file-name.txt
 ```
 
 #### Serving images/thumbnails
@@ -300,7 +300,7 @@ Appkit also comes with a system for generating thumbnails or applying some filte
 
 To serve an image scaled to a width and height, and a grayscale filter applied, use:
 ```
-GET /images/ID/file-name?width=500&height=200&filters=grayscale
+GET /images/Id/file-name?width=500&height=200&filters=grayscale
 ```
 
 <a name="Concepts.serversiderendering"></a>
@@ -430,12 +430,12 @@ import(
 )
 
 type Project struct {
-	// IntIDModel contains an ID uint64 field and some methods implementing the appkit.Model interface.
+	// IntIdModel contains an Id uint64 field and some methods implementing the appkit.Model interface.
 	// You can also implemnt the methods yourself.
 	// For details, refer to the [Concepts](https://github.com/app-kit/go-appkit#Concepts.Models) and the DukeDB documentation.
-	dukedb.IntIDModel
+	dukedb.IntIdModel
 
-	Name string `db:"not-null;max:100"`
+	Name string `db:"required;max:100"`
 	Description string `db:"max:5000"`
 }
 
@@ -444,12 +444,12 @@ func (Project) Collection() string {
 }
 
 type Todo struct {
-	dukedb.IntIDModel
+	dukedb.IntIdModel
 
 	Project *Project
-	ProjectID uint64 `db:"not-null"`
+	ProjectId uint64 `db:"required"`
 
-	Name string `db:"not-null;max:300"`
+	Name string `db:"required;max:300"`
 	Description string `db:"max:5000"`
 	DueDate time.Time
 	FinishedAt *time.Time
@@ -592,14 +592,14 @@ import (
 )
 
 type Project struct {
-	// IntIDModel contains an ID uint64 field and some methods implementing the appkit.Model interface.
+	// IntIdModel contains an Id uint64 field and some methods implementing the appkit.Model interface.
 	// You can also implemnt the methods yourself.
 	// For details, refer to the [Concepts](https://github.com/app-kit/go-appkit#Concepts.Models) and the DukeDB documentation.
-	dukedb.IntIDModel
+	dukedb.IntIdModel
 
 	users.IntUserModel
 
-	Name        string `db:"not-null;max:100"`
+	Name        string `db:"required;max:100"`
 	Description string `db:"max:5000"`
 }
 
@@ -608,14 +608,14 @@ func (Project) Collection() string {
 }
 
 type Todo struct {
-	dukedb.IntIDModel
+	dukedb.IntIdModel
 
 	users.IntUserModel
 
 	Project   *Project
-	ProjectID uint64 `db:"not-null"`
+	ProjectId uint64 `db:"required"`
 
-	Name        string `db:"not-null;max:300"`
+	Name        string `db:"required;max:300"`
 	Description string `db:"max:5000"`
 	DueDate     time.Time
 	FinishedAt  *time.Time
@@ -801,7 +801,7 @@ import(
 )
 
 type Model struct {
-  dukedb.IntIDModel
+  dukedb.IntIdModel
   users.IntUserModel
 }
 

@@ -66,7 +66,7 @@ var _ = Describe("Backend implementations", func() {
 
 			createFile("test", "testfile1", []byte("test content"))
 			createFile("test", "testfile2", []byte("test content"))
-			Expect(backend.FileIDs("test")).To(Equal([]string{"testfile1", "testfile2"}))
+			Expect(backend.FileIds("test")).To(Equal([]string{"testfile1", "testfile2"}))
 		})
 
 		It("Should allow to read file", func() {
@@ -101,7 +101,7 @@ var _ = Describe("Backend implementations", func() {
 			Expect(backend.ClearBucket("test")).ToNot(HaveOccurred())
 			Expect(backend.HasFileById("test", "testfile")).To(BeFalse())
 			Expect(backend.HasFileById("test", "testfile2")).To(BeFalse())
-			Expect(backend.FileIDs("test")).To(Equal([]string{}))
+			Expect(backend.FileIds("test")).To(Equal([]string{}))
 		})
 
 		It("Should delete file", func() {

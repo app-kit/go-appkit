@@ -63,7 +63,7 @@ func (h LoggerHook) Fire(e *logrus.Entry) error {
 }
 
 type UserProfile struct {
-	users.IntIDUserProfile
+	users.IntIdUserProfile
 
 	FirstName string
 	LastName  string
@@ -222,7 +222,7 @@ var _ = Describe("App", func() {
 				plainUser := rawUser.(kit.User)
 
 				// Find full user data with profile and roles.
-				user, err := registry.UserService().FindUser(plainUser.GetID())
+				user, err := registry.UserService().FindUser(plainUser.GetId())
 				Expect(err).ToNot(HaveOccurred())
 				Expect(user).ToNot(BeNil())
 
@@ -242,7 +242,7 @@ var _ = Describe("App", func() {
 
 				logEntry = logMessages[len(logMessages)-2]
 				Expect(logEntry.Data["action"]).To(Equal("users.email_confirmation_mail_sent"))
-				Expect(logEntry.Data["user_id"]).To(Equal(user.GetID()))
+				Expect(logEntry.Data["user_id"]).To(Equal(user.GetId()))
 				Expect(logEntry.Data["email"]).To(Equal(user.GetEmail()))
 
 				skipUser = false
@@ -273,7 +273,7 @@ var _ = Describe("App", func() {
 
 				session := rawSession.(kit.Session)
 
-				userId := session.GetUserID()
+				userId := session.GetUserId()
 				rawUser, err := registry.Backend("memory").FindOne("users", userId)
 				Expect(err).ToNot(HaveOccurred())
 				Expect(rawUser).ToNot(BeNil())
@@ -298,7 +298,7 @@ var _ = Describe("App", func() {
 				// Check that confirmation email was sent.
 				logEntry := logMessages[len(logMessages)-2]
 				Expect(logEntry.Data["action"]).To(Equal("users.email_confirmation_mail_sent"))
-				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetId()))
 				Expect(logEntry.Data["email"]).To(Equal(currentUser.GetEmail()))
 
 				currentToken = logEntry.Data["token"].(string)
@@ -316,9 +316,9 @@ var _ = Describe("App", func() {
 
 				logEntry := logMessages[len(logMessages)-2]
 				Expect(logEntry.Data["action"]).To(Equal("users.email_confirmed"))
-				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetId()))
 
-				rawUser, err := registry.Backend("memory").FindOne("users", currentUser.GetID())
+				rawUser, err := registry.Backend("memory").FindOne("users", currentUser.GetId())
 				Expect(rawUser.(kit.User).IsEmailConfirmed()).To(BeTrue())
 			})
 
@@ -335,7 +335,7 @@ var _ = Describe("App", func() {
 				// Check that confirmation email was sent.
 				logEntry := logMessages[len(logMessages)-2]
 				Expect(logEntry.Data["action"]).To(Equal("users.password_reset_requested"))
-				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetId()))
 				Expect(logEntry.Data["email"]).To(Equal(currentUser.GetEmail()))
 
 				currentToken = logEntry.Data["token"].(string)
@@ -353,7 +353,7 @@ var _ = Describe("App", func() {
 
 				logEntry := logMessages[len(logMessages)-2]
 				Expect(logEntry.Data["action"]).To(Equal("users.password_reset"))
-				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetID()))
+				Expect(logEntry.Data["user_id"]).To(Equal(currentUser.GetId()))
 
 				// Try to authenticate user with new password.
 				user, err := registry.UserService().AuthenticateUser(currentUser, "password", map[string]interface{}{"password": "newpassword"})
@@ -394,7 +394,7 @@ var _ = Describe("App", func() {
 
 			logEntry = logMessages[len(logMessages)-2]
 			Expect(logEntry.Data["action"]).To(Equal("users.email_confirmation_mail_sent"))
-			Expect(logEntry.Data["user_id"]).To(Equal(user.GetID()))
+			Expect(logEntry.Data["user_id"]).To(Equal(user.GetId()))
 			Expect(logEntry.Data["email"]).To(Equal(user.GetEmail()))
 
 			skipUser = false
@@ -427,7 +427,7 @@ var _ = Describe("App", func() {
 
 			session := rawSession.(kit.Session)
 
-			userId := session.GetUserID()
+			userId := session.GetUserId()
 			rawUser, err := registry.Backend("memory").FindOne("users", userId)
 			Expect(err).ToNot(HaveOccurred())
 			Expect(rawUser).ToNot(BeNil())

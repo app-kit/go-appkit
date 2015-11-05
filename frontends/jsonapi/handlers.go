@@ -4,10 +4,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"reflect"
 	"strings"
 
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
+	"github.com/theduke/go-reflector"
 
 	kit "github.com/app-kit/go-appkit"
 )
@@ -28,7 +30,7 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 
 	info := res.Backend().ModelInfo(collection)
 
-	var query db.Query
+	var query *db.Query
 
 	jsonQuery := request.GetContext().String("query")
 	if jsonQuery != "" {
@@ -42,14 +44,14 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 		// A custom query was supplied.
 		// Try to parse the query.
 		var err apperror.Error
-		query, err = db.ParseQuery(rawQuery)
+		query, err = db.ParseQuery(res.Backend(), rawQuery)
 		if err != nil {
 			return nil, apperror.Wrap(err, "invalid_query", "", false)
 		}
 	}
 
 	if query == nil {
-		query = db.Q(collection)
+		query = res.Backend().Q(collection)
 	}
 
 	// Check paging parameters.
@@ -123,12 +125,9 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 	if context.Has("joins") {
 		parts := strings.Split(context.String("joins"), ",")
 		for _, name := range parts {
-			fieldName := info.MapMarshalName(name)
-			if fieldName == "" {
-				fieldName = name
-			}
+			relation := info.FindRelation(name)
 
-			if !info.HasField(fieldName) {
+			if relation == nil {
 				return nil, &apperror.Err{
 					Code:    "invalid_join",
 					Message: fmt.Sprintf("Tried to join a NON-existant relationship %v", name),
@@ -136,9 +135,8 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 				}
 			}
 
-			query.Join(fieldName)
+			query.Join(relation.Name())
 		}
-
 	}
 
 	// Add filters.
@@ -156,29 +154,20 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 			}
 
 			fieldName := filterParts[0]
-
 			// COnvert id query to pk field.
 			if fieldName == "id" {
-				fieldName = info.PkField
+				fieldName = info.PkAttribute().BackendName()
 			}
 
-			if !info.HasField(fieldName) {
-				fieldName = info.MapMarshalName(fieldName)
-			}
+			var typ reflect.Type
 
-			if !info.HasField(fieldName) {
-				return nil, &apperror.Err{
-					Code:    "filter_for_inexistant_field",
-					Message: fmt.Sprintf("Tried to filter with inexistant field %v", fieldName),
-				}
-			}
-
-			fieldInfo := info.GetField(fieldName)
-
-			if fieldInfo.IsRelation() {
-				if fieldInfo.HasOne {
-					fieldInfo = info.GetField(fieldInfo.HasOneField)
-					fieldName = fieldInfo.Name
+			if attr := info.FindAttribute(fieldName); attr != nil {
+				fieldName = attr.BackendName()
+				typ = attr.Type()
+			} else if rel := info.FindRelation(fieldName); rel != nil {
+				if rel.RelationType() == db.RELATION_TYPE_HAS_ONE {
+					fieldName = rel.LocalField()
+					typ = info.Attribute(rel.LocalField()).Type()
 				} else {
 					return nil, &apperror.Err{
 						Public:  true,
@@ -186,19 +175,24 @@ func Find(res kit.Resource, request kit.Request) (kit.Response, apperror.Error) 
 						Message: fmt.Sprintf("Tried to filter on relationship field %v (only possible for has-one relations)", fieldName),
 					}
 				}
+			} else {
+				return nil, &apperror.Err{
+					Public:  true,
+					Code:    "filter_for_inexistant_field",
+					Message: fmt.Sprintf("Tried to filter with inexistant field %v", fieldName),
+				}
 			}
 
-			convertedVal, err := db.Convert(filterParts[1], fieldInfo.Type)
+			converted, err := reflector.R(filterParts[1]).ConvertTo(typ)
 			if err != nil {
 				return nil, &apperror.Err{
 					Public: true,
 					Code:   "inconvertible_filter_value",
 					Message: fmt.Sprintf("Coult not convert filter value %v for field %v (should be %v)",
-						filterParts[1], fieldName, fieldInfo.Type),
+						filterParts[1], fieldName, typ),
 				}
 			}
-
-			query.Filter(fieldName, convertedVal)
+			query.Filter(fieldName, converted)
 		}
 	}
 

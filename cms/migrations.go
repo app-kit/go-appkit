@@ -13,7 +13,7 @@ func BuildMigrations(b db.MigrationBackend, app kit.App) []db.Migration {
 		Name:            "Create all CMS tables.",
 		WrapTransaction: true,
 		Up: func(b db.MigrationBackend) error {
-			if err := b.CreateCollections(
+			if err := b.CreateCollection(
 				"files",
 				"tags",
 				"menus",

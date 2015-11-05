@@ -12,7 +12,7 @@ import (
 type Service interface {
 	Name() string
 
-	GetClientID() string
+	GetClientId() string
 	GetClientSecrect() string
 	GetAuthUrl() string
 	GetRedirectUrl() string
@@ -31,12 +31,12 @@ type BaseService struct {
 	TokenUrl    string
 	EndpointUrl string
 
-	ClientID     string
+	ClientId     string
 	ClientSecret string
 }
 
-func (s *BaseService) GetClientID() string {
-	return s.ClientID
+func (s *BaseService) GetClientId() string {
+	return s.ClientId
 }
 
 func (s *BaseService) GetClientSecrect() string {
@@ -93,7 +93,7 @@ func NewFacebook(clientId, clientSecret string) *Facebook {
 			TokenUrl:    "https://graph.facebook.com/oauth/access_token",
 			EndpointUrl: "https://graph.facebook.com",
 
-			ClientID:     clientId,
+			ClientId:     clientId,
 			ClientSecret: clientSecret,
 		},
 	}
@@ -112,7 +112,7 @@ func (s *Facebook) GetExchangeUrl(token string) string {
 
 	vals := url.Values{}
 	vals.Add("grant_type", "fb_exchange_token")
-	vals.Add("client_id", s.GetClientID())
+	vals.Add("client_id", s.GetClientId())
 	vals.Add("client_secret", s.GetClientSecrect())
 	vals.Add("fb_exchange_token", token)
 
@@ -148,7 +148,7 @@ func (s *Facebook) GetUserData(token string) (*UserData, apperror.Error) {
 	}
 
 	userData := &UserData{
-		ID:   data["id"].(string),
+		Id:   data["id"].(string),
 		Data: data,
 	}
 

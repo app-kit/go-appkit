@@ -2,10 +2,10 @@ package resources
 
 import (
 	"math"
-	"reflect"
 
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
+	"github.com/theduke/go-reflector"
 
 	kit "github.com/app-kit/go-appkit"
 	"github.com/app-kit/go-appkit/utils"
@@ -15,8 +15,9 @@ type Resource struct {
 	debug    bool
 	registry kit.Registry
 
-	backend db.Backend
-	hooks   interface{}
+	backend   db.Backend
+	modelInfo *db.ModelInfo
+	hooks     interface{}
 
 	isPublic bool
 
@@ -67,6 +68,11 @@ func (res *Resource) SetBackend(b db.Backend) {
 	if !b.HasCollection(res.Collection()) {
 		b.RegisterModel(res.Model())
 	}
+	res.modelInfo = b.ModelInfo(res.Collection())
+}
+
+func (res *Resource) ModelInfo() *db.ModelInfo {
+	return res.modelInfo
 }
 
 func (res *Resource) IsPublic() bool {
@@ -86,10 +92,7 @@ func (res *Resource) SetModel(x kit.Model) {
 }
 
 func (res *Resource) CreateModel() kit.Model {
-	n, err := res.backend.CreateModel(res.model.Collection())
-	if err != nil {
-
-	}
+	n := res.modelInfo.New()
 	return n.(kit.Model)
 }
 
@@ -108,7 +111,7 @@ func (res *Resource) SetHooks(h interface{}) {
 /**
  * Perform a query.
  */
-func (res Resource) Query(q db.Query, targetSlice ...interface{}) ([]kit.Model, apperror.Error) {
+func (res Resource) Query(q *db.Query, targetSlice ...interface{}) ([]kit.Model, apperror.Error) {
 	items, err := res.backend.Query(q, targetSlice...)
 	if err != nil {
 		return nil, err
@@ -116,14 +119,14 @@ func (res Resource) Query(q db.Query, targetSlice ...interface{}) ([]kit.Model, 
 	return utils.InterfaceToModelSlice(items), nil
 }
 
-func (res Resource) Count(q db.Query) (int, apperror.Error) {
+func (res Resource) Count(q *db.Query) (int, apperror.Error) {
 	return res.Backend().Count(q)
 }
 
 /**
  * Return a new query initialized with the backend.
  */
-func (res Resource) Q() db.Query {
+func (res Resource) Q() *db.Query {
 	return res.backend.Q(res.model.Collection())
 }
 
@@ -171,7 +174,7 @@ func (res *Resource) ApiFindOne(rawId string, r kit.Request) kit.Response {
 	}
 }
 
-func (res *Resource) ApiFind(query db.Query, r kit.Request) kit.Response {
+func (res *Resource) ApiFind(query *db.Query, r kit.Request) kit.Response {
 	// If query is empty, query for all records.
 	if query == nil {
 		query = res.Q()
@@ -243,10 +246,10 @@ func (res *Resource) Create(obj kit.Model, user kit.User) apperror.Error {
 	}
 
 	// This has to be done before tthe AllowCreate hook to allow the hook to
-	// compare UserID value.
+	// compare UserId value.
 	if userModel, ok := obj.(kit.UserModel); ok && user != nil {
-		if db.IsZero(userModel.GetUserID()) {
-			userModel.SetUserID(user.GetID())
+		if reflector.R(userModel.GetUserId()).IsZero() {
+			userModel.SetUserId(user.GetId())
 		}
 	}
 
@@ -300,7 +303,7 @@ func (res *Resource) update(obj kit.Model, user kit.User, partial bool) apperror
 		return hook.Update(res, obj, user)
 	}
 
-	oldObj, err := res.FindOne(obj.GetID())
+	oldObj, err := res.FindOne(obj.GetId())
 	if err != nil {
 		return err
 	} else if oldObj == nil {
@@ -320,16 +323,19 @@ func (res *Resource) update(obj kit.Model, user kit.User, partial bool) apperror
 	}
 
 	if partial {
-		info := res.backend.ModelInfo(obj.Collection())
+		rOld := reflector.Reflect(oldObj).MustStruct()
+		rNew := reflector.Reflect(oldObj).MustStruct()
 
-		reflNewObj := reflect.ValueOf(obj).Elem()
-		reflOldObj := reflect.ValueOf(oldObj).Elem()
-
-		for fieldName := range info.FieldInfo {
-			reflVal := reflNewObj.FieldByName(fieldName)
-
-			if !db.IsZero(reflVal.Interface()) {
-				reflOldObj.FieldByName(fieldName).Set(reflVal)
+		for fieldName, _ := range res.modelInfo.Attributes() {
+			val := rNew.Field(fieldName)
+			if !val.IsZero() {
+				rOld.Field(fieldName).Set(val)
+			}
+		}
+		for fieldName, _ := range res.modelInfo.Relations() {
+			val := rNew.Field(fieldName)
+			if !val.IsZero() {
+				rOld.Field(fieldName).Set(val)
 			}
 		}
 
@@ -523,7 +529,7 @@ func (UserResource) AllowFind(res kit.Resource, model kit.Model, user kit.User) 
 	if user == nil {
 		return false
 	}
-	if model.(kit.UserModel).GetUserID() == user.GetID() {
+	if model.(kit.UserModel).GetUserId() == user.GetId() {
 		return true
 	}
 	return user.HasRole("admin")
@@ -533,7 +539,7 @@ func (UserResource) AllowCreate(res kit.Resource, obj kit.Model, user kit.User) 
 	if user == nil {
 		return false
 	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+	if obj.(kit.UserModel).GetUserId() == user.GetId() {
 		return true
 	}
 	return user.HasRole("admin") || user.HasPermission(res.Collection()+".create")
@@ -543,7 +549,7 @@ func (UserResource) AllowUpdate(res kit.Resource, obj kit.Model, old kit.Model, 
 	if user == nil {
 		return false
 	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+	if obj.(kit.UserModel).GetUserId() == user.GetId() {
 		return true
 	}
 	return user.HasRole("admin") || user.HasPermission(res.Collection()+".update")
@@ -553,7 +559,7 @@ func (UserResource) AllowDelete(res kit.Resource, obj kit.Model, user kit.User) 
 	if user == nil {
 		return false
 	}
-	if obj.(kit.UserModel).GetUserID() == user.GetID() {
+	if obj.(kit.UserModel).GetUserId() == user.GetId() {
 		return true
 	}
 	return user.HasRole("admin") || user.HasPermission(res.Collection()+".delete")

@@ -35,12 +35,12 @@ type ApiFindOneHook interface {
 }
 
 type ApiFindHook interface {
-	ApiFind(res kit.Resource, query db.Query, r kit.Request) kit.Response
+	ApiFind(res kit.Resource, query *db.Query, r kit.Request) kit.Response
 }
 
 type ApiAlterQueryHook interface {
 	// Alter an API query before it is executed.
-	ApiAlterQuery(res kit.Resource, query db.Query, r kit.Request) apperror.Error
+	ApiAlterQuery(res kit.Resource, query *db.Query, r kit.Request) apperror.Error
 }
 
 type ApiAfterFindHook interface {

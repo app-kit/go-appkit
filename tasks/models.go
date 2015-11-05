@@ -8,7 +8,7 @@ import (
 )
 
 type Task struct {
-	Name     string      `db:"not-null"`
+	Name     string      `db:"required"`
 	Data     interface{} `db:"marshal"`
 	RunAt    *time.Time
 	Priority int
@@ -174,38 +174,38 @@ func (t *Task) SetLog(log string) {
 	t.Log = log
 }
 
-type TaskIntID struct {
-	db.IntIDModel
+type TaskIntId struct {
+	db.IntIdModel
 	Task
 
-	UserID uint64
+	UserId uint64
 }
 
-// Ensure that TaskIntID implements appkit.Task.
-var _ kit.Task = (*TaskIntID)(nil)
+// Ensure that TaskIntId implements appkit.Task.
+var _ kit.Task = (*TaskIntId)(nil)
 
-func (t TaskIntID) GetUserID() interface{} {
-	return t.UserID
+func (t TaskIntId) GetUserId() interface{} {
+	return t.UserId
 }
 
-func (t TaskIntID) SetUserID(id interface{}) {
-	t.UserID = id.(uint64)
+func (t TaskIntId) SetUserId(id interface{}) {
+	t.UserId = id.(uint64)
 }
 
-type TaskStrID struct {
-	db.StrIDModel
+type TaskStrId struct {
+	db.StrIdModel
 	Task
 
-	UserID string
+	UserId string
 }
 
-// Ensure that TaskStrID implements appkit.Task.
-var _ kit.Task = (*TaskStrID)(nil)
+// Ensure that TaskStrId implements appkit.Task.
+var _ kit.Task = (*TaskStrId)(nil)
 
-func (t TaskStrID) GetUserID() interface{} {
-	return t.UserID
+func (t TaskStrId) GetUserId() interface{} {
+	return t.UserId
 }
 
-func (t TaskStrID) SetUserID(id interface{}) {
-	t.UserID = id.(string)
+func (t TaskStrId) SetUserId(id interface{}) {
+	t.UserId = id.(string)
 }

@@ -9,7 +9,7 @@ import (
 )
 
 type Project struct {
-	db.IntIDModel
+	db.IntIdModel
 	users.IntUserModel
 	govalidate.Model
 
@@ -31,23 +31,23 @@ func (t Tag) Collection() string {
 	return "tags"
 }
 
-func (t Tag) GetID() string {
+func (t Tag) GetId() string {
 	return t.Tag
 }
 
-func (t *Tag) SetID(tag string) error {
+func (t *Tag) SetId(tag string) error {
 	t.Tag = tag
 	return nil
 }
 
 type Todo struct {
-	db.IntIDModel
+	db.IntIdModel
 	users.IntUserModel
 
 	Name        string `db:"max:400"`
 	Description string `db:"max:400"`
 
-	Files []*files.FileIntID `db:"m2m"`
+	Files []*files.FileIntId `db:"m2m"`
 	Tags  []*Tag             `db:"m2m"`
 }
 

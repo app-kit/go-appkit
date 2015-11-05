@@ -106,7 +106,7 @@ func CopyFile(sourcePath, targetPath string) apperror.Error {
 
 // Write contents to a tmp file and return the path to the file.
 func WriteTmpFile(content []byte, name string) (string, apperror.Error) {
-	uuid := UUIDv4()
+	uuid := UUIdv4()
 
 	if name == "" {
 		name = uuid

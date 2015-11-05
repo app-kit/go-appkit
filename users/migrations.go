@@ -13,7 +13,7 @@ func GetUserMigrations(service kit.UserService) []db.Migration {
 		Name:            "Create user system tables",
 		WrapTransaction: true,
 		Up: func(b db.MigrationBackend) error {
-			if err := b.CreateCollections(
+			if err := b.CreateCollection(
 				"user_permissions",
 				"user_roles",
 				"users",

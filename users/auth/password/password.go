@@ -24,10 +24,10 @@ func GetStringFromMap(data map[string]interface{}, field string) (string, bool) 
 }
 
 type AuthItemPassword struct {
-	// ID serves as UserID.
-	db.StrIDModel
+	// Id serves as UserId.
+	db.StrIdModel
 
-	Hash string `db:"not-null;max:150"`
+	Hash string `db:"required;max:150"`
 }
 
 // Ensure AuthItemPassword implements kit.AuthItem.
@@ -37,12 +37,12 @@ func (item *AuthItemPassword) Collection() string {
 	return "users_auth_passwords"
 }
 
-func (item *AuthItemPassword) GetUserID() interface{} {
-	return item.ID
+func (item *AuthItemPassword) GetUserId() interface{} {
+	return item.Id
 }
 
-func (item *AuthItemPassword) SetUserID(id interface{}) error {
-	return item.SetID(id)
+func (item *AuthItemPassword) SetUserId(id interface{}) error {
+	return item.SetId(id)
 }
 
 func (item *AuthItemPassword) GetUser() kit.User {
@@ -50,7 +50,7 @@ func (item *AuthItemPassword) GetUser() kit.User {
 }
 
 func (item *AuthItemPassword) SetUser(u kit.User) {
-	item.SetUserID(u.GetID())
+	item.SetUserId(u.GetId())
 }
 
 type AuthAdaptorPassword struct {
@@ -90,7 +90,7 @@ func (a *AuthAdaptorPassword) RegisterUser(user kit.User, data map[string]interf
 	item := &AuthItemPassword{
 		Hash: string(hash),
 	}
-	item.SetID(user.GetID())
+	item.SetId(user.GetId())
 
 	return item, nil
 }
@@ -102,15 +102,15 @@ func (a *AuthAdaptorPassword) GetItem(userId string) (*AuthItemPassword, apperro
 	} else if rawItem == nil {
 		return nil, &apperror.Err{
 			Code:    "no_authitem",
-			Message: fmt.Sprintf("No password auth item could be found for userID %v", userId),
+			Message: fmt.Sprintf("No password auth item could be found for userId %v", userId),
 		}
 	}
 
 	return rawItem.(*AuthItemPassword), nil
 }
 
-func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interface{}) (string, apperror.Error) {
-	if userID == "" {
+func (a AuthAdaptorPassword) Authenticate(userId string, data map[string]interface{}) (string, apperror.Error) {
+	if userId == "" {
 		return "", apperror.New("empty_user_id")
 	}
 
@@ -119,7 +119,7 @@ func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interfa
 		return "", apperror.New("invalid_data_no_password", true)
 	}
 
-	item, err := a.GetItem(userID)
+	item, err := a.GetItem(userId)
 	if err != nil {
 		return "", err
 	}
@@ -128,7 +128,7 @@ func (a AuthAdaptorPassword) Authenticate(userID string, data map[string]interfa
 		return "", apperror.New("invalid_credentials", true)
 	}
 
-	return userID, nil
+	return userId, nil
 }
 
 func (a *AuthAdaptorPassword) ChangePassword(userId, newPw string) apperror.Error {

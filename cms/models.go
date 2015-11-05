@@ -35,13 +35,13 @@ func (a *Location) Collection() string {
 	return "locations"
 }
 
-type LocationIntID struct {
-	db.IntIDModel
+type LocationIntId struct {
+	db.IntIdModel
 	Location
 }
 
-type LocationStrID struct {
-	db.StrIDModel
+type LocationStrId struct {
+	db.StrIdModel
 	Location
 }
 
@@ -50,21 +50,21 @@ type LocationStrID struct {
  */
 
 type BaseTag struct {
-	Tag   string `db:"not-null;max:100;index;unique-with:Group"`
-	Group string `db:"not-null;max:100;index"`
+	Tag   string `db:"required;max:100;index;unique-with:Group"`
+	Group string `db:"required;max:100;index"`
 }
 
 func (t *BaseTag) Collection() string {
 	return "tags"
 }
 
-type TagStrID struct {
-	db.StrIDModel
+type TagStrId struct {
+	db.StrIdModel
 	BaseTag
 }
 
-type TagIntID struct {
-	db.IntIDModel
+type TagIntId struct {
+	db.IntIdModel
 	BaseTag
 }
 
@@ -74,7 +74,7 @@ type TagIntID struct {
 
 type MenuItem struct {
 	// Internal name for the menu item.
-	Name string `db:"not-null;max:200;unique-with:MenuID"`
+	Name string `db:"required;max:200;unique-with:MenuId"`
 
 	// Optinal description for admins.
 	Description string
@@ -86,7 +86,7 @@ type MenuItem struct {
 	IsPlaceholder bool
 
 	// The title that should be rendered.
-	Title string `db:"not-null;max:250"`
+	Title string `db:"required;max:250"`
 
 	// Url this item links to.
 	Url string `db:"max:2000"`
@@ -98,48 +98,48 @@ type MenuItem struct {
 	RouteArgs string `db:"max:1000"`
 
 	// Used for sorting.
-	Weight int `db:"not-null"`
+	Weight int `db:"required"`
 }
 
 func (i *MenuItem) Collection() string {
 	return "menu_items"
 }
 
-type MenuItemStrID struct {
-	db.StrIDModel
+type MenuItemStrId struct {
+	db.StrIdModel
 	MenuItem
 
-	Menu   *MenuStrID
-	MenuID string `db:"max:200;not-null"`
+	Menu   *MenuStrId
+	MenuId string `db:"max:200;required"`
 
-	Parent   *MenuItemStrID
-	ParentID string `db:"max:200"`
+	Parent   *MenuItemStrId
+	ParentId string `db:"max:200"`
 
-	Children []*MenuItemStrID `db:"belongs-to:ID:ParentID"`
+	Children []*MenuItemStrId `db:"belongs-to:Id:ParentId"`
 }
 
-type MenuItemIntID struct {
-	db.IntIDModel
+type MenuItemIntId struct {
+	db.IntIdModel
 	MenuItem
 
-	Menu   *MenuIntID
-	MenuID uint64 `db:"not-null"`
+	Menu   *MenuIntId
+	MenuId uint64 `db:"required"`
 
-	Parent   *MenuItemIntID
-	ParentID uint64
+	Parent   *MenuItemIntId
+	ParentId uint64
 
-	Children []*MenuItemIntID `db:"belongs-to:ID:ParentID"`
+	Children []*MenuItemIntId `db:"belongs-to:Id:ParentId"`
 }
 
 type Menu struct {
 	// Internal identifier for the menu
-	Name string `db:"not-null;unique;index;max:200;`
+	Name string `db:"required;unique;index;max:200;`
 
 	// Language this menu is in.
-	Language string `db:"not-null;min:2;max:2"`
+	Language string `db:"required;min:2;max:2"`
 
 	// Readable title for the menu.
-	Title string `db:"not-null;max:250"`
+	Title string `db:"required;max:250"`
 
 	// Optional menu description.
 	Description string `db:"max:500"`
@@ -149,34 +149,34 @@ func (m *Menu) Collection() string {
 	return "menus"
 }
 
-type MenuStrID struct {
-	db.StrIDModel
+type MenuStrId struct {
+	db.StrIdModel
 	Menu
 
-	TranslatedMenu   *MenuStrID
-	TranslatedMenuID string `db:"max:200"`
+	TranslatedMenu   *MenuStrId
+	TranslatedMenuId string `db:"max:200"`
 
-	Items []*MenuItemStrID `db:"belongs-to:ID:MenuID"`
+	Items []*MenuItemStrId `db:"belongs-to:Id:MenuId"`
 }
 
-func (i MenuStrID) BeforeDelete(b db.Backend) error {
+func (i MenuStrId) BeforeDelete(b db.Backend) error {
 	// Delete menu items first.
-	return b.Q("menu_items").Filter("menu_id", i.ID).Delete()
+	return b.Q("menu_items").Filter("menu_id", i.Id).Delete()
 }
 
-type MenuIntID struct {
-	db.IntIDModel
+type MenuIntId struct {
+	db.IntIdModel
 	Menu
 
-	TranslatedMenu   *MenuIntID
-	TranslatedMenuID uint64
+	TranslatedMenu   *MenuIntId
+	TranslatedMenuId uint64
 
-	Items []*MenuItemIntID `db:"belongs-to:ID:MenuID"`
+	Items []*MenuItemIntId `db:"belongs-to:Id:MenuId"`
 }
 
-func (i MenuIntID) BeforeDelete(b db.Backend) error {
+func (i MenuIntId) BeforeDelete(b db.Backend) error {
 	// Delete menu items first.
-	return b.Q("menu_items").Filter("menu_id", i.ID).Delete()
+	return b.Q("menu_items").Filter("menu_id", i.Id).Delete()
 }
 
 /**
@@ -185,22 +185,22 @@ func (i MenuIntID) BeforeDelete(b db.Backend) error {
 
 type Comment struct {
 	db.TimeStampedModel
-	Type    string `db:"not-null;max:200;"`
+	Type    string `db:"required;max:200;"`
 	Title   string `db:"max:255"`
-	Comment string `db:"not-null"`
+	Comment string `db:"required"`
 }
 
 func (c *Comment) Collection() string {
 	return "comments"
 }
 
-type CommentStrID struct {
-	db.StrIDModel
+type CommentStrId struct {
+	db.StrIdModel
 	Comment
 }
 
-type CommentIntID struct {
-	db.IntIDModel
+type CommentIntId struct {
+	db.IntIdModel
 	Comment
 }
 
@@ -214,10 +214,10 @@ type CommentIntID struct {
 
 type PageComponent struct {
 	// Component type.
-	Type string `db:"max:255;not-null"`
+	Type string `db:"max:255;required"`
 
 	// Explicative name for the content.
-	Name string `db:"not-null"`
+	Name string `db:"required"`
 
 	// Data for the component.
 	Data string `db:""`
@@ -233,22 +233,22 @@ func (PageComponent) Collection() string {
 	return "page_components"
 }
 
-type PageComponentStrID struct {
-	db.StrIDModel
+type PageComponentStrId struct {
+	db.StrIdModel
 	PageComponent
 
-	PageID string `db:"not-null"`
+	PageId string `db:"required"`
 
-	Files []*files.FileStrID `db:"m2m:pages_component_files"`
+	Files []*files.FileStrId `db:"m2m:pages_component_files"`
 }
 
-type PageComponentIntID struct {
-	db.IntIDModel
+type PageComponentIntId struct {
+	db.IntIdModel
 	PageComponent
 
-	PageID uint64 `db:"not-null"`
+	PageId uint64 `db:"required"`
 
-	Files []*files.FileIntID `db:"m2m:pages_component_files"`
+	Files []*files.FileIntId `db:"m2m:pages_component_files"`
 }
 
 type Page struct {
@@ -259,18 +259,18 @@ type Page struct {
 	PublishedAt time.Time
 
 	// Internal title.
-	Name string `db:"not-null;max:200"`
+	Name string `db:"required;max:200"`
 
 	// Type of the page, like "blog post"
-	Type string `db:"not-null;max:200"`
+	Type string `db:"required;max:200"`
 
-	Language string `db:"not-null;min:2;max:2"`
+	Language string `db:"required;min:2;max:2"`
 
 	// Public title.
-	Title string `db:"not-null;max:200"`
+	Title string `db:"required;max:200"`
 
 	// Slug.
-	Slug string `db:"not-null;max:250"`
+	Slug string `db:"required;max:250"`
 
 	// Summary for lists.
 	ListSummary string
@@ -282,42 +282,42 @@ type Page struct {
 	Layout string `db:"max:255"`
 
 	// The actual content.
-	Content string `db:"not-null;"`
+	Content string `db:"required;"`
 }
 
 func (p Page) Collection() string {
 	return "pages"
 }
 
-type PageStrID struct {
-	db.StrIDModel
+type PageStrId struct {
+	db.StrIdModel
 	users.StrUserModel
 	Page
 
-	MenuItem   *MenuItemStrID
-	MenuItemID string `db:"max:200"`
+	MenuItem   *MenuItemStrId
+	MenuItemId string `db:"max:200"`
 
-	TranslatedPage   *PageStrID
-	TranslatedPageID string `db:"max:200"`
+	TranslatedPage   *PageStrId
+	TranslatedPageId string `db:"max:200"`
 
-	Files []*files.FileStrID `db:"m2m:pages_files"`
+	Files []*files.FileStrId `db:"m2m:pages_files"`
 
 	// Tags.
-	Tags []*TagStrID `db:"m2m:pages_tags"`
+	Tags []*TagStrId `db:"m2m:pages_tags"`
 
 	// Components.
-	Components []*PageComponentStrID `db:"belongs-to:ID:PageID"`
+	Components []*PageComponentStrId `db:"belongs-to:Id:PageId"`
 }
 
-func (p PageStrID) BeforeDelete(b db.Backend) error {
+func (p PageStrId) BeforeDelete(b db.Backend) error {
 	// Delete tags.
 	m2m, _ := b.M2M(p, "Tags")
 	if err := m2m.Clear(); err != nil {
 		return err
 	}
 
-	if p.MenuItemID != "" {
-		if err := b.Q("menu_items").Filter("id", p.MenuItemID).Delete(); err != nil {
+	if p.MenuItemId != "" {
+		if err := b.Q("menu_items").Filter("id", p.MenuItemId).Delete(); err != nil {
 			return err
 		}
 	}
@@ -325,35 +325,35 @@ func (p PageStrID) BeforeDelete(b db.Backend) error {
 	return nil
 }
 
-type PageIntID struct {
-	db.IntIDModel
+type PageIntId struct {
+	db.IntIdModel
 	users.IntUserModel
 	Page
 
-	MenuItem   *MenuItemIntID
-	MenuItemID uint64
+	MenuItem   *MenuItemIntId
+	MenuItemId uint64
 
-	TranslatedPage   *PageIntID
-	TranslatedPageID string `db:"max:200"`
+	TranslatedPage   *PageIntId
+	TranslatedPageId string `db:"max:200"`
 
-	Files []*files.FileIntID `db:"m2m:pages_files"`
+	Files []*files.FileIntId `db:"m2m:pages_files"`
 
 	// Tags.
-	Tags []*TagIntID `db:"m2m:pages_tags"`
+	Tags []*TagIntId `db:"m2m:pages_tags"`
 
 	// Components.
-	Components []*PageComponentIntID `db:"belongs-to:ID:PageID"`
+	Components []*PageComponentIntId `db:"belongs-to:Id:PageId"`
 }
 
-func (p PageIntID) BeforeDelete(b db.Backend) error {
+func (p PageIntId) BeforeDelete(b db.Backend) error {
 	// Delete tags.
 	m2m, _ := b.M2M(p, "Tags")
 	if err := m2m.Clear(); err != nil {
 		return err
 	}
 
-	if p.MenuItemID != 0 {
-		if err := b.Q("menu_items").Filter("id", p.MenuItemID).Delete(); err != nil {
+	if p.MenuItemId != 0 {
+		if err := b.Q("menu_items").Filter("id", p.MenuItemId).Delete(); err != nil {
 			return err
 		}
 	}

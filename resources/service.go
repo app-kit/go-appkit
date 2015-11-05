@@ -69,7 +69,7 @@ func (s *Service) RegisterResource(res kit.Resource) {
 	s.resources[res.Collection()] = res
 }
 
-func (s *Service) Q(modelType string) (db.Query, apperror.Error) {
+func (s *Service) Q(modelType string) (*db.Query, apperror.Error) {
 	res := s.resources[modelType]
 	if res == nil {
 		return nil, &apperror.Err{

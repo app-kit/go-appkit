@@ -2,13 +2,13 @@ package users
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
+	"github.com/theduke/go-reflector"
 	"github.com/twinj/uuid"
 
 	kit "github.com/app-kit/go-appkit"
@@ -51,10 +51,10 @@ func NewService(registry kit.Registry, backend db.Backend, profileModel kit.User
 
 	// Build resources.
 	var userModel kit.Model
-	if backend.HasStringIDs() {
-		userModel = &UserStrID{}
+	if backend.HasStringIds() {
+		userModel = &UserStrId{}
 	} else {
-		userModel = &UserIntID{}
+		userModel = &UserIntId{}
 	}
 	users := resources.NewResource(userModel, UserResourceHooks{}, true)
 	h.Users = users
@@ -65,7 +65,7 @@ func NewService(registry kit.Registry, backend db.Backend, profileModel kit.User
 	}
 
 	var sessionModel kit.Model
-	if backend.HasStringIDs() {
+	if backend.HasStringIds() {
 		sessionModel = &Session{}
 	} else {
 		sessionModel = &IntUserSession{}
@@ -208,7 +208,7 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 	tokenItem := s.Tokens.CreateModel().(kit.UserToken)
 	tokenItem.SetType(typ)
 	tokenItem.SetToken(token)
-	tokenItem.SetUserID(userId)
+	tokenItem.SetUserId(userId)
 
 	if err := s.Tokens.Backend().Create(tokenItem); err != nil {
 		return nil, apperror.Wrap(err, "token_create_error", "Could not save token to database")
@@ -217,29 +217,22 @@ func (s *Service) BuildToken(typ, userId string, expiresAt time.Time) (kit.UserT
 	return tokenItem, nil
 }
 
-// FindUser tries to find a user based on either userID, user.Username or user.Email.
+// FindUser tries to find a user based on either userId, user.Username or user.Email.
 func (s *Service) FindUser(userIdentifier interface{}) (kit.User, apperror.Error) {
 
-	or := db.Or()
-
+	query := s.Users.Q()
 	modelInfo := s.backend.ModelInfo("users")
-	idType := modelInfo.GetField(modelInfo.PkField).Type
+	idType := modelInfo.PkAttribute().Type()
 
 	if strId, ok := userIdentifier.(string); ok {
-		or.Add(db.Eq("username", strId))
-		or.Add(db.Eq("email", userIdentifier))
-
-		if idType.Kind() == reflect.String {
-			or.Add(db.Eq("id", strId))
-		}
+		query.Or("username", strId).Or("email", strId)
 	}
 
-	id, err1 := db.Convert(userIdentifier, idType)
-	if err1 == nil {
-		or.Add(db.Eq("id", id))
+	if id, err := reflector.R(userIdentifier).ConvertToType(idType); err == nil {
+		query.Or(modelInfo.PkAttribute().BackendName(), id)
 	}
 
-	rawUser, err := s.Users.Q().FilterQ(or).Join("Roles.Permissions").First()
+	rawUser, err := query.Join("Roles.Permissions").First()
 	if err != nil {
 		return nil, err
 	} else if rawUser == nil {
@@ -249,7 +242,7 @@ func (s *Service) FindUser(userIdentifier interface{}) (kit.User, apperror.Error
 	user := rawUser.(kit.User)
 
 	if s.Profiles != nil {
-		profile, err := s.Users.Backend().Q(s.Profiles.Collection()).Filter("id", user.GetID()).First()
+		profile, err := s.Users.Backend().Q(s.Profiles.Collection()).Filter("id", user.GetId()).First()
 		if err != nil {
 			return nil, apperror.Wrap(err, "profile_query_error")
 		} else if profile != nil {
@@ -319,7 +312,7 @@ func (s *Service) CreateUser(user kit.User, adaptorName string, authData map[str
 
 	// Persist auth item.
 	if authItemUserId, ok := authItem.(kit.UserModel); ok {
-		authItemUserId.SetUserID(user.GetID())
+		authItemUserId.SetUserId(user.GetId())
 	}
 	if err := s.Users.Backend().Create(authItem); err != nil {
 		s.Users.Backend().Delete(user)
@@ -352,7 +345,7 @@ func (s *Service) SendConfirmationEmail(user kit.User) apperror.Error {
 	}
 
 	// Generate a token.
-	tokenItem, err := s.BuildToken("email_confirmation", user.GetStrID(), time.Time{})
+	tokenItem, err := s.BuildToken("email_confirmation", user.GetStrId(), time.Time{})
 	if err != nil {
 		return err
 	}
@@ -434,9 +427,9 @@ To confirm your email address, please visit <a href="%v">this link</a>.
 	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.email_confirmation_mail_sent",
 		"email":   user.GetEmail(),
-		"user_id": user.GetID(),
+		"user_id": user.GetId(),
 		"token":   token,
-	}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetID())
+	}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetId())
 
 	return nil
 }
@@ -455,7 +448,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, apperror.Error) {
 		return nil, apperror.New("expired_token")
 	}
 
-	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
+	rawUser, err := s.Users.FindOne(tokenItem.GetUserId())
 	if err != nil {
 		return nil, apperror.Wrap(err, "user_query_error", "")
 	}
@@ -464,7 +457,7 @@ func (s *Service) ConfirmEmail(token string) (kit.User, apperror.Error) {
 	}
 
 	user := rawUser.(kit.User)
-	userId := user.GetStrID()
+	userId := user.GetStrId()
 
 	if user.IsEmailConfirmed() {
 		// Email already confirmed.
@@ -490,8 +483,8 @@ func (s *Service) ConfirmEmail(token string) (kit.User, apperror.Error) {
 	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.email_confirmed",
 		"email":   user.GetEmail(),
-		"user_id": user.GetID(),
-	}).Debugf("Confirmed email %v for user %v", user.GetEmail(), user.GetID())
+		"user_id": user.GetId(),
+	}).Debugf("Confirmed email %v for user %v", user.GetEmail(), user.GetId())
 
 	return user, nil
 }
@@ -508,7 +501,7 @@ func (s *Service) SendPasswordResetEmail(user kit.User) apperror.Error {
 
 	// Generate a token.
 	expiresAt := time.Now().Add(time.Hour * time.Duration(hoursValid))
-	tokenItem, err := s.BuildToken("password_reset", user.GetStrID(), expiresAt)
+	tokenItem, err := s.BuildToken("password_reset", user.GetStrId(), expiresAt)
 	if err != nil {
 		return err
 	}
@@ -603,9 +596,9 @@ The link will be valid for %v hours.
 	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.password_reset_requested",
 		"email":   user.GetEmail(),
-		"user_id": user.GetID(),
+		"user_id": user.GetId(),
 		"token":   token,
-	}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetID())
+	}).Debugf("Password reset email sent to %v for user %v", user.GetEmail(), user.GetId())
 
 	return nil
 }
@@ -621,7 +614,7 @@ func (s *Service) ChangePassword(user kit.User, newPassword string) apperror.Err
 
 	passwordAdaptor := adaptor.(*password.AuthAdaptorPassword)
 
-	if err := passwordAdaptor.ChangePassword(user.GetStrID(), newPassword); err != nil {
+	if err := passwordAdaptor.ChangePassword(user.GetStrId(), newPassword); err != nil {
 		if err.IsPublic() {
 			return err
 		} else {
@@ -647,7 +640,7 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, apperror.E
 		return nil, apperror.New("token_expired", true)
 	}
 
-	rawUser, err := s.Users.FindOne(tokenItem.GetUserID())
+	rawUser, err := s.Users.FindOne(tokenItem.GetUserId())
 	if err != nil {
 		return nil, apperror.Wrap(err, "user_query_error", "")
 	}
@@ -665,8 +658,8 @@ func (s *Service) ResetPassword(token, newPassword string) (kit.User, apperror.E
 
 	s.registry.Logger().WithFields(logrus.Fields{
 		"action":  "users.password_reset",
-		"user_id": user.GetID(),
-	}).Debugf("Password for user %v was reset", user.GetID())
+		"user_id": user.GetId(),
+	}).Debugf("Password for user %v was reset", user.GetId())
 
 	return user, nil
 }
@@ -695,7 +688,7 @@ func (h *Service) AuthenticateUser(userIdentifier string, authAdaptorName string
 
 	userId := ""
 	if user != nil {
-		userId = user.GetStrID()
+		userId = user.GetStrId()
 	}
 
 	userId, err = authAdaptor.Authenticate(userId, data)
@@ -742,7 +735,7 @@ func (s Service) StartSession(user kit.User, sessionType string) (kit.Session, a
 	session.SetValidUntil(time.Now().Add(time.Hour * 12))
 
 	if user != nil {
-		session.SetUserID(user.GetID())
+		session.SetUserId(user.GetId())
 	}
 
 	err := s.Sessions.Create(session, nil)
@@ -770,7 +763,7 @@ func (h *Service) VerifySession(token string) (kit.User, kit.Session, apperror.E
 
 	if !session.IsAnonymous() {
 		// Load user.
-		rawUser, err := h.FindUser(session.GetUserID())
+		rawUser, err := h.FindUser(session.GetUserId())
 		if err != nil {
 			return nil, nil, err
 		}

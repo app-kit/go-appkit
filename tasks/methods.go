@@ -16,7 +16,7 @@ var RetryTaskMethod = &methods.Method{
 
 		taskId := r.GetData()
 		if taskId == nil {
-			return kit.NewErrorResponse("invalid_task_id", "Expected 'data' to be the task ID.", true)
+			return kit.NewErrorResponse("invalid_task_id", "Expected 'data' to be the task Id.", true)
 		}
 
 		backend := registry.DefaultBackend()
@@ -30,7 +30,7 @@ var RetryTaskMethod = &methods.Method{
 		task := rawTask.(kit.Task)
 
 		// Permissions check.
-		if !(user.HasRole("admin") || user.GetID() == task.GetUserID()) {
+		if !(user.HasRole("admin") || user.GetId() == task.GetUserId()) {
 			return kit.NewErrorResponse("permission_denied")
 		}
 
@@ -65,7 +65,7 @@ var CancelTaskMethod = &methods.Method{
 
 		taskId := r.GetData()
 		if taskId == nil {
-			return kit.NewErrorResponse("invalid_task_id", "Expected 'data' to be the task ID.", true)
+			return kit.NewErrorResponse("invalid_task_id", "Expected 'data' to be the task Id.", true)
 		}
 
 		backend := registry.DefaultBackend()
@@ -79,7 +79,7 @@ var CancelTaskMethod = &methods.Method{
 		task := rawTask.(kit.Task)
 
 		// Permissions check.
-		if !(user.HasRole("admin") || user.GetID() == task.GetUserID()) {
+		if !(user.HasRole("admin") || user.GetId() == task.GetUserId()) {
 			return kit.NewErrorResponse("permission_denied")
 		}
 

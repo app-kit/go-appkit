@@ -328,7 +328,7 @@ func (m *SessionManager) Run() {
 type ResourceMethodData struct {
 	Resource kit.Resource
 	Objects  []kit.Model
-	IDs      []string
+	Ids      []string
 	Query    db.Query
 }
 
@@ -405,15 +405,25 @@ var queryMethod kit.Method = &Method{
 		// Build query.
 		data, _ := r.GetData().(map[string]interface{})
 		if data == nil {
-			return kit.NewErrorResponse("no_data", "No request data.")
+			return kit.NewErrorResponse("no_data", "No request data.", true)
 		}
 
 		rawQuery, _ := data["query"].(map[string]interface{})
 		if rawQuery == nil {
-			return kit.NewErrorResponse("no_query", "No query in request data.")
+			return kit.NewErrorResponse("no_query", "No query in request data.", true)
 		}
 
-		query, err := db.ParseQuery(rawQuery)
+		collection, _ := rawQuery["collection"].(string)
+		if collection == "" {
+			return kit.NewErrorResponse("empty_collection", "No collection in query", true)
+		}
+
+		resource := registry.Resource(collection)
+		if resource == nil {
+			return kit.NewErrorResponse("unknown_collection", "Unknown collection", true)
+		}
+
+		query, err := db.ParseQuery(resource.Backend(), rawQuery)
 		if err != nil {
 			if err.IsPublic() {
 				return kit.NewErrorResponse(err)

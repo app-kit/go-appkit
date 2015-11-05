@@ -11,7 +11,7 @@ import (
 
 type StrItem struct {
 	Key       string    `db:"primary-key;max:10000"`
-	Value     string    `db:"not-null;max:-1"`
+	Value     string    `db:"required;max:-1"`
 	ExpiresAt time.Time `db:"ignore-zero"`
 	Tags      []string  `db:"ignore-zero;marshal"`
 }
@@ -23,20 +23,20 @@ func (i *StrItem) Collection() string {
 	return "caches"
 }
 
-func (i *StrItem) GetID() interface{} {
+func (i *StrItem) GetId() interface{} {
 	return i.Key
 }
 
-func (i *StrItem) SetID(key interface{}) error {
+func (i *StrItem) SetId(key interface{}) error {
 	i.Key = key.(string)
 	return nil
 }
 
-func (i *StrItem) GetStrID() string {
+func (i *StrItem) GetStrId() string {
 	return i.Key
 }
 
-func (i *StrItem) SetStrID(key string) error {
+func (i *StrItem) SetStrId(key string) error {
 	i.Key = key
 	return nil
 }
@@ -95,7 +95,7 @@ func (i *StrItem) SetTags(x []string) {
 
 type MapItem struct {
 	StrItem
-	Value map[string]interface{} `db:"not-null;max:-1;marshal"`
+	Value map[string]interface{} `db:"required;max:-1;marshal"`
 }
 
 func (i *MapItem) GetValue() interface{} {
@@ -132,7 +132,7 @@ func (i *MapItem) FromString(x string) apperror.Error {
 
 type Item struct {
 	StrItem
-	Value interface{} `db:"not-null;max:-1;marshal"`
+	Value interface{} `db:"required;max:-1;marshal"`
 }
 
 func (i *Item) GetValue() interface{} {

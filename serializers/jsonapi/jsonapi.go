@@ -3,11 +3,11 @@ package jsonapi
 import (
 	"encoding/json"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/theduke/go-apperror"
 	db "github.com/theduke/go-dukedb"
+	"github.com/theduke/go-reflector"
 
 	kit "github.com/app-kit/go-appkit"
 )
@@ -220,7 +220,7 @@ func ApiModelFromMap(rawData interface{}) (*ApiModel, apperror.Error) {
 
 	model.Type = typ
 
-	// Find ID.
+	// Find Id.
 	rawId, ok := data["id"]
 	if ok && rawId != nil {
 		id, ok := rawId.(string)
@@ -310,7 +310,7 @@ func SerializeModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, ap
 
 	data := &ApiModel{
 		Type:       m.Collection(),
-		Id:         m.GetStrID(),
+		Id:         m.GetStrId(),
 		Attributes: modelData,
 	}
 
@@ -319,41 +319,33 @@ func SerializeModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, ap
 
 	// Check every model  field.
 
-	for fieldName := range info.FieldInfo {
-		field := info.FieldInfo[fieldName]
-
-		if !field.IsRelation() {
-			// Not a relatinship field, so skip.
-			continue
-		}
-
+	r := reflector.R(m).MustStruct()
+	for fieldName, rel := range info.Relations() {
 		// Retrieve the related model.
-		fieldVal, err := db.GetStructField(m, fieldName)
-		if err != nil {
+		field := r.Field(fieldName)
+		if field != nil {
 			return nil, nil, apperror.Wrap(err, "model_get_field_error")
 		}
 
 		// If field is zero value, skip.
-		if db.IsZero(fieldVal.Interface()) {
+		if field.IsZero() {
 			continue
 		}
 
 		related := make([]kit.Model, 0)
 
-		if !field.RelationIsMany {
+		if !rel.IsMany() {
 			// Make sure that we have a pointer.
-			if fieldVal.Type().Kind() == reflect.Struct {
-				fieldVal = fieldVal.Addr()
+			if !field.IsPtr() {
+				field = field.Addr()
 			}
-
-			related = append(related, fieldVal.Interface().(kit.Model))
+			related = append(related, field.Interface().(kit.Model))
 		} else {
-			for i := 0; i < fieldVal.Len(); i++ {
-				item := fieldVal.Index(i)
-				if item.Type().Kind() == reflect.Struct {
+			slice := field.MustSlice()
+			for _, item := range slice.Items() {
+				if !item.IsPtr() {
 					item = item.Addr()
 				}
-
 				related = append(related, item.Interface().(kit.Model))
 			}
 		}
@@ -368,11 +360,11 @@ func SerializeModel(backend db.Backend, m kit.Model) (*ApiModel, []*ApiModel, ap
 			// Build relation info and set in in relationships map.
 			relation := &ApiModel{
 				Type: relatedModel.Collection(),
-				Id:   relatedModel.GetStrID(),
+				Id:   relatedModel.GetStrId(),
 			}
 
-			isSingle := !field.RelationIsMany
-			data.AddRelation(field.MarshalName, relation, isSingle)
+			isSingle := !rel.IsMany()
+			data.AddRelation(rel.MarshalName(), relation, isSingle)
 
 			// Add related model to included data.
 			includedModels = append(includedModels, relationData)
@@ -525,15 +517,16 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 		}
 		rawModel = model
 	} else {
-		rawModel, _ = backend.CreateModel(data.Type)
+		rawModel = info.New()
 	}
 
 	model := rawModel.(kit.Model)
+	modelReflector := reflector.R(model).MustStruct()
 
 	fieldData := make(map[string]interface{})
-	for key := range data.Attributes {
-		fieldName := info.MapMarshalName(key)
-		if fieldName == "" {
+	for key, val := range data.Attributes {
+		attr := info.FindAttribute(key)
+		if attr == nil {
 			return nil, &apperror.Err{
 				Public:  true,
 				Code:    "invalid_attribute",
@@ -541,17 +534,17 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 			}
 		}
 
-		fieldData[fieldName] = data.Attributes[key]
+		fieldData[attr.Name()] = val
 	}
 
-	// Set ID if supplied.
+	// Set Id if supplied.
 	if data.Id != "" {
-		if err := model.SetStrID(data.Id); err != nil {
+		if err := model.SetStrId(data.Id); err != nil {
 			return nil, apperror.Wrap(err, "invalid_id", true)
 		}
 	}
 
-	if err := db.UpdateModelFromData(info, model, fieldData); err != nil {
+	if err := info.UpdateModelFromData(model, fieldData); err != nil {
 		return nil, apperror.Wrap(err, "update_model_from_dict_error", "")
 	}
 
@@ -566,11 +559,8 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 			continue
 		}
 
-		if !info.HasField(relationship) {
-			relationship = info.MapMarshalName(relationship)
-		}
-
-		if !info.HasField(relationship) {
+		relInfo := info.FindRelation(relationship)
+		if relInfo == nil {
 			return nil, &apperror.Err{
 				Public:  true,
 				Code:    "invalid_relationship",
@@ -578,19 +568,13 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 			}
 		}
 
-		fieldInfo := info.GetField(relationship)
-		relatedInfo := backend.ModelInfo(fieldInfo.RelationCollection)
+		relatedInfo := relInfo.RelatedModel()
 
-		// Get a new related model for ID conversion.
-		rawModel, err := backend.CreateModel(relatedInfo.Collection)
-		if err != nil {
-			return nil, apperror.Wrap(err, "create_related_model_error")
-		}
-
-		relatedModel := rawModel.(kit.Model)
+		// Get a new related model for Id conversion.
+		relatedModel := relatedInfo.New().(kit.Model)
 
 		// Handle has-one field.
-		if fieldInfo.HasOne {
+		if relInfo.RelationType() == db.RELATION_TYPE_HAS_ONE {
 			if len(items) != 1 {
 				return nil, &apperror.Err{
 					Code:    "multiple_items_for_has_one_relationship",
@@ -599,7 +583,7 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 			}
 
 			item := items[0]
-			if item.Type != fieldInfo.RelationCollection {
+			if item.Type != relInfo.StructName() {
 				return nil, &apperror.Err{
 					Public:  true,
 					Code:    "invalid_relationship_type",
@@ -607,7 +591,7 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 				}
 			}
 
-			targetModel, err := backend.FindOne(fieldInfo.RelationCollection, item.Id)
+			targetModel, err := backend.FindOne(relatedInfo.Collection(), item.Id)
 			if err != nil {
 				return nil, apperror.Wrap(err, "db_error", true)
 			}
@@ -615,26 +599,25 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 				return nil, &apperror.Err{
 					Code: "inexistant_related_item",
 					Message: fmt.Sprintf("Model for relationship %v (collection %v) with id %v does not exist",
-						relationship, fieldInfo.RelationCollection, item.Id),
+						relationship, relatedInfo.Collection(), item.Id),
 				}
 			}
 
-			foreignKey, _ := db.GetStructFieldValue(targetModel, fieldInfo.HasOneForeignField)
-			err2 := db.SetStructField(model, fieldInfo.HasOneField, foreignKey)
-			if err2 != nil {
-				return nil, apperror.Wrap(err2, "assing_relationship_models_error")
+			foreignKey := reflector.R(targetModel).MustStruct().Field(relInfo.ForeignField())
+			if err := modelReflector.SetField(relInfo.LocalField(), foreignKey); err != nil {
+				return nil, apperror.Wrap(err, "assing_relationship_models_error")
 			}
 		}
 
 		// Handle m2m field.
-		if fieldInfo.M2M {
-			// First, collect the IDs of all related models.
+		if relInfo.RelationType() == db.RELATION_TYPE_M2M {
+			// First, collect the Ids of all related models.
 
 			ids := make([]interface{}, 0)
 			for _, item := range items {
 
 				// Ensure that item has the correct collection.
-				if item.Type != relatedInfo.Collection {
+				if item.Type != relatedInfo.Collection() {
 					return nil, &apperror.Err{
 						Public:  true,
 						Code:    "invalid_relationship_type",
@@ -651,7 +634,7 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 				}
 
 				// Use the related model to convert the id.
-				if err := relatedModel.SetStrID(item.Id); err != nil {
+				if err := relatedModel.SetStrId(item.Id); err != nil {
 					return nil, &apperror.Err{
 						Public:  true,
 						Code:    "invalid_relationship_item_id",
@@ -659,11 +642,11 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 					}
 				}
 
-				ids = append(ids, relatedModel.GetID())
+				ids = append(ids, relatedModel.GetId())
 			}
 
 			// Now, query the records from the database.
-			res, err := backend.Q(relatedInfo.Collection).FilterCond(relatedInfo.PkField, "in", ids).Find()
+			res, err := backend.Q(relatedInfo.Collection()).FilterCond(relatedInfo.PkAttribute().BackendName(), "in", ids).Find()
 			if err != nil {
 				return nil, apperror.Wrap(err, "db_error")
 			}
@@ -677,7 +660,7 @@ func (s *Serializer) UnserializeModel(collection string, rawData interface{}) (k
 			}
 
 			// Now we can update the model.
-			if err := db.SetStructModelField(model, fieldInfo.Name, res); err != nil {
+			if err := modelReflector.Field(relInfo.Name()).SetValue(res, true); err != nil {
 				return nil, apperror.Wrap(err, "assing_relationship_models_error")
 			}
 		}

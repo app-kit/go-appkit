@@ -57,7 +57,7 @@ func (PageResource) Methods(res kit.Resource) []kit.Method {
 				return kit.NewErrorResponse("not_found", "The specified page id does not exist.")
 			}
 
-			err = res.Backend().UpdateByMap(rawPage, map[string]interface{}{
+			err = res.ModelInfo().UpdateModelFromData(rawPage, map[string]interface{}{
 				"published":    true,
 				"published_at": time.Now(),
 			})
@@ -76,15 +76,15 @@ func (PageResource) Methods(res kit.Resource) []kit.Method {
 }
 
 func (PageResource) AllowFind(res kit.Resource, obj kit.Model, user kit.User) bool {
-	if p, ok := obj.(*PageIntID); ok && p.Published {
+	if p, ok := obj.(*PageIntId); ok && p.Published {
 		return true
-	} else if p, ok := obj.(*PageStrID); ok && p.Published {
+	} else if p, ok := obj.(*PageStrId); ok && p.Published {
 		return true
 	}
 
 	u := obj.(kit.UserModel)
 
-	return user != nil && (u.GetUserID() == user.GetID() || user.HasRole("admin"))
+	return user != nil && (u.GetUserId() == user.GetId() || user.HasRole("admin"))
 }
 
 func (PageResource) BeforeUpdate(res kit.Resource, obj, oldobj kit.Model, user kit.User) apperror.Error {
@@ -103,7 +103,10 @@ func (PageResource) BeforeDelete(res kit.Resource, obj kit.Model, user kit.User)
 		return err
 	}
 
-	files := m2m.All()
+	files, err := m2m.All()
+	if err != nil {
+		return err
+	}
 
 	// Delete m2m relation.
 	if err := m2m.Clear(); err != nil {

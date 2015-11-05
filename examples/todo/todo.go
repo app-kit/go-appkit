@@ -22,25 +22,25 @@ import (
 )
 
 type Project struct {
-	ID   uint64 `gorm:"primary_key"`
+	Id   uint64 `gorm:"primary_key"`
 	Name string
 
 	Todos []*Todo
 
 	Todo   *Todo
-	TodoID uint64
+	TodoId uint64
 }
 
-func (b Project) GetID() string {
-	return strconv.FormatUint(b.ID, 10)
+func (b Project) GetId() string {
+	return strconv.FormatUint(b.Id, 10)
 }
 
-func (b Project) SetID(rawId string) error {
+func (b Project) SetId(rawId string) error {
 	id, err := strconv.ParseUint(rawId, 10, 64)
 	if err != nil {
 		return err
 	}
-	b.ID = id
+	b.Id = id
 	return nil
 }
 
@@ -57,7 +57,7 @@ func (p ProjectHooks) BeforeCreate(res kit.Resource, obj kit.Model, user kit.Use
 }
 
 type Todo struct {
-	ID uint64 `gorm:"primary_key"`
+	Id uint64 `gorm:"primary_key"`
 
 	Name     string
 	Comments string
@@ -65,19 +65,19 @@ type Todo struct {
 	Priority int
 
 	Project   *Project
-	ProjectID uint64
+	ProjectId uint64
 }
 
-func (b Todo) GetID() string {
-	return strconv.FormatUint(b.ID, 10)
+func (b Todo) GetId() string {
+	return strconv.FormatUint(b.Id, 10)
 }
 
-func (b Todo) SetID(rawId string) error {
+func (b Todo) SetId(rawId string) error {
 	id, err := strconv.ParseUint(rawId, 10, 64)
 	if err != nil {
 		return err
 	}
-	b.ID = id
+	b.Id = id
 	return nil
 }
 

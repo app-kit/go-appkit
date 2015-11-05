@@ -35,8 +35,8 @@ import (
 )
 
 type App struct {
-	// Unique app instance ID.
-	instanceID string
+	// Unique app instance Id.
+	instanceId string
 
 	registry kit.Registry
 
@@ -81,12 +81,12 @@ func NewApp(cfgPaths ...string) *App {
 	return app
 }
 
-func (a *App) InstanceID() string {
-	return a.instanceID
+func (a *App) InstanceId() string {
+	return a.instanceId
 }
 
-func (a *App) SetInstanceID(x string) {
-	a.instanceID = x
+func (a *App) SetInstanceId(x string) {
+	a.instanceId = x
 }
 
 func (a *App) Defaults() {
@@ -287,7 +287,7 @@ func (a *App) ReadConfig(path string) {
 func (a *App) PrepareBackends() {
 	backends := a.registry.Backends()
 	for name := range backends {
-		backends[name].BuildRelationshipInfo()
+		backends[name].Build()
 	}
 }
 
@@ -392,7 +392,7 @@ func (a *App) Crawl() {
  */
 
 func (a *App) RegisterBackend(b db.Backend) {
-	if b.GetLogger() == nil {
+	if b.Logger() == nil {
 		b.SetLogger(a.Logger())
 	}
 

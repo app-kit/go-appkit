@@ -102,12 +102,12 @@ var _ = Describe("Json", func() {
 		model := rawModel.(*tests.TestModel)
 		Expect(model.StrVal).To(Equal("val"))
 		Expect(model.IntVal).To(Equal(int64(33)))
-		Expect(model.GetID()).To(Equal("33"))
+		Expect(model.GetId()).To(Equal("33"))
 	})
 
 	It("Should convert single model response", func() {
 		model := &tests.TestModel{
-			ID:     33,
+			Id:     33,
 			StrVal: "val",
 			IntVal: 33,
 		}
@@ -128,13 +128,13 @@ var _ = Describe("Json", func() {
 
 	It("Should convert multiple model response", func() {
 		model1 := &tests.TestModel{
-			ID:     1,
+			Id:     1,
 			StrVal: "val1",
 			IntVal: 1,
 		}
 
 		model2 := &tests.TestModel{
-			ID:     2,
+			Id:     2,
 			StrVal: "val2",
 			IntVal: 2,
 		}
@@ -163,7 +163,7 @@ var _ = Describe("Json", func() {
 		Expect(json.Unmarshal(newResp.GetRawData(), &data)).ToNot(HaveOccurred())
 
 		modelData := data.Data
-		Expect(modelData.Id).To(Equal(model.GetID()))
-		Expect(modelData.GetRelation("child")[0].Id).To(Equal(model.Child.GetID()))
+		Expect(modelData.Id).To(Equal(model.GetId()))
+		Expect(modelData.GetRelation("child")[0].Id).To(Equal(model.Child.GetId()))
 	})
 })
