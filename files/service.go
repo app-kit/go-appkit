@@ -7,8 +7,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/theduke/go-apperror"
-
 	kit "github.com/app-kit/go-appkit"
 	"github.com/app-kit/go-appkit/files/backends/fs"
 	"github.com/app-kit/go-appkit/resources"
@@ -121,7 +119,7 @@ func (h FileService) BuildFileFromPath(bucket, path string, deleteFile bool) (ki
 }
 
 func (h FileService) BuildFile(file kit.File, user kit.User, deleteDir, deleteFile bool) apperror.Error {
-	if h.DefaultBackend == nil {
+	if h.DefaultBackend() == nil {
 		return &apperror.Err{
 			Code:    "no_default_backend",
 			Message: "Cant build a file without a default backend.",
